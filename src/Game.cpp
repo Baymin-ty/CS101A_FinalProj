@@ -185,6 +185,43 @@ void Game::resetGame()
   NetworkManager::getInstance().disconnect();
 }
 
+void Game::restartMultiplayer()
+{
+  // 重新开始多人游戏，使用已有的迷宫数据
+  if (!m_generatedMazeData.empty()) {
+    m_maze.loadFromString(m_generatedMazeData);
+  }
+  
+  // 设置玩家位置
+  sf::Vector2f startPos = m_maze.getPlayerStartPosition();
+  
+  // 重新创建本地玩家
+  m_player = std::make_unique<Tank>();
+  m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                         "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+  m_player->setPosition(startPos);
+  m_player->setScale(m_tankScale);
+  
+  // 重新创建其他玩家
+  m_otherPlayer = std::make_unique<Tank>();
+  m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
+                               "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+  m_otherPlayer->setPosition(startPos);
+  m_otherPlayer->setScale(m_tankScale);
+  
+  // 重置状态
+  m_localPlayerReachedExit = false;
+  m_otherPlayerReachedExit = false;
+  m_gameOver = false;
+  m_gameWon = false;
+  m_bullets.clear();
+  
+  // 初始化相机位置
+  m_gameView.setCenter(startPos);
+  
+  m_gameState = GameState::Multiplayer;
+}
+
 void Game::run()
 {
   while (m_window.isOpen())
@@ -374,7 +411,11 @@ void Game::processEvents()
       {
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
-          startGame(); // 重新开始
+          if (m_isMultiplayer) {
+            restartMultiplayer(); // 多人模式重新开始
+          } else {
+            startGame(); // 单机模式重新开始
+          }
         }
         else if (keyPressed->code == sf::Keyboard::Key::Escape)
         {

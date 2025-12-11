@@ -71,6 +71,7 @@ private:
   void spawnEnemies();
   void resetGame();
   void startGame();
+  void restartMultiplayer();  // 重新开始多人游戏
   void updateCamera();
   void generateRandomMaze();
 

@@ -25,9 +25,15 @@ public:
 
   // 获取/设置旋转角度
   float getRotation() const { return m_hullAngle; }
-  void setRotation(float angle) { m_hullAngle = angle; }
+  void setRotation(float angle) { 
+    m_hullAngle = angle; 
+    if (m_hull) m_hull->setRotation(sf::degrees(m_hullAngle));
+  }
   float getTurretRotation() const { return m_turretAngle; }
-  void setTurretRotation(float angle) { m_turretAngle = angle; }
+  void setTurretRotation(float angle) { 
+    m_turretAngle = angle; 
+    if (m_turret) m_turret->setRotation(sf::degrees(m_turretAngle));
+  }
 
   // 获取枪口位置
   sf::Vector2f getGunPosition() const;

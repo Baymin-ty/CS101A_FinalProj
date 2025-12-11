@@ -183,6 +183,10 @@ void Tank::setPosition(sf::Vector2f pos)
   {
     m_hull->setPosition(pos);
   }
+  if (m_turret)
+  {
+    m_turret->setPosition(pos);
+  }
 }
 
 sf::Vector2f Tank::getPosition() const
