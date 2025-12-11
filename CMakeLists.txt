@@ -22,6 +22,7 @@ set(SOURCES
   src/Enemy.cpp
   src/Maze.cpp
   src/MazeGenerator.cpp
+  src/NetworkManager.cpp
 )
 
 # 头文件
@@ -34,6 +35,7 @@ set(HEADERS
   src/include/Enemy.hpp
   src/include/Maze.hpp
   src/include/MazeGenerator.hpp
+  src/include/NetworkManager.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})
@@ -42,4 +44,4 @@ target_include_directories(CS101AFinalProj PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/include
 )
-target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics)
+target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics SFML::Network)

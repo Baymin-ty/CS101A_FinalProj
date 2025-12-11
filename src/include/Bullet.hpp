@@ -2,6 +2,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <vector>
+#include <memory>
 #include "Utils.hpp"
 
 // 前向声明
@@ -17,18 +18,23 @@ class Bullet
 {
 public:
   Bullet(const sf::Texture &texture, sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner);
+  
+  // 简易构造函数（不需要纹理）
+  Bullet(float x, float y, float angleDegrees, bool isPlayer, sf::Color color = sf::Color::Yellow);
 
   void update(float dt);
   void draw(sf::RenderWindow &window) const;
+  void render(sf::RenderWindow &window) const { draw(window); }
 
   bool isActive() const { return m_active; }
+  bool isAlive() const { return m_active; }
   void setInactive() { m_active = false; }
 
   // 检查是否出界
   void checkBounds(float width, float height);
 
   // 碰撞检测
-  sf::Vector2f getPosition() const { return m_sprite.getPosition(); }
+  sf::Vector2f getPosition() const;
   BulletOwner getOwner() const { return m_owner; }
 
   // 获取伤害值
@@ -36,11 +42,17 @@ public:
   void setDamage(float damage) { m_damage = damage; }
 
 private:
-  sf::Sprite m_sprite;
+  std::unique_ptr<sf::Sprite> m_sprite;
+  const sf::Texture* m_texture = nullptr;
   sf::Vector2f m_velocity;
+  sf::Vector2f m_position;
+  sf::Color m_color = sf::Color::Yellow;
   bool m_active = true;
+  bool m_useSimpleGraphics = false;
   BulletOwner m_owner;
   float m_damage = 25.f;
+  float m_speed = 500.f;
+  float m_angle = 0.f;
 };
 
 // 管理所有子弹

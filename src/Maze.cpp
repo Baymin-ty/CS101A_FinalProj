@@ -78,6 +78,17 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   }
 }
 
+void Maze::generateRandomMaze(int width, int height, unsigned int seed)
+{
+  MazeGenerator generator(width, height);
+  if (seed != 0) {
+    generator.setSeed(seed);
+  }
+  generator.setEnemyCount(0); // 多人模式不需要敌人
+  std::vector<std::string> mazeData = generator.generate();
+  loadFromString(mazeData);
+}
+
 void Maze::update(float dt)
 {
   (void)dt;

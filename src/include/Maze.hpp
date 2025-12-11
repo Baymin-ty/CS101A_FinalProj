@@ -5,6 +5,7 @@
 #include <string>
 #include <queue>
 #include <unordered_map>
+#include "MazeGenerator.hpp"
 
 // 墙体类型
 enum class WallType
@@ -57,8 +58,12 @@ public:
   // 'X' = 敌人位置
   void loadFromString(const std::vector<std::string> &map);
 
+  // 生成随机迷宫（使用 MazeGenerator）
+  void generateRandomMaze(int width, int height, unsigned int seed = 0);
+
   void update(float dt);
   void draw(sf::RenderWindow &window) const;
+  void render(sf::RenderWindow &window) const { draw(window); } // 别名
 
   // 碰撞检测
   bool checkCollision(sf::Vector2f position, float radius) const;
@@ -68,6 +73,7 @@ public:
 
   // 获取起点位置
   sf::Vector2f getStartPosition() const { return m_startPosition; }
+  sf::Vector2f getPlayerStartPosition() const { return m_startPosition; }
 
   // 获取出口位置
   sf::Vector2f getExitPosition() const { return m_exitPosition; }
