@@ -5,59 +5,23 @@
 Game::Game()
     : m_window(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game"),
       m_gameView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)})),
-      m_uiView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)}))
+      m_uiView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)})),
+      m_mazeGenerator(31, 21) // 默认中等尺寸
 {
   m_window.setFramerateLimit(60);
 }
 
 bool Game::init()
 {
-  // 定义迷宫地图
-  // '#' = 不可破坏墙, '*' = 可破坏墙, '.' = 空地, 'S' = 起点, 'E' = 出口, 'X' = 敌人
-  std::vector<std::string> mazeMap = {
-      "###############################################",
-      "#S..#.....#.....*.....#.......#.....#.......E#",
-      "#...#.###.#.###.*.###.#.#####.#.###.#.#####.##",
-      "#.###.#...#.#.#.*.#.....#...#.#.#...#.#.....##",
-      "#.....#.###.#.#.#.#####.#.#.#.#.#.###.#.######",
-      "#####.#.#...#...#.#X....#.#.#...#.#...#......#",
-      "#.....#.#.#####.###.###.#.#.#####.#.#######..#",
-      "#.#####.#.....#.....#.#.#.#.....#.#.....#....#",
-      "#.#.....#####.#######.#.#.#####.#.#####.#.####",
-      "#.#.#####...#.........#.#.....#.#.....#.#....#",
-      "#.#.....#.#.###########.#####.#.#####.#.####.#",
-      "#.#####.#.#.....*.....#.....#.#...X.#.#....#.#",
-      "#.....#.#.#####.*.###.#####.#####.#.#.####.#.#",
-      "#####.#.#.......*.#.....X...#.....#.#....#.#.#",
-      "#.....#.###########.#######.#.#####.####.#.#.#",
-      "#.###.#.....#.....#.#.....#.#.#.........X#.#.#",
-      "#.#...#####.#.###.#.#.###*#.#.#.#########.#.#",
-      "#.#.#.....#.#.#X..#...#.#...#...#.........#.#",
-      "#.#.#.###.#.#.#.#####.#.#####.###.#########.#",
-      "#.#.#.#...#.#.#.....#.#.....#.#...#.........#",
-      "#.#.#.#.###.#.#####.#.#####.#.#.###.#########",
-      "#...#.#.....#.......*.....#.#.#.....*.......#",
-      "#.###.#######.#####.*.###.#.#.#######.#####.#",
-      "#.#...........#...#.*.#...#.#.......#.#...#.#",
-      "#.#############.#.#.#.#.###.#######.#.#.#.#.#",
-      "#...............#...#.#.............#...#...#",
-      "###############################################",
-  };
-
-  m_maze.loadFromString(mazeMap);
-
-  // 创建玩家
-  m_player = std::make_unique<Tank>();
-
-  // 加载玩家坦克纹理
-  if (!m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                              "tank_assets/PNG/Weapon_Color_A/Gun_01.png"))
+  // 加载字体
+  if (!m_font.openFromFile("/System/Library/Fonts/Helvetica.ttc"))
   {
-    return false;
+    // 尝试其他字体
+    if (!m_font.openFromFile("/System/Library/Fonts/Arial.ttf"))
+    {
+      return false;
+    }
   }
-
-  // 设置玩家到起点
-  m_player->setPosition(m_maze.getStartPosition());
 
   // 加载子弹纹理
   if (!m_bulletTexture.loadFromFile("tank_assets/PNG/Effects/Medium_Shell.png"))
@@ -67,10 +31,81 @@ bool Game::init()
 
   m_bulletManager.setTexture(m_bulletTexture);
 
+  return true;
+}
+
+void Game::generateRandomMaze()
+{
+  int width = m_widthOptions[m_widthIndex];
+  int height = m_heightOptions[m_heightIndex];
+  m_mazeGenerator = MazeGenerator(width, height);
+
+  // 使用菜单中选择的敌人数量
+  int enemyCount = m_enemyOptions[m_enemyIndex];
+  m_mazeGenerator.setEnemyCount(enemyCount);
+  m_mazeGenerator.setDestructibleRatio(0.15f);
+
+  auto mazeMap = m_mazeGenerator.generate();
+  m_maze.loadFromString(mazeMap);
+}
+
+void Game::startGame()
+{
+  if (m_useRandomMap)
+  {
+    generateRandomMaze();
+  }
+  else
+  {
+    // 使用固定地图
+    std::vector<std::string> mazeMap = {
+        "###############################################",
+        "#S..#.....#.....*.....#.......#.....#.......E#",
+        "#...#.###.#.###.*.###.#.#####.#.###.#.#####.##",
+        "#.###.#...#.#.#.*.#.....#...#.#.#...#.#.....##",
+        "#.....#.###.#.#.#.#####.#.#.#.#.#.###.#.######",
+        "#####.#.#...#...#.#X....#.#.#...#.#...#......#",
+        "#.....#.#.#####.###.###.#.#.#####.#.#######..#",
+        "#.#####.#.....#.....#.#.#.#.....#.#.....#....#",
+        "#.#.....#####.#######.#.#.#####.#.#####.#.####",
+        "#.#.#####...#.........#.#.....#.#.....#.#....#",
+        "#.#.....#.#.###########.#####.#.#####.#.####.#",
+        "#.#####.#.#.....*.....#.....#.#...X.#.#....#.#",
+        "#.....#.#.#####.*.###.#####.#####.#.#.####.#.#",
+        "#####.#.#.......*.#.....X...#.....#.#....#.#.#",
+        "#.....#.###########.#######.#.#####.####.#.#.#",
+        "#.###.#.....#.....#.#.....#.#.#.........X#.#.#",
+        "#.#...#####.#.###.#.#.###*#.#.#.#########.#.#",
+        "#.#.#.....#.#.#X..#...#.#...#...#.........#.#",
+        "#.#.#.###.#.#.#.#####.#.#####.###.#########.#",
+        "#.#.#.#...#.#.#.....#.#.....#.#...#.........#",
+        "#.#.#.#.###.#.#####.#.#####.#.#.###.#########",
+        "#...#.#.....#.......*.....#.#.#.....*.......#",
+        "#.###.#######.#####.*.###.#.#.#######.#####.#",
+        "#.#...........#...#.*.#...#.#.......#.#...#.#",
+        "#.#############.#.#.#.#.###.#######.#.#.#.#.#",
+        "#...............#...#.#.............#...#...#",
+        "###############################################",
+    };
+    m_maze.loadFromString(mazeMap);
+  }
+
+  // 创建玩家
+  m_player = std::make_unique<Tank>();
+
+  // 加载玩家坦克纹理
+  m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                         "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+
+  // 设置玩家到起点
+  m_player->setPosition(m_maze.getStartPosition());
+
   // 在指定位置生成敌人
   spawnEnemies();
 
-  return true;
+  m_gameState = GameState::Playing;
+  m_gameOver = false;
+  m_gameWon = false;
 }
 
 void Game::spawnEnemies()
@@ -93,15 +128,12 @@ void Game::spawnEnemies()
 
 void Game::resetGame()
 {
+  m_gameState = GameState::MainMenu;
   m_gameOver = false;
   m_gameWon = false;
   m_enemies.clear();
-
-  m_player = std::make_unique<Tank>();
-  m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                         "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
-  m_player->setPosition(m_maze.getStartPosition());
-  spawnEnemies();
+  m_bulletManager.clear();
+  m_player.reset();
 }
 
 void Game::run()
@@ -110,11 +142,112 @@ void Game::run()
   {
     float dt = m_clock.restart().asSeconds();
     processEvents();
-    if (!m_gameOver)
+
+    switch (m_gameState)
     {
+    case GameState::MainMenu:
+      // 菜单不需要 update
+      break;
+    case GameState::Playing:
       update(dt);
+      break;
+    case GameState::GameOver:
+    case GameState::Victory:
+      // 游戏结束/胜利状态不需要 update
+      break;
     }
+
     render();
+  }
+}
+
+void Game::processMenuEvents(const sf::Event &event)
+{
+  if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>())
+  {
+    int optionCount = static_cast<int>(MenuOption::Count);
+
+    switch (keyPressed->code)
+    {
+    case sf::Keyboard::Key::Up:
+    case sf::Keyboard::Key::W:
+    {
+      int current = static_cast<int>(m_selectedOption);
+      current = (current - 1 + optionCount) % optionCount;
+      m_selectedOption = static_cast<MenuOption>(current);
+      break;
+    }
+    case sf::Keyboard::Key::Down:
+    case sf::Keyboard::Key::S:
+    {
+      int current = static_cast<int>(m_selectedOption);
+      current = (current + 1) % optionCount;
+      m_selectedOption = static_cast<MenuOption>(current);
+      break;
+    }
+    case sf::Keyboard::Key::Enter:
+    case sf::Keyboard::Key::Space:
+      switch (m_selectedOption)
+      {
+      case MenuOption::StartGame:
+        startGame();
+        break;
+      case MenuOption::ToggleRandomMap:
+        m_useRandomMap = !m_useRandomMap;
+        break;
+      case MenuOption::MapWidth:
+        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+        break;
+      case MenuOption::MapHeight:
+        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+        break;
+      case MenuOption::EnemyCount:
+        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        break;
+      case MenuOption::Exit:
+        m_window.close();
+        break;
+      default:
+        break;
+      }
+      break;
+    case sf::Keyboard::Key::Left:
+    case sf::Keyboard::Key::A:
+      switch (m_selectedOption)
+      {
+      case MenuOption::MapWidth:
+        m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+        break;
+      case MenuOption::MapHeight:
+        m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
+        break;
+      case MenuOption::EnemyCount:
+        m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
+        break;
+      default:
+        break;
+      }
+      break;
+    case sf::Keyboard::Key::Right:
+    case sf::Keyboard::Key::D:
+      switch (m_selectedOption)
+      {
+      case MenuOption::MapWidth:
+        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+        break;
+      case MenuOption::MapHeight:
+        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+        break;
+      case MenuOption::EnemyCount:
+        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        break;
+      default:
+        break;
+      }
+      break;
+    default:
+      break;
+    }
   }
 }
 
@@ -127,18 +260,41 @@ void Game::processEvents()
       m_window.close();
     }
 
-    // 按 R 重新开始
-    if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
+    switch (m_gameState)
     {
-      if (keyPressed->code == sf::Keyboard::Key::R && m_gameOver)
-      {
-        resetGame();
-      }
-    }
+    case GameState::MainMenu:
+      processMenuEvents(*event);
+      break;
 
-    if (!m_gameOver && m_player)
-    {
-      m_player->handleInput(*event);
+    case GameState::Playing:
+      if (m_player)
+      {
+        m_player->handleInput(*event);
+      }
+      // 按 ESC 返回菜单
+      if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
+      {
+        if (keyPressed->code == sf::Keyboard::Key::Escape)
+        {
+          resetGame();
+        }
+      }
+      break;
+
+    case GameState::GameOver:
+    case GameState::Victory:
+      if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
+      {
+        if (keyPressed->code == sf::Keyboard::Key::R)
+        {
+          startGame(); // 重新开始
+        }
+        else if (keyPressed->code == sf::Keyboard::Key::Escape)
+        {
+          resetGame(); // 返回菜单
+        }
+      }
+      break;
     }
   }
 }
@@ -203,6 +359,7 @@ void Game::update(float dt)
   {
     m_gameWon = true;
     m_gameOver = true;
+    m_gameState = GameState::Victory;
   }
 
   // 更新视角
@@ -259,6 +416,7 @@ void Game::update(float dt)
   if (m_player->isDead())
   {
     m_gameOver = true;
+    m_gameState = GameState::GameOver;
   }
 }
 
@@ -344,6 +502,96 @@ void Game::render()
 {
   m_window.clear(sf::Color(30, 30, 30));
 
+  switch (m_gameState)
+  {
+  case GameState::MainMenu:
+    renderMenu();
+    break;
+  case GameState::Playing:
+  case GameState::GameOver:
+  case GameState::Victory:
+    renderGame();
+    if (m_gameState != GameState::Playing)
+    {
+      renderGameOver();
+    }
+    break;
+  }
+
+  m_window.display();
+}
+
+void Game::renderMenu()
+{
+  m_window.setView(m_uiView);
+
+  // 标题
+  sf::Text title(m_font);
+  title.setString("TANK MAZE");
+  title.setCharacterSize(72);
+  title.setFillColor(sf::Color::White);
+  title.setStyle(sf::Text::Bold);
+  sf::FloatRect titleBounds = title.getLocalBounds();
+  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, 80.f});
+  m_window.draw(title);
+
+  // 菜单选项
+  float startY = 200.f;
+  float spacing = 50.f;
+
+  std::vector<std::string> options = {
+      "Start Game",
+      std::string("Random Map: ") + (m_useRandomMap ? "ON" : "OFF"),
+      std::string("Map Width: < ") + std::to_string(m_widthOptions[m_widthIndex]) + " >",
+      std::string("Map Height: < ") + std::to_string(m_heightOptions[m_heightIndex]) + " >",
+      std::string("Enemies: < ") + std::to_string(m_enemyOptions[m_enemyIndex]) + " >",
+      "Exit"};
+
+  for (size_t i = 0; i < options.size(); ++i)
+  {
+    sf::Text optionText(m_font);
+    optionText.setString(options[i]);
+    optionText.setCharacterSize(32);
+
+    if (static_cast<int>(i) == static_cast<int>(m_selectedOption))
+    {
+      optionText.setFillColor(sf::Color::Yellow);
+      optionText.setString("> " + options[i] + " <");
+    }
+    else
+    {
+      optionText.setFillColor(sf::Color(180, 180, 180));
+    }
+
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({(m_screenWidth - bounds.size.x) / 2.f, startY + i * spacing});
+    m_window.draw(optionText);
+  }
+
+  // 地图预览信息
+  sf::Text mapInfo(m_font);
+  int totalCells = m_widthOptions[m_widthIndex] * m_heightOptions[m_heightIndex];
+  mapInfo.setString("Map: " + std::to_string(m_widthOptions[m_widthIndex]) + " x " +
+                    std::to_string(m_heightOptions[m_heightIndex]) + " = " +
+                    std::to_string(totalCells) + " cells");
+  mapInfo.setCharacterSize(20);
+  mapInfo.setFillColor(sf::Color(100, 180, 100));
+  sf::FloatRect mapInfoBounds = mapInfo.getLocalBounds();
+  mapInfo.setPosition({(m_screenWidth - mapInfoBounds.size.x) / 2.f, m_screenHeight - 120.f});
+  m_window.draw(mapInfo);
+
+  // 提示
+  sf::Text hint(m_font);
+  hint.setString("W/S: Navigate | A/D or Left/Right: Adjust values | Enter: Select");
+  hint.setCharacterSize(18);
+  hint.setFillColor(sf::Color(120, 120, 120));
+  sf::FloatRect hintBounds = hint.getLocalBounds();
+  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight - 60.f});
+  m_window.draw(hint);
+}
+
+void Game::renderGame()
+{
   // 使用游戏视图绘制游戏世界
   m_window.setView(m_gameView);
 
@@ -373,30 +621,38 @@ void Game::render()
   {
     m_player->drawUI(m_window);
   }
+}
 
-  // 显示游戏结束/胜利信息
-  if (m_gameOver)
+void Game::renderGameOver()
+{
+  m_window.setView(m_uiView);
+
+  // 半透明背景
+  sf::RectangleShape overlay({static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)});
+  overlay.setFillColor(sf::Color(0, 0, 0, 150));
+  m_window.draw(overlay);
+
+  sf::Text text(m_font);
+  if (m_gameWon)
   {
-    sf::Font font;
-    // 尝试加载系统字体，如果失败则跳过文字显示
-    if (font.openFromFile("/System/Library/Fonts/Helvetica.ttc"))
-    {
-      sf::Text text(font);
-      if (m_gameWon)
-      {
-        text.setString("YOU WIN!\nPress R to restart");
-        text.setFillColor(sf::Color::Green);
-      }
-      else
-      {
-        text.setString("GAME OVER\nPress R to restart");
-        text.setFillColor(sf::Color::Red);
-      }
-      text.setCharacterSize(48);
-      text.setPosition({m_screenWidth / 2.f - 150.f, m_screenHeight / 2.f - 50.f});
-      m_window.draw(text);
-    }
+    text.setString("YOU WIN!");
+    text.setFillColor(sf::Color::Green);
   }
+  else
+  {
+    text.setString("GAME OVER");
+    text.setFillColor(sf::Color::Red);
+  }
+  text.setCharacterSize(64);
+  sf::FloatRect bounds = text.getLocalBounds();
+  text.setPosition({(m_screenWidth - bounds.size.x) / 2.f, m_screenHeight / 2.f - 80.f});
+  m_window.draw(text);
 
-  m_window.display();
+  sf::Text hint(m_font);
+  hint.setString("Press R to restart, ESC for menu");
+  hint.setCharacterSize(28);
+  hint.setFillColor(sf::Color::White);
+  sf::FloatRect hintBounds = hint.getLocalBounds();
+  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight / 2.f + 20.f});
+  m_window.draw(hint);
 }

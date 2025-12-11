@@ -7,6 +7,28 @@
 #include "Bullet.hpp"
 #include "Enemy.hpp"
 #include "Maze.hpp"
+#include "MazeGenerator.hpp"
+
+// 游戏状态枚举
+enum class GameState
+{
+  MainMenu,
+  Playing,
+  GameOver,
+  Victory
+};
+
+// 菜单选项枚举
+enum class MenuOption
+{
+  StartGame,
+  ToggleRandomMap,
+  MapWidth,
+  MapHeight,
+  EnemyCount,
+  Exit,
+  Count // 用于计数
+};
 
 class Game
 {
@@ -18,12 +40,18 @@ public:
 
 private:
   void processEvents();
+  void processMenuEvents(const sf::Event &event);
   void update(float dt);
   void render();
+  void renderMenu();
+  void renderGame();
+  void renderGameOver();
   void checkCollisions();
   void spawnEnemies();
   void resetGame();
+  void startGame();
   void updateCamera();
+  void generateRandomMaze();
 
   // 配置（放在前面以便初始化列表使用）
   const unsigned int m_screenWidth = 1280;
@@ -40,11 +68,28 @@ private:
   std::vector<std::unique_ptr<Enemy>> m_enemies;
   BulletManager m_bulletManager;
   Maze m_maze;
+  MazeGenerator m_mazeGenerator;
 
   sf::Texture m_bulletTexture;
+  sf::Font m_font;
 
   sf::Clock m_clock;
   sf::Clock m_shootClock;
+
+  // 游戏状态
+  GameState m_gameState = GameState::MainMenu;
+  MenuOption m_selectedOption = MenuOption::StartGame;
+  bool m_useRandomMap = true;
+
+  // 地图尺寸选项
+  std::vector<int> m_widthOptions = {21, 31, 41, 51, 61, 71};
+  std::vector<int> m_heightOptions = {15, 21, 31, 41, 51};
+  int m_widthIndex = 2;  // 默认 41
+  int m_heightIndex = 2; // 默认 31
+
+  // 敌人数量选项
+  std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30};
+  int m_enemyIndex = 3; // 默认 10
 
   bool m_gameOver = false;
   bool m_gameWon = false;

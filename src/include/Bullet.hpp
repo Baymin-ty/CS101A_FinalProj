@@ -59,6 +59,9 @@ public:
   // 检查与墙壁的碰撞
   void checkWallCollision(Maze &maze);
 
+  // 清空所有子弹
+  void clear() { m_bullets.clear(); }
+
 private:
   const sf::Texture *m_texture = nullptr;
   std::vector<Bullet> m_bullets;

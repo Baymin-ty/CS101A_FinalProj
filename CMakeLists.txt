@@ -21,6 +21,7 @@ set(SOURCES
   src/HealthBar.cpp
   src/Enemy.cpp
   src/Maze.cpp
+  src/MazeGenerator.cpp
 )
 
 # 头文件
@@ -32,6 +33,7 @@ set(HEADERS
   src/include/HealthBar.hpp
   src/include/Enemy.hpp
   src/include/Maze.hpp
+  src/include/MazeGenerator.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})
