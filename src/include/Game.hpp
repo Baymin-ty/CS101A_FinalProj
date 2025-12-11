@@ -67,6 +67,7 @@ private:
   void renderWaitingForPlayer();
   void renderMultiplayer();
   void checkCollisions();
+  void checkMultiplayerCollisions();
   void spawnEnemies();
   void resetGame();
   void startGame();

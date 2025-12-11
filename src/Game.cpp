@@ -651,6 +651,57 @@ void Game::checkCollisions()
       m_bullets.end());
 }
 
+void Game::checkMultiplayerCollisions()
+{
+  if (!m_player || !m_otherPlayer)
+    return;
+
+  // 检查子弹碰撞
+  for (auto &bullet : m_bullets)
+  {
+    if (!bullet->isAlive())
+      continue;
+
+    sf::Vector2f bulletPos = bullet->getPosition();
+
+    // 检查与墙壁碰撞（可拆墙）
+    if (m_maze.bulletHit(bulletPos, bullet->getDamage()))
+    {
+      bullet->setInactive();
+      continue;
+    }
+
+    // 检查与本地玩家的碰撞（对方子弹，BulletOwner::Enemy代表对方玩家）
+    if (bullet->getOwner() == BulletOwner::Enemy)
+    {
+      float dist = std::hypot(bulletPos.x - m_player->getPosition().x,
+                               bulletPos.y - m_player->getPosition().y);
+      if (dist < m_player->getCollisionRadius() + 5.f)
+      {
+        m_player->takeDamage(bullet->getDamage());
+        bullet->setInactive();
+        continue;
+      }
+    }
+    
+    // 检查与对方玩家的碰撞（本地玩家子弹，BulletOwner::Player）
+    // 注意：这是本地模拟，实际判定应该由对方客户端处理
+    // 这里只是为了显示效果
+    if (bullet->getOwner() == BulletOwner::Player)
+    {
+      float dist = std::hypot(bulletPos.x - m_otherPlayer->getPosition().x,
+                               bulletPos.y - m_otherPlayer->getPosition().y);
+      if (dist < m_otherPlayer->getCollisionRadius() + 5.f)
+      {
+        // 对方玩家被击中的效果可以在这里处理
+        // 但实际伤害判定应该由对方客户端处理
+        bullet->setInactive();
+        continue;
+      }
+    }
+  }
+}
+
 void Game::render()
 {
   m_window.clear(sf::Color(30, 30, 30));
@@ -915,11 +966,18 @@ void Game::setupNetworkCallbacks()
     // 设置玩家位置
     sf::Vector2f startPos = m_maze.getPlayerStartPosition();
     
-    m_player = std::make_unique<Tank>(startPos.x, startPos.y, sf::Color::Blue);
+    // 创建本地玩家并加载贴图（与单机模式一致）
+    m_player = std::make_unique<Tank>();
+    m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                           "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+    m_player->setPosition(startPos);
     m_player->setScale(m_tankScale);
     
-    // 设置第二个玩家（另一个客户端）
-    m_otherPlayer = std::make_unique<Tank>(startPos.x, startPos.y, sf::Color::Cyan);
+    // 设置第二个玩家（另一个客户端）- 使用不同颜色贴图
+    m_otherPlayer = std::make_unique<Tank>();
+    m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
+                                "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+    m_otherPlayer->setPosition(startPos);
     m_otherPlayer->setScale(m_tankScale);
     
     m_localPlayerReachedExit = false;
@@ -1071,10 +1129,16 @@ void Game::updateMultiplayer(float dt)
     net.sendShoot(bulletPos.x, bulletPos.y, bulletAngle);
   }
   
+  // 更新迷宫（可拆墙动画等）
+  m_maze.update(dt);
+  
   // 更新子弹
   for (auto& bullet : m_bullets) {
     bullet->update(dt);
   }
+  
+  // 子弹碰撞检测（与单人模式类似）
+  checkMultiplayerCollisions();
   
   // 删除超出范围的子弹
   m_bullets.erase(
@@ -1096,6 +1160,12 @@ void Game::updateMultiplayer(float dt)
       m_gameWon = true;
       m_gameState = GameState::Victory;
     }
+  }
+  
+  // 检查玩家是否死亡
+  if (m_player->isDead()) {
+    m_gameOver = true;
+    m_gameState = GameState::GameOver;
   }
   
   // 更新相机
