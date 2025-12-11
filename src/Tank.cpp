@@ -113,6 +113,14 @@ void Tank::drawUI(sf::RenderWindow &window) const
   m_healthBar.draw(window);
 }
 
+void Tank::setPosition(sf::Vector2f pos)
+{
+  if (m_hull)
+  {
+    m_hull->setPosition(pos);
+  }
+}
+
 sf::Vector2f Tank::getPosition() const
 {
   return m_hull->getPosition();
@@ -134,4 +142,18 @@ sf::Vector2f Tank::getGunPosition() const
 void Tank::takeDamage(float damage)
 {
   m_healthBar.setHealth(m_healthBar.getHealth() - damage);
+}
+
+sf::Vector2f Tank::getMovement(float dt) const
+{
+  sf::Vector2f movement{0.f, 0.f};
+  if (m_keyW)
+    movement.y -= m_moveSpeed * dt;
+  if (m_keyS)
+    movement.y += m_moveSpeed * dt;
+  if (m_keyA)
+    movement.x -= m_moveSpeed * dt;
+  if (m_keyD)
+    movement.x += m_moveSpeed * dt;
+  return movement;
 }

@@ -4,6 +4,9 @@
 #include <vector>
 #include "Utils.hpp"
 
+// 前向声明
+class Maze;
+
 enum class BulletOwner
 {
   Player,
@@ -28,11 +31,16 @@ public:
   sf::Vector2f getPosition() const { return m_sprite.getPosition(); }
   BulletOwner getOwner() const { return m_owner; }
 
+  // 获取伤害值
+  float getDamage() const { return m_damage; }
+  void setDamage(float damage) { m_damage = damage; }
+
 private:
   sf::Sprite m_sprite;
   sf::Vector2f m_velocity;
   bool m_active = true;
   BulletOwner m_owner;
+  float m_damage = 25.f;
 };
 
 // 管理所有子弹
@@ -41,12 +49,15 @@ class BulletManager
 public:
   void setTexture(const sf::Texture &texture) { m_texture = &texture; }
 
-  void spawn(sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner = BulletOwner::Player);
+  void spawn(sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner = BulletOwner::Player, float damage = 25.f);
   void update(float dt, float screenWidth, float screenHeight);
   void draw(sf::RenderWindow &window) const;
 
   // 检查与目标的碰撞，返回伤害值
   float checkCollision(sf::Vector2f targetPos, float targetRadius, BulletOwner ignoreOwner);
+
+  // 检查与墙壁的碰撞
+  void checkWallCollision(Maze &maze);
 
 private:
   const sf::Texture *m_texture = nullptr;

@@ -1,4 +1,5 @@
 #include "Bullet.hpp"
+#include "Maze.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -35,11 +36,12 @@ void Bullet::checkBounds(float width, float height)
 }
 
 // BulletManager 实现
-void BulletManager::spawn(sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner)
+void BulletManager::spawn(sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner, float damage)
 {
   if (m_texture)
   {
     m_bullets.emplace_back(*m_texture, position, angleDegrees, speed, owner);
+    m_bullets.back().setDamage(damage);
   }
 }
 
@@ -70,7 +72,6 @@ void BulletManager::draw(sf::RenderWindow &window) const
 float BulletManager::checkCollision(sf::Vector2f targetPos, float targetRadius, BulletOwner ignoreOwner)
 {
   float totalDamage = 0.f;
-  const float bulletDamage = 10.f;
 
   for (auto &bullet : m_bullets)
   {
@@ -85,9 +86,24 @@ float BulletManager::checkCollision(sf::Vector2f targetPos, float targetRadius, 
     if (distance < targetRadius)
     {
       bullet.setInactive();
-      totalDamage += bulletDamage;
+      totalDamage += bullet.getDamage();
     }
   }
 
   return totalDamage;
+}
+
+void BulletManager::checkWallCollision(Maze &maze)
+{
+  for (auto &bullet : m_bullets)
+  {
+    if (!bullet.isActive())
+      continue;
+
+    // 检查子弹是否击中墙壁
+    if (maze.bulletHit(bullet.getPosition(), bullet.getDamage()))
+    {
+      bullet.setInactive();
+    }
+  }
 }

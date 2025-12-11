@@ -17,6 +17,7 @@ public:
   void draw(sf::RenderWindow &window) const;
   void drawUI(sf::RenderWindow &window) const; // 绘制 UI（血条在左上角）
 
+  void setPosition(sf::Vector2f pos);
   sf::Vector2f getPosition() const;
   float getTurretAngle() const;
 
@@ -31,7 +32,10 @@ public:
   bool isDead() const { return m_healthBar.isDead(); }
 
   // 获取碰撞半径
-  float getCollisionRadius() const { return 25.f; }
+  float getCollisionRadius() const { return 18.f; }
+
+  // 获取当前移动向量（用于墙壁滑动）
+  sf::Vector2f getMovement(float dt) const;
 
 private:
   sf::Texture m_hullTexture;
@@ -54,6 +58,6 @@ private:
   // 配置
   const float m_moveSpeed = 200.f;
   const float m_rotationSpeed = 5.f;
-  const float m_scale = 0.35f;
-  const float m_gunLength = 35.f;
+  const float m_scale = 0.25f;
+  const float m_gunLength = 25.f;
 };

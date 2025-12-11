@@ -20,6 +20,7 @@ set(SOURCES
   src/Bullet.cpp
   src/HealthBar.cpp
   src/Enemy.cpp
+  src/Maze.cpp
 )
 
 # 头文件
@@ -30,6 +31,7 @@ set(HEADERS
   src/Bullet.hpp
   src/HealthBar.hpp
   src/Enemy.hpp
+  src/Maze.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})

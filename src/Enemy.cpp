@@ -1,4 +1,5 @@
 #include "Enemy.hpp"
+#include "Maze.hpp"
 #include <cstdlib>
 #include <cmath>
 
@@ -44,43 +45,127 @@ void Enemy::setTarget(sf::Vector2f targetPos)
   m_targetPos = targetPos;
 }
 
-void Enemy::update(float dt)
+void Enemy::update(float dt, const Maze &maze)
 {
   if (!m_hull || !m_turret)
     return;
 
-  // 定期改变移动方向
-  if (m_directionChangeClock.getElapsedTime().asSeconds() > m_directionChangeInterval)
+  // 如果未激活，只是待机（不移动不攻击）
+  if (!m_activated)
   {
-    float angle = static_cast<float>(rand() % 360) * Utils::PI / 180.f;
-    m_moveDirection = {std::cos(angle), std::sin(angle)};
-    m_directionChangeClock.restart();
+    // 炮塔跟随车身位置
+    m_turret->setPosition(m_hull->getPosition());
+    // 更新血条位置
+    sf::Vector2f healthBarPos = m_hull->getPosition();
+    healthBarPos.x -= 25.f;
+    healthBarPos.y -= 45.f;
+    m_healthBar.setPosition(healthBarPos);
+    return;
+  }
+
+  // 保存旧位置
+  sf::Vector2f oldPos = m_hull->getPosition();
+
+  // 定期更新 A* 路径
+  if (m_pathUpdateClock.getElapsedTime().asSeconds() > m_pathUpdateInterval || m_path.empty())
+  {
+    m_path = maze.findPath(oldPos, m_targetPos);
+    m_currentPathIndex = 0;
+    m_pathUpdateClock.restart();
+  }
+
+  // 沿路径移动
+  sf::Vector2f moveTarget = m_targetPos; // 默认直接朝向玩家
+
+  if (!m_path.empty() && m_currentPathIndex < m_path.size())
+  {
+    moveTarget = m_path[m_currentPathIndex];
+
+    // 检查是否接近当前路径点
+    sf::Vector2f toWaypoint = moveTarget - oldPos;
+    float distToWaypoint = std::sqrt(toWaypoint.x * toWaypoint.x + toWaypoint.y * toWaypoint.y);
+
+    if (distToWaypoint < 20.f)
+    {
+      // 移动到下一个路径点
+      m_currentPathIndex++;
+      if (m_currentPathIndex < m_path.size())
+      {
+        moveTarget = m_path[m_currentPathIndex];
+      }
+    }
+  }
+
+  // 计算移动方向
+  sf::Vector2f toTarget = moveTarget - oldPos;
+  float distToTarget = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
+
+  if (distToTarget > 5.f)
+  {
+    m_moveDirection = toTarget / distToTarget; // 归一化
+  }
+
+  // 如果接近玩家，保持距离
+  sf::Vector2f toPlayer = m_targetPos - oldPos;
+  float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+
+  if (distToPlayer < 80.f)
+  {
+    // 太近了，后退
+    m_moveDirection = -toPlayer / distToPlayer;
+  }
+  else if (distToPlayer < 120.f && distToPlayer > 80.f)
+  {
+    // 在合适距离，横向移动
+    m_moveDirection = {-toPlayer.y / distToPlayer, toPlayer.x / distToPlayer};
   }
 
   // 移动
   sf::Vector2f movement = m_moveDirection * m_moveSpeed * dt;
-  sf::Vector2f newPos = m_hull->getPosition() + movement;
+  sf::Vector2f newPos = oldPos + movement;
 
-  // 边界检查（保持在屏幕内）
-  newPos.x = std::max(50.f, std::min(newPos.x, 1230.f));
-  newPos.y = std::max(50.f, std::min(newPos.y, 670.f));
+  // 边界检查
+  newPos.x = std::max(50.f, std::min(newPos.x, m_bounds.x - 50.f));
+  newPos.y = std::max(50.f, std::min(newPos.y, m_bounds.y - 50.f));
 
-  // 如果碰到边界，反弹
-  if (newPos.x <= 50.f || newPos.x >= 1230.f)
+  // 检查墙壁碰撞并实现滑动
+  if (!maze.checkCollision(newPos, getCollisionRadius()))
   {
-    m_moveDirection.x = -m_moveDirection.x;
+    m_hull->setPosition(newPos);
   }
-  if (newPos.y <= 50.f || newPos.y >= 670.f)
+  else
   {
-    m_moveDirection.y = -m_moveDirection.y;
-  }
+    // 尝试只在 X 或 Y 方向移动（滑动）
+    sf::Vector2f newPosX = {oldPos.x + movement.x, oldPos.y};
+    sf::Vector2f newPosY = {oldPos.x, oldPos.y + movement.y};
 
-  m_hull->setPosition(newPos);
+    bool canMoveX = !maze.checkCollision(newPosX, getCollisionRadius());
+    bool canMoveY = !maze.checkCollision(newPosY, getCollisionRadius());
+
+    if (canMoveX && canMoveY)
+    {
+      // 选择主要移动方向
+      if (std::abs(movement.x) > std::abs(movement.y))
+        m_hull->setPosition(newPosX);
+      else
+        m_hull->setPosition(newPosY);
+    }
+    else if (canMoveX)
+    {
+      m_hull->setPosition(newPosX);
+    }
+    else if (canMoveY)
+    {
+      m_hull->setPosition(newPosY);
+    }
+    // 如果两个方向都碰撞，则不移动
+  }
 
   // 车身转向移动方向
-  if (movement.x != 0.f || movement.y != 0.f)
+  sf::Vector2f actualMovement = m_hull->getPosition() - oldPos;
+  if (actualMovement.x != 0.f || actualMovement.y != 0.f)
   {
-    float targetAngle = Utils::getDirectionAngle(movement);
+    float targetAngle = Utils::getDirectionAngle(actualMovement);
     m_hullAngle = Utils::lerpAngle(m_hullAngle, targetAngle, m_rotationSpeed * dt);
     m_hull->setRotation(sf::degrees(m_hullAngle));
   }
@@ -132,6 +217,10 @@ sf::Vector2f Enemy::getGunPosition() const
 
 bool Enemy::shouldShoot()
 {
+  // 只有激活后才会射击
+  if (!m_activated)
+    return false;
+
   if (m_shootClock.getElapsedTime().asSeconds() > m_shootCooldown)
   {
     m_shootClock.restart();
@@ -143,4 +232,18 @@ bool Enemy::shouldShoot()
 void Enemy::takeDamage(float damage)
 {
   m_healthBar.setHealth(m_healthBar.getHealth() - damage);
+}
+
+void Enemy::checkActivation(sf::Vector2f playerPos)
+{
+  if (m_activated)
+    return;
+
+  sf::Vector2f toPlayer = playerPos - getPosition();
+  float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+
+  if (dist < m_activationRange)
+  {
+    m_activated = true;
+  }
 }
