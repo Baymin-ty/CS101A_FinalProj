@@ -4,14 +4,35 @@ project(CS101AFinalProj CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
-FetchContent_Declare(sfml 
-    GIT_REPOSITORY https://github.com/SFML/SFML.git 
-    GIT_TAG 3.0.2
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
+FetchContent_Declare(sfml
+  GIT_REPOSITORY https://github.com/SFML/SFML.git
+  GIT_TAG 3.0.2
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(sfml)
 
-add_executable(CS101AFinalProj test.cpp)
+# 源文件
+set(SOURCES
+  src/main.cpp
+  src/Game.cpp
+  src/Tank.cpp
+  src/Bullet.cpp
+  src/HealthBar.cpp
+  src/Enemy.cpp
+)
+
+# 头文件
+set(HEADERS
+  src/Utils.hpp
+  src/Game.hpp
+  src/Tank.hpp
+  src/Bullet.hpp
+  src/HealthBar.hpp
+  src/Enemy.hpp
+)
+
+add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})
 target_compile_features(CS101AFinalProj PRIVATE cxx_std_20)
+target_include_directories(CS101AFinalProj PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics)
