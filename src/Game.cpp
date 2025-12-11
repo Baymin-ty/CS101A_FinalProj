@@ -168,6 +168,7 @@ void Game::resetGame()
   m_gameState = GameState::MainMenu;
   m_gameOver = false;
   m_gameWon = false;
+  m_multiplayerWin = false;
   m_enemies.clear();
   m_bullets.clear();
   m_player.reset();
@@ -180,6 +181,7 @@ void Game::resetGame()
   m_connectionStatus = "Enter server IP:";
   m_inputText.clear();
   m_inputMode = InputMode::None;
+  m_generatedMazeData.clear();
 
   // 断开网络连接
   NetworkManager::getInstance().disconnect();
@@ -212,6 +214,7 @@ void Game::restartMultiplayer()
   // 重置状态
   m_localPlayerReachedExit = false;
   m_otherPlayerReachedExit = false;
+  m_multiplayerWin = false;
   m_gameOver = false;
   m_gameWon = false;
   m_bullets.clear();
@@ -412,7 +415,35 @@ void Game::processEvents()
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
           if (m_isMultiplayer) {
-            restartMultiplayer(); // 多人模式重新开始
+            if (m_isHost) {
+              // 房主按 R：回到等待玩家界面，通知对方准备重新开始
+              NetworkManager::getInstance().sendRestartRequest();
+              
+              // 重新生成迷宫
+              m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0);
+              m_generatedMazeData = m_maze.getMazeData();
+              NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
+              
+              m_gameState = GameState::WaitingForPlayer;
+              m_connectionStatus = "Waiting for other player to restart...";
+              
+              // 重置状态
+              m_localPlayerReachedExit = false;
+              m_otherPlayerReachedExit = false;
+              m_multiplayerWin = false;
+              m_gameOver = false;
+              m_gameWon = false;
+              m_bullets.clear();
+            } else {
+              // 非房主按 R：自动重新加入上次的房间
+              if (!m_roomCode.empty()) {
+                NetworkManager::getInstance().joinRoom(m_roomCode);
+                m_gameState = GameState::WaitingForPlayer;
+                m_connectionStatus = "Rejoining room: " + m_roomCode;
+              } else {
+                resetGame();  // 没有房间码，返回主菜单
+              }
+            }
           } else {
             startGame(); // 单机模式重新开始
           }
@@ -923,23 +954,45 @@ void Game::renderGameOver()
   m_window.draw(overlay);
 
   sf::Text text(m_font);
-  if (m_gameWon)
-  {
-    text.setString("YOU WIN!");
-    text.setFillColor(sf::Color::Green);
+  
+  // 根据游戏模式和结果显示不同文本
+  if (m_isMultiplayer) {
+    if (m_gameState == GameState::Victory) {
+      text.setString("VICTORY!");
+      text.setFillColor(sf::Color::Green);
+    } else {
+      text.setString("DEFEATED!");
+      text.setFillColor(sf::Color::Red);
+    }
+  } else {
+    // 单机模式
+    if (m_gameWon) {
+      text.setString("YOU WIN!");
+      text.setFillColor(sf::Color::Green);
+    } else {
+      text.setString("GAME OVER");
+      text.setFillColor(sf::Color::Red);
+    }
   }
-  else
-  {
-    text.setString("GAME OVER");
-    text.setFillColor(sf::Color::Red);
-  }
+  
   text.setCharacterSize(64);
   sf::FloatRect bounds = text.getLocalBounds();
   text.setPosition({(m_screenWidth - bounds.size.x) / 2.f, m_screenHeight / 2.f - 80.f});
   m_window.draw(text);
 
   sf::Text hint(m_font);
-  hint.setString("Press R to restart, ESC for menu");
+  
+  // 多人模式显示不同的提示
+  if (m_isMultiplayer) {
+    if (m_isHost) {
+      hint.setString("Press R to restart match, ESC for menu");
+    } else {
+      hint.setString("Press R to rejoin room, ESC for menu");
+    }
+  } else {
+    hint.setString("Press R to restart, ESC for menu");
+  }
+  
   hint.setCharacterSize(28);
   hint.setFillColor(sf::Color::White);
   sf::FloatRect hintBounds = hint.getLocalBounds();
@@ -1041,17 +1094,27 @@ void Game::setupNetworkCallbacks()
       m_otherPlayer->setTurretRotation(state.turretAngle);
       m_otherPlayerReachedExit = state.reachedExit;
       
-      // 检查是否双方都到达终点
-      if (m_localPlayerReachedExit && m_otherPlayerReachedExit) {
-        m_gameWon = true;
-        m_gameState = GameState::Victory;
-      }
+      // 注意：胜利条件改为先到终点或打死对方，不再是双方都到达
     }
   });
   
   net.setOnPlayerShoot([this](float x, float y, float angle) {
     // 创建另一个玩家的子弹
     m_bullets.push_back(std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan));
+  });
+  
+  net.setOnGameResult([this](bool isWinner) {
+    // 收到对方发来的游戏结果
+    m_multiplayerWin = isWinner;
+    m_gameState = isWinner ? GameState::Victory : GameState::GameOver;
+  });
+  
+  net.setOnRestartRequest([this]() {
+    // 对方请求重新开始（房主发起）
+    // 非房主收到后自动重新开始游戏
+    if (!m_isHost) {
+      restartMultiplayer();
+    }
   });
   
   net.setOnError([this](const std::string& error) {
@@ -1187,27 +1250,29 @@ void Game::updateMultiplayer(float dt)
       [](const std::unique_ptr<Bullet>& b) { return !b->isAlive(); }),
     m_bullets.end());
   
-  // 检查玩家是否到达终点
+  // 检查玩家是否到达终点（先到达者获胜）
   sf::Vector2f exitPos = m_maze.getExitPosition();
   float distToExit = std::hypot(m_player->getPosition().x - exitPos.x,
                                  m_player->getPosition().y - exitPos.y);
   
   if (distToExit < TILE_SIZE && !m_localPlayerReachedExit) {
     m_localPlayerReachedExit = true;
-    net.sendReachExit();
-    
-    // 检查是否双方都到达终点
-    if (m_otherPlayerReachedExit) {
-      m_gameWon = true;
-      m_gameState = GameState::Victory;
-    }
+    // 先到达终点，获胜！
+    m_multiplayerWin = true;
+    net.sendGameResult(true);  // 通知对方我赢了
+    m_gameState = GameState::Victory;
+    return;
   }
   
-  // 检查玩家是否死亡
+  // 检查本地玩家是否死亡（被对方打死，失败）
   if (m_player->isDead()) {
-    m_gameOver = true;
+    m_multiplayerWin = false;
+    net.sendGameResult(false);  // 通知对方我输了（对方赢）
     m_gameState = GameState::GameOver;
+    return;
   }
+  
+  // 检查对方玩家是否被打死（需要在 checkMultiplayerCollisions 中处理）
   
   // 更新相机
   sf::Vector2f playerPos = m_player->getPosition();

@@ -112,6 +112,7 @@ private:
   bool m_isHost = false;
   bool m_localPlayerReachedExit = false;
   bool m_otherPlayerReachedExit = false;
+  bool m_multiplayerWin = false;  // 多人模式中本地玩家是否获胜
   std::string m_roomCode;
   std::string m_connectionStatus = "Enter server IP:";
   

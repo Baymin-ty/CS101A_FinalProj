@@ -13,10 +13,12 @@ const MessageType = {
   GameStart: 9,
   PlayerUpdate: 10,
   PlayerShoot: 11,
-  MazeData: 12,      // 新增：迷宫数据
-  RequestMaze: 13,   // 新增：请求迷宫数据
+  MazeData: 12,
+  RequestMaze: 13,
   ReachExit: 14,
-  GameWin: 15
+  GameWin: 15,
+  GameResult: 16,      // 新增：游戏结果
+  RestartRequest: 17   // 新增：重新开始请求
 };
 
 // 房间管理
@@ -257,6 +259,38 @@ function handleMessage(socket, data) {
 
       // 转发给其他玩家
       broadcastToRoom(room, socket, data);
+      break;
+    }
+
+    case MessageType.GameResult: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room || !room.started) break;
+
+      // 转发游戏结果给其他玩家
+      broadcastToRoom(room, socket, data);
+      console.log(`Game result sent in room ${roomCode}`);
+      break;
+    }
+
+    case MessageType.RestartRequest: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room) break;
+
+      // 重置房间状态，准备下一轮
+      room.started = false;
+      for (const player of room.players) {
+        player.reachedExit = false;
+      }
+
+      // 转发重新开始请求给其他玩家
+      broadcastToRoom(room, socket, data);
+      console.log(`Restart request in room ${roomCode}`);
       break;
     }
   }

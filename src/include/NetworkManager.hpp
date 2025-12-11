@@ -30,7 +30,9 @@ enum class NetMessageType : uint8_t
   MazeData,      // 迷宫数据
   RequestMaze,   // 请求迷宫数据
   ReachExit,     // 到达终点
-  GameWin,       // 游戏胜利
+  GameWin,       // 游戏胜利（先到终点）
+  GameResult,    // 游戏结果（胜/负）
+  RestartRequest, // 重新开始请求
 };
 
 // 玩家状态数据
@@ -53,6 +55,8 @@ using OnMazeDataCallback = std::function<void(const std::vector<std::string>& ma
 using OnRequestMazeCallback = std::function<void()>;
 using OnPlayerUpdateCallback = std::function<void(const PlayerState& state)>;
 using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>;
+using OnGameResultCallback = std::function<void(bool isWinner)>;
+using OnRestartRequestCallback = std::function<void()>;
 using OnErrorCallback = std::function<void(const std::string& error)>;
 
 class NetworkManager
@@ -80,6 +84,8 @@ public:
   void sendPosition(const PlayerState& state);
   void sendShoot(float x, float y, float angle);
   void sendReachExit();
+  void sendGameResult(bool localWin);  // 发送游戏结果
+  void sendRestartRequest();           // 发送重新开始请求
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -94,6 +100,8 @@ public:
   void setOnRequestMaze(OnRequestMazeCallback cb) { m_onRequestMaze = cb; }
   void setOnPlayerUpdate(OnPlayerUpdateCallback cb) { m_onPlayerUpdate = cb; }
   void setOnPlayerShoot(OnPlayerShootCallback cb) { m_onPlayerShoot = cb; }
+  void setOnGameResult(OnGameResultCallback cb) { m_onGameResult = cb; }
+  void setOnRestartRequest(OnRestartRequestCallback cb) { m_onRestartRequest = cb; }
   void setOnError(OnErrorCallback cb) { m_onError = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
@@ -123,5 +131,7 @@ private:
   OnRequestMazeCallback m_onRequestMaze;
   OnPlayerUpdateCallback m_onPlayerUpdate;
   OnPlayerShootCallback m_onPlayerShoot;
+  OnGameResultCallback m_onGameResult;
+  OnRestartRequestCallback m_onRestartRequest;
   OnErrorCallback m_onError;
 };

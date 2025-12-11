@@ -152,6 +152,25 @@ void NetworkManager::sendReachExit()
   sendPacket(data);
 }
 
+void NetworkManager::sendGameResult(bool localWin)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::GameResult));
+  data.push_back(localWin ? 1 : 0);  // 我赢了
+  sendPacket(data);
+}
+
+void NetworkManager::sendRestartRequest()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::RestartRequest));
+  sendPacket(data);
+}
+
 void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData)
 {
   if (!m_connected) return;
@@ -378,6 +397,29 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   {
     // 游戏胜利，两个玩家都到达终点
     // 可以在这里触发胜利回调
+    break;
+  }
+  case NetMessageType::GameResult:
+  {
+    // 游戏结果 - 对方发来的结果（对方赢意味着本地输）
+    if (data.size() >= 2)
+    {
+      bool otherPlayerWon = data[1] != 0;
+      if (m_onGameResult)
+      {
+        // 对方赢 = 我输，对方输 = 我赢
+        m_onGameResult(!otherPlayerWon);
+      }
+    }
+    break;
+  }
+  case NetMessageType::RestartRequest:
+  {
+    // 对方请求重新开始
+    if (m_onRestartRequest)
+    {
+      m_onRestartRequest();
+    }
     break;
   }
   default:
