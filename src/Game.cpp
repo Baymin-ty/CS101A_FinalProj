@@ -13,14 +13,56 @@ Game::Game()
 
 bool Game::init()
 {
-  // 加载字体
-  if (!m_font.openFromFile("/System/Library/Fonts/Helvetica.ttc"))
+  // 加载字体 - 跨平台支持
+  bool fontLoaded = false;
+
+#ifdef _WIN32
+  // Windows 字体路径
+  if (m_font.openFromFile("C:\\Windows\\Fonts\\arial.ttf"))
   {
-    // 尝试其他字体
-    if (!m_font.openFromFile("/System/Library/Fonts/Arial.ttf"))
-    {
-      return false;
-    }
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("C:\\Windows\\Fonts\\times.ttf"))
+  {
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("C:\\Windows\\Fonts\\segoeui.ttf"))
+  {
+    fontLoaded = true;
+  }
+#elif __APPLE__
+  // macOS 字体路径
+  if (m_font.openFromFile("/System/Library/Fonts/Helvetica.ttc"))
+  {
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("/System/Library/Fonts/Arial.ttf"))
+  {
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("/Library/Fonts/Arial.ttf"))
+  {
+    fontLoaded = true;
+  }
+#else
+  // Linux 字体路径
+  if (m_font.openFromFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+  {
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("/usr/share/fonts/TTF/DejaVuSans.ttf"))
+  {
+    fontLoaded = true;
+  }
+  else if (m_font.openFromFile("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"))
+  {
+    fontLoaded = true;
+  }
+#endif
+
+  if (!fontLoaded)
+  {
+    return false;
   }
 
   // 加载子弹纹理
