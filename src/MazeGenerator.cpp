@@ -3,24 +3,30 @@
 #include <ctime>
 
 MazeGenerator::MazeGenerator(int width, int height)
-    : m_width(width), m_height(height)
+    : m_width(width), m_height(height), m_seed(0), m_seedSet(false)
 {
   // 确保宽高是奇数（迷宫生成算法需要）
   if (m_width % 2 == 0)
     m_width++;
   if (m_height % 2 == 0)
     m_height++;
-
-  m_rng.seed(static_cast<unsigned int>(std::time(nullptr)));
 }
 
 void MazeGenerator::setSeed(unsigned int seed)
 {
-  m_rng.seed(seed);
+  m_seed = seed;
+  m_seedSet = true;
 }
 
 std::vector<std::string> MazeGenerator::generate()
 {
+  // 在生成开始时设置随机数种子，确保相同种子产生相同结果
+  if (m_seedSet) {
+    m_rng.seed(m_seed);
+  } else {
+    m_rng.seed(static_cast<unsigned int>(std::time(nullptr)));
+  }
+  
   // 初始化网格，全部填充墙
   m_grid.clear();
   m_grid.resize(m_height, std::vector<char>(m_width, '#'));

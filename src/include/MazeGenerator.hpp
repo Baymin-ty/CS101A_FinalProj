@@ -33,6 +33,8 @@ private:
   int m_height;
   std::vector<std::vector<char>> m_grid;
   std::mt19937 m_rng;
+  unsigned int m_seed = 0;
+  bool m_seedSet = false;
 
   int m_enemyCount = 5;
   float m_destructibleRatio = 0.15f;
