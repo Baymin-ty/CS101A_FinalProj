@@ -13,6 +13,8 @@ const MessageType = {
   GameStart: 9,
   PlayerUpdate: 10,
   PlayerShoot: 11,
+  MazeData: 12,      // 新增：迷宫数据
+  RequestMaze: 13,   // 新增：请求迷宫数据
   ReachExit: 14,
   GameWin: 15
 };
@@ -79,13 +81,14 @@ function handleMessage(socket, data) {
         code: roomCode,
         mazeWidth: mazeWidth,
         mazeHeight: mazeHeight,
-        mazeSeed: Math.floor(Math.random() * 0xFFFFFFFF),
-        players: [{ socket: socket, reachedExit: false }],
+        mazeData: null,  // 存储迷宫数据
+        players: [{ socket: socket, reachedExit: false, isHost: true }],
         started: false
       };
 
       rooms.set(roomCode, room);
       socket.roomCode = roomCode;
+      socket.isHost = true;
 
       console.log(`Room created: ${roomCode} (${mazeWidth}x${mazeHeight})`);
 
@@ -95,6 +98,43 @@ function handleMessage(socket, data) {
       response[1] = roomCode.length;
       response.write(roomCode, 2);
       sendMessage(socket, response);
+      break;
+    }
+
+    case MessageType.MazeData: {
+      // 房主发送迷宫数据
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room) break;
+
+      // 只有房主可以发送迷宫数据
+      if (!socket.isHost) break;
+
+      // 存储迷宫数据
+      room.mazeData = data;
+      console.log(`Received maze data for room ${roomCode}, size: ${data.length} bytes`);
+
+      // 如果有第二个玩家在等待，发送迷宫数据给他并开始游戏
+      if (room.players.length === 2 && !room.started) {
+        room.started = true;
+        
+        // 发送迷宫数据给第二个玩家
+        const guest = room.players.find(p => !p.isHost);
+        if (guest) {
+          sendMessage(guest.socket, data);
+          console.log(`Sent maze data to guest in room ${roomCode}`);
+        }
+
+        // 发送游戏开始消息给两个玩家
+        const gameStartMsg = Buffer.alloc(1);
+        gameStartMsg[0] = MessageType.GameStart;
+        for (const player of room.players) {
+          sendMessage(player.socket, gameStartMsg);
+        }
+        console.log(`Game started in room: ${roomCode}`);
+      }
       break;
     }
 
@@ -124,8 +164,9 @@ function handleMessage(socket, data) {
         break;
       }
 
-      room.players.push({ socket: socket, reachedExit: false });
+      room.players.push({ socket: socket, reachedExit: false, isHost: false });
       socket.roomCode = roomCode;
+      socket.isHost = false;
 
       console.log(`Player joined room: ${roomCode}`);
 
@@ -136,22 +177,30 @@ function handleMessage(socket, data) {
       response.write(roomCode, 2);
       sendMessage(socket, response);
 
-      // 如果房间满了，开始游戏
-      if (room.players.length === 2) {
+      // 如果房主已经发送了迷宫数据，直接发送给新玩家并开始游戏
+      if (room.mazeData) {
         room.started = true;
+        
+        // 发送迷宫数据给新玩家
+        sendMessage(socket, room.mazeData);
+        console.log(`Sent existing maze data to new player in room ${roomCode}`);
 
-        // 发送游戏开始给所有玩家
-        const gameStartMsg = Buffer.alloc(9);
+        // 发送游戏开始消息给两个玩家
+        const gameStartMsg = Buffer.alloc(1);
         gameStartMsg[0] = MessageType.GameStart;
-        gameStartMsg.writeUInt16LE(room.mazeWidth, 1);
-        gameStartMsg.writeUInt16LE(room.mazeHeight, 3);
-        gameStartMsg.writeUInt32LE(room.mazeSeed, 5);
-
         for (const player of room.players) {
           sendMessage(player.socket, gameStartMsg);
         }
-
         console.log(`Game started in room: ${roomCode}`);
+      } else {
+        // 请求房主发送迷宫数据
+        const host = room.players.find(p => p.isHost);
+        if (host) {
+          const requestMsg = Buffer.alloc(1);
+          requestMsg[0] = MessageType.RequestMaze;
+          sendMessage(host.socket, requestMsg);
+          console.log(`Requested maze data from host in room ${roomCode}`);
+        }
       }
       break;
     }
@@ -191,90 +240,83 @@ function handleMessage(socket, data) {
       const player = room.players.find(p => p.socket === socket);
       if (player) {
         player.reachedExit = true;
-        console.log(`Player reached exit in room: ${roomCode}`);
+        console.log(`Player reached exit in room ${roomCode}`);
 
         // 检查是否所有玩家都到达终点
         const allReached = room.players.every(p => p.reachedExit);
         if (allReached) {
-          // 发送游戏胜利
+          // 发送游戏胜利消息
           const winMsg = Buffer.alloc(1);
           winMsg[0] = MessageType.GameWin;
-
           for (const p of room.players) {
             sendMessage(p.socket, winMsg);
           }
-
-          console.log(`Game won in room: ${roomCode}`);
+          console.log(`All players reached exit in room ${roomCode}! Game won!`);
         }
       }
-      break;
-    }
 
-    case MessageType.Disconnect: {
-      handleDisconnect(socket);
+      // 转发给其他玩家
+      broadcastToRoom(room, socket, data);
       break;
-    }
-  }
-}
-
-// 处理断开连接
-function handleDisconnect(socket) {
-  const roomCode = socket.roomCode;
-  if (roomCode) {
-    const room = rooms.get(roomCode);
-    if (room) {
-      room.players = room.players.filter(p => p.socket !== socket);
-      if (room.players.length === 0) {
-        rooms.delete(roomCode);
-        console.log(`Room deleted: ${roomCode}`);
-      } else {
-        // 通知其他玩家
-        const disconnectMsg = Buffer.alloc(1);
-        disconnectMsg[0] = MessageType.Disconnect;
-        for (const p of room.players) {
-          sendMessage(p.socket, disconnectMsg);
-        }
-      }
     }
   }
 }
 
 // 创建服务器
 const server = net.createServer((socket) => {
-  console.log('Client connected from', socket.remoteAddress);
+  console.log(`Client connected from ${socket.remoteAddress}`);
 
   let buffer = Buffer.alloc(0);
 
-  socket.on('data', (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
+  socket.on('data', (data) => {
+    buffer = Buffer.concat([buffer, data]);
 
-    // 处理完整的消息
+    // 处理所有完整的消息
     while (buffer.length >= 2) {
-      const len = buffer.readUInt16LE(0);
+      const msgLen = buffer.readUInt16LE(0);
+      if (buffer.length < 2 + msgLen) break;
 
-      if (buffer.length >= 2 + len) {
-        const message = buffer.slice(2, 2 + len);
-        buffer = buffer.slice(2 + len);
-        handleMessage(socket, message);
-      } else {
-        break;
+      const msgData = buffer.slice(2, 2 + msgLen);
+      buffer = buffer.slice(2 + msgLen);
+
+      try {
+        handleMessage(socket, msgData);
+      } catch (e) {
+        console.error('Error handling message:', e);
       }
     }
   });
 
   socket.on('close', () => {
     console.log('Client disconnected');
-    handleDisconnect(socket);
+
+    // 清理房间
+    if (socket.roomCode) {
+      const room = rooms.get(socket.roomCode);
+      if (room) {
+        room.players = room.players.filter(p => p.socket !== socket);
+        if (room.players.length === 0) {
+          rooms.delete(socket.roomCode);
+          console.log(`Room ${socket.roomCode} deleted`);
+        } else {
+          // 通知其他玩家
+          const disconnectMsg = Buffer.alloc(1);
+          disconnectMsg[0] = MessageType.Disconnect;
+          for (const player of room.players) {
+            sendMessage(player.socket, disconnectMsg);
+          }
+        }
+      }
+    }
   });
 
   socket.on('error', (err) => {
-    console.log('Socket error:', err.message);
-    handleDisconnect(socket);
+    console.error('Socket error:', err.message);
   });
 });
 
 const PORT = 9999;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`Tank Maze Server running on port ${PORT}`);
   console.log('Waiting for players...');
 });

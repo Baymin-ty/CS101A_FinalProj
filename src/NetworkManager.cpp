@@ -152,6 +152,31 @@ void NetworkManager::sendReachExit()
   sendPacket(data);
 }
 
+void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::MazeData));
+  
+  // 迷宫行数
+  uint16_t rows = static_cast<uint16_t>(mazeData.size());
+  data.push_back(static_cast<uint8_t>(rows & 0xFF));
+  data.push_back(static_cast<uint8_t>((rows >> 8) & 0xFF));
+  
+  // 每行数据
+  for (const auto& row : mazeData) {
+    uint16_t len = static_cast<uint16_t>(row.length());
+    data.push_back(static_cast<uint8_t>(len & 0xFF));
+    data.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+    for (char c : row) {
+      data.push_back(static_cast<uint8_t>(c));
+    }
+  }
+  
+  sendPacket(data);
+}
+
 void NetworkManager::update()
 {
   if (!m_connected) return;
@@ -272,15 +297,48 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   }
   case NetMessageType::GameStart:
   {
-    if (data.size() >= 9)
+    // 新版本：GameStart 只是一个信号，迷宫数据已经通过 MazeData 传输
+    if (m_onGameStart)
     {
-      int mazeWidth = data[1] | (data[2] << 8);
-      int mazeHeight = data[3] | (data[4] << 8);
-      uint32_t seed = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
-      if (m_onGameStart)
+      m_onGameStart();
+    }
+    break;
+  }
+  case NetMessageType::MazeData:
+  {
+    // 解析迷宫数据
+    if (data.size() >= 3)
+    {
+      size_t offset = 1;
+      uint16_t rows = data[offset] | (data[offset + 1] << 8);
+      offset += 2;
+      
+      std::vector<std::string> mazeData;
+      for (uint16_t i = 0; i < rows && offset + 2 <= data.size(); i++)
       {
-        m_onGameStart(mazeWidth, mazeHeight, seed);
+        uint16_t len = data[offset] | (data[offset + 1] << 8);
+        offset += 2;
+        if (offset + len <= data.size())
+        {
+          std::string row(data.begin() + offset, data.begin() + offset + len);
+          mazeData.push_back(row);
+          offset += len;
+        }
       }
+      
+      if (m_onMazeData)
+      {
+        m_onMazeData(mazeData);
+      }
+    }
+    break;
+  }
+  case NetMessageType::RequestMaze:
+  {
+    // 服务器请求房主发送迷宫数据
+    if (m_onRequestMaze)
+    {
+      m_onRequestMaze();
     }
     break;
   }

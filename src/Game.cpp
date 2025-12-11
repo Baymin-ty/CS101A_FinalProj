@@ -877,22 +877,40 @@ void Game::setupNetworkCallbacks()
     m_isHost = true;
     m_gameState = GameState::WaitingForPlayer;
     m_connectionStatus = "Room created! Code: " + roomCode;
+    
+    // 房主立即生成迷宫并发送
+    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0);
+    m_generatedMazeData = m_maze.getMazeData();
+    NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
   });
   
   net.setOnRoomJoined([this](const std::string& roomCode) {
     m_roomCode = roomCode;
     m_isHost = false;
     m_gameState = GameState::WaitingForPlayer;
-    m_connectionStatus = "Joined room: " + roomCode;
+    m_connectionStatus = "Joined room: " + roomCode + " - Waiting for maze...";
   });
   
-  net.setOnGameStart([this](int mazeWidth, int mazeHeight, uint32_t mazeSeed) {
-    m_mazeWidth = mazeWidth;
-    m_mazeHeight = mazeHeight;
+  net.setOnMazeData([this](const std::vector<std::string>& mazeData) {
+    // 收到迷宫数据（非房主）
+    m_generatedMazeData = mazeData;
+    m_connectionStatus = "Maze received! Waiting for game start...";
+  });
+  
+  net.setOnRequestMaze([this]() {
+    // 服务器请求迷宫数据（房主收到）
+    if (m_isHost && !m_generatedMazeData.empty()) {
+      NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
+    }
+  });
+  
+  net.setOnGameStart([this]() {
     m_isMultiplayer = true;
     
-    // 使用相同的种子生成相同的迷宫
-    m_maze.generateRandomMaze(mazeWidth, mazeHeight, mazeSeed);
+    // 使用已接收/生成的迷宫数据
+    if (!m_generatedMazeData.empty()) {
+      m_maze.loadFromString(m_generatedMazeData);
+    }
     
     // 设置玩家位置
     sf::Vector2f startPos = m_maze.getPlayerStartPosition();

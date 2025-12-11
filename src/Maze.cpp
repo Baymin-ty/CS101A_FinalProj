@@ -12,6 +12,9 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   if (map.empty())
     return;
 
+  // 保存原始迷宫数据用于网络传输
+  m_mazeData = map;
+
   m_rows = static_cast<int>(map.size());
   m_cols = 0;
   for (const auto &row : map)

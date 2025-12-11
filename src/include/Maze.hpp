@@ -61,6 +61,9 @@ public:
   // 生成随机迷宫（使用 MazeGenerator）
   void generateRandomMaze(int width, int height, unsigned int seed = 0);
 
+  // 获取迷宫数据（用于网络传输）
+  std::vector<std::string> getMazeData() const { return m_mazeData; }
+
   void update(float dt);
   void draw(sf::RenderWindow &window) const;
   void render(sf::RenderWindow &window) const { draw(window); } // 别名
@@ -104,6 +107,7 @@ public:
 
 private:
   std::vector<std::vector<Wall>> m_walls;
+  std::vector<std::string> m_mazeData;  // 保存原始迷宫数据用于网络传输
   sf::Vector2f m_startPosition;
   sf::Vector2f m_exitPosition;
   std::vector<sf::Vector2f> m_enemySpawnPoints;

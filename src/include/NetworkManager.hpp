@@ -27,6 +27,8 @@ enum class NetMessageType : uint8_t
   // 游戏状态同步
   PlayerUpdate,  // 玩家位置、角度等
   PlayerShoot,   // 玩家射击
+  MazeData,      // 迷宫数据
+  RequestMaze,   // 请求迷宫数据
   ReachExit,     // 到达终点
   GameWin,       // 游戏胜利
 };
@@ -46,7 +48,9 @@ using OnConnectedCallback = std::function<void()>;
 using OnDisconnectedCallback = std::function<void()>;
 using OnRoomCreatedCallback = std::function<void(const std::string& roomCode)>;
 using OnRoomJoinedCallback = std::function<void(const std::string& roomCode)>;
-using OnGameStartCallback = std::function<void(int mazeWidth, int mazeHeight, uint32_t mazeSeed)>;
+using OnGameStartCallback = std::function<void()>;
+using OnMazeDataCallback = std::function<void(const std::vector<std::string>& mazeData)>;
+using OnRequestMazeCallback = std::function<void()>;
 using OnPlayerUpdateCallback = std::function<void(const PlayerState& state)>;
 using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>;
 using OnErrorCallback = std::function<void(const std::string& error)>;
@@ -69,6 +73,9 @@ public:
   void createRoom(int mazeWidth, int mazeHeight);
   void joinRoom(const std::string& roomCode);
 
+  // 发送迷宫数据（房主调用）
+  void sendMazeData(const std::vector<std::string>& mazeData);
+
   // 发送游戏数据
   void sendPosition(const PlayerState& state);
   void sendShoot(float x, float y, float angle);
@@ -83,6 +90,8 @@ public:
   void setOnRoomCreated(OnRoomCreatedCallback cb) { m_onRoomCreated = cb; }
   void setOnRoomJoined(OnRoomJoinedCallback cb) { m_onRoomJoined = cb; }
   void setOnGameStart(OnGameStartCallback cb) { m_onGameStart = cb; }
+  void setOnMazeData(OnMazeDataCallback cb) { m_onMazeData = cb; }
+  void setOnRequestMaze(OnRequestMazeCallback cb) { m_onRequestMaze = cb; }
   void setOnPlayerUpdate(OnPlayerUpdateCallback cb) { m_onPlayerUpdate = cb; }
   void setOnPlayerShoot(OnPlayerShootCallback cb) { m_onPlayerShoot = cb; }
   void setOnError(OnErrorCallback cb) { m_onError = cb; }
@@ -110,6 +119,8 @@ private:
   OnRoomCreatedCallback m_onRoomCreated;
   OnRoomJoinedCallback m_onRoomJoined;
   OnGameStartCallback m_onGameStart;
+  OnMazeDataCallback m_onMazeData;
+  OnRequestMazeCallback m_onRequestMaze;
   OnPlayerUpdateCallback m_onPlayerUpdate;
   OnPlayerShootCallback m_onPlayerShoot;
   OnErrorCallback m_onError;

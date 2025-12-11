@@ -130,6 +130,9 @@ private:
   std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30};
   int m_enemyIndex = 3; // 默认 10
 
+  // 多人游戏迷宫数据
+  std::vector<std::string> m_generatedMazeData;
+
   bool m_gameOver = false;
   bool m_gameWon = false;
 };
