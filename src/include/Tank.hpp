@@ -47,8 +47,8 @@ public:
   void takeDamage(float damage);
   bool isDead() const { return m_healthBar.isDead(); }
 
-  // 获取碰撞半径
-  float getCollisionRadius() const { return 18.f * m_scale / 0.25f; }
+  // 获取碰撞半径 (减小以适应迷宫通道)
+  float getCollisionRadius() const { return 12.f * m_scale / 0.25f; }
 
   // 获取当前移动向量（用于墙壁滑动）
   sf::Vector2f getMovement(float dt) const;

@@ -896,6 +896,7 @@ void Game::setupNetworkCallbacks()
     
     // 设置玩家位置
     sf::Vector2f startPos = m_maze.getPlayerStartPosition();
+    
     m_player = std::make_unique<Tank>(startPos.x, startPos.y, sf::Color::Blue);
     m_player->setScale(m_tankScale);
     
@@ -909,6 +910,10 @@ void Game::setupNetworkCallbacks()
     // 多人模式没有敌人
     m_enemies.clear();
     m_bullets.clear();
+    
+    // 初始化相机位置
+    m_gameView.setCenter(startPos);
+    
     m_gameState = GameState::Multiplayer;
   });
   
