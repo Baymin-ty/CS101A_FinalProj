@@ -14,6 +14,7 @@ enum class GameState
 {
   MainMenu,
   Playing,
+  Paused,
   GameOver,
   Victory
 };
@@ -45,6 +46,7 @@ private:
   void render();
   void renderMenu();
   void renderGame();
+  void renderPaused();
   void renderGameOver();
   void checkCollisions();
   void spawnEnemies();

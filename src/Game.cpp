@@ -193,6 +193,9 @@ void Game::run()
     case GameState::Playing:
       update(dt);
       break;
+    case GameState::Paused:
+      // 暂停状态不需要 update
+      break;
     case GameState::GameOver:
     case GameState::Victory:
       // 游戏结束/胜利状态不需要 update
@@ -313,12 +316,31 @@ void Game::processEvents()
       {
         m_player->handleInput(*event);
       }
-      // 按 ESC 返回菜单
+      // 按 ESC 返回菜单，按 P 暂停
       if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
       {
         if (keyPressed->code == sf::Keyboard::Key::Escape)
         {
           resetGame();
+        }
+        else if (keyPressed->code == sf::Keyboard::Key::P)
+        {
+          m_gameState = GameState::Paused;
+        }
+      }
+      break;
+
+    case GameState::Paused:
+      if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
+      {
+        if (keyPressed->code == sf::Keyboard::Key::P ||
+            keyPressed->code == sf::Keyboard::Key::Escape)
+        {
+          m_gameState = GameState::Playing;
+        }
+        else if (keyPressed->code == sf::Keyboard::Key::Q)
+        {
+          resetGame(); // 返回菜单
         }
       }
       break;
@@ -550,13 +572,16 @@ void Game::render()
     renderMenu();
     break;
   case GameState::Playing:
+    renderGame();
+    break;
+  case GameState::Paused:
+    renderGame();
+    renderPaused();
+    break;
   case GameState::GameOver:
   case GameState::Victory:
     renderGame();
-    if (m_gameState != GameState::Playing)
-    {
-      renderGameOver();
-    }
+    renderGameOver();
     break;
   }
 
@@ -663,6 +688,35 @@ void Game::renderGame()
   {
     m_player->drawUI(m_window);
   }
+}
+
+void Game::renderPaused()
+{
+  m_window.setView(m_uiView);
+
+  // 半透明背景
+  sf::RectangleShape overlay({static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)});
+  overlay.setFillColor(sf::Color(0, 0, 0, 180));
+  m_window.draw(overlay);
+
+  // 暂停标题
+  sf::Text title(m_font);
+  title.setString("PAUSED");
+  title.setCharacterSize(72);
+  title.setFillColor(sf::Color::Yellow);
+  title.setStyle(sf::Text::Bold);
+  sf::FloatRect titleBounds = title.getLocalBounds();
+  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, m_screenHeight / 2.f - 100.f});
+  m_window.draw(title);
+
+  // 提示信息
+  sf::Text hint(m_font);
+  hint.setString("Press P or ESC to resume\nPress Q to quit to menu");
+  hint.setCharacterSize(28);
+  hint.setFillColor(sf::Color::White);
+  sf::FloatRect hintBounds = hint.getLocalBounds();
+  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight / 2.f + 20.f});
+  m_window.draw(hint);
 }
 
 void Game::renderGameOver()
