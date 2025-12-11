@@ -1092,6 +1092,7 @@ void Game::setupNetworkCallbacks()
       m_otherPlayer->setPosition({state.x, state.y});
       m_otherPlayer->setRotation(state.rotation);
       m_otherPlayer->setTurretRotation(state.turretAngle);
+      m_otherPlayer->setHealth(state.health);  // 同步血量
       m_otherPlayerReachedExit = state.reachedExit;
       
       // 注意：胜利条件改为先到终点或打死对方，不再是双方都到达
@@ -1443,25 +1444,60 @@ void Game::renderMultiplayer()
     bullet->render(m_window);
   }
   
-  // UI
+  // UI - 显示双方血条
   m_window.setView(m_uiView);
   
-  // 显示到达终点状态
-  sf::Text statusText(m_font);
-  std::string status = "You: " + std::string(m_localPlayerReachedExit ? "DONE" : "---");
-  status += "  |  Partner: " + std::string(m_otherPlayerReachedExit ? "DONE" : "---");
-  statusText.setString(status);
-  statusText.setCharacterSize(24);
-  statusText.setFillColor(sf::Color::White);
-  statusText.setPosition({20.f, 20.f});
-  m_window.draw(statusText);
+  // 本地玩家血条 (Self)
+  float barWidth = 150.f;
+  float barHeight = 20.f;
+  float barX = 20.f;
+  float barY = 20.f;
   
-  sf::Text goalText(m_font);
-  goalText.setString("Both players must reach the green exit!");
-  goalText.setCharacterSize(18);
-  goalText.setFillColor(sf::Color::Yellow);
-  goalText.setPosition({20.f, 50.f});
-  m_window.draw(goalText);
+  // Self 标签
+  sf::Text selfLabel(m_font);
+  selfLabel.setString("Self");
+  selfLabel.setCharacterSize(18);
+  selfLabel.setFillColor(sf::Color::White);
+  selfLabel.setPosition({barX, barY - 2.f});
+  m_window.draw(selfLabel);
+  
+  // Self 血条背景
+  sf::RectangleShape selfBarBg({barWidth, barHeight});
+  selfBarBg.setPosition({barX + 50.f, barY});
+  selfBarBg.setFillColor(sf::Color(60, 60, 60));
+  selfBarBg.setOutlineColor(sf::Color::White);
+  selfBarBg.setOutlineThickness(2.f);
+  m_window.draw(selfBarBg);
+  
+  // Self 血条
+  float selfHealthPercent = m_player ? (m_player->getHealth() / 100.f) : 0.f;
+  sf::RectangleShape selfBar({barWidth * selfHealthPercent, barHeight});
+  selfBar.setPosition({barX + 50.f, barY});
+  selfBar.setFillColor(sf::Color::Green);
+  m_window.draw(selfBar);
+  
+  // Other 标签
+  sf::Text otherLabel(m_font);
+  otherLabel.setString("Other");
+  otherLabel.setCharacterSize(18);
+  otherLabel.setFillColor(sf::Color::White);
+  otherLabel.setPosition({barX, barY + 30.f - 2.f});
+  m_window.draw(otherLabel);
+  
+  // Other 血条背景
+  sf::RectangleShape otherBarBg({barWidth, barHeight});
+  otherBarBg.setPosition({barX + 50.f, barY + 30.f});
+  otherBarBg.setFillColor(sf::Color(60, 60, 60));
+  otherBarBg.setOutlineColor(sf::Color::White);
+  otherBarBg.setOutlineThickness(2.f);
+  m_window.draw(otherBarBg);
+  
+  // Other 血条
+  float otherHealthPercent = m_otherPlayer ? (m_otherPlayer->getHealth() / 100.f) : 0.f;
+  sf::RectangleShape otherBar({barWidth * otherHealthPercent, barHeight});
+  otherBar.setPosition({barX + 50.f, barY + 30.f});
+  otherBar.setFillColor(sf::Color::Cyan);
+  m_window.draw(otherBar);
   
   m_window.display();
 }
