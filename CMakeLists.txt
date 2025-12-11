@@ -25,16 +25,19 @@ set(SOURCES
 
 # 头文件
 set(HEADERS
-  src/Utils.hpp
-  src/Game.hpp
-  src/Tank.hpp
-  src/Bullet.hpp
-  src/HealthBar.hpp
-  src/Enemy.hpp
-  src/Maze.hpp
+  src/include/Utils.hpp
+  src/include/Game.hpp
+  src/include/Tank.hpp
+  src/include/Bullet.hpp
+  src/include/HealthBar.hpp
+  src/include/Enemy.hpp
+  src/include/Maze.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})
 target_compile_features(CS101AFinalProj PRIVATE cxx_std_20)
-target_include_directories(CS101AFinalProj PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(CS101AFinalProj PRIVATE 
+  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/src/include
+)
 target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics)
