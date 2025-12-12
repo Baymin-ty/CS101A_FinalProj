@@ -18,6 +18,25 @@ enum class WallType
   Exit          // 出口
 };
 
+// 可破坏墙体属性
+enum class WallAttribute
+{
+  None,       // 无属性（普通，10%）
+  Gold,       // 金色 - 打掉获得2金币（50%）
+  Heal,       // 浅蓝色 - 恢复25%血量（20%）
+  Explosive   // 红色 - 爆炸（20%）
+};
+
+// 墙体被摧毁时的结果
+struct WallDestroyResult
+{
+  bool destroyed = false;
+  WallAttribute attribute = WallAttribute::None;
+  sf::Vector2f position = {0, 0};
+  int gridX = 0;
+  int gridY = 0;
+};
+
 // 圆角半径常量
 constexpr float WALL_CORNER_RADIUS = 12.f;
 
@@ -26,11 +45,12 @@ struct Wall
 {
   SelectiveRoundedRectShape shape;
   WallType type;
+  WallAttribute attribute;  // 墙体属性
   float health;
   float maxHealth;
   std::array<bool, 4> roundedCorners; // [左上, 右上, 右下, 左下]
 
-  Wall() : shape({0, 0}, WALL_CORNER_RADIUS, 6), type(WallType::None), health(0), maxHealth(0), roundedCorners({false, false, false, false}) {}
+  Wall() : shape({0, 0}, WALL_CORNER_RADIUS, 6), type(WallType::None), attribute(WallAttribute::None), health(0), maxHealth(0), roundedCorners({false, false, false, false}) {}
 };
 
 // 网格坐标
@@ -65,7 +85,7 @@ public:
   void loadFromString(const std::vector<std::string> &map);
 
   // 生成随机迷宫（使用 MazeGenerator）
-  void generateRandomMaze(int width, int height, unsigned int seed = 0, int enemyCount = 8);
+  void generateRandomMaze(int width, int height, unsigned int seed = 0, int enemyCount = 8, bool multiplayerMode = false);
 
   // 获取迷宫数据（用于网络传输）
   std::vector<std::string> getMazeData() const { return m_mazeData; }
@@ -79,6 +99,15 @@ public:
 
   // 子弹与墙壁碰撞，返回是否击中，同时处理可破坏墙
   bool bulletHit(sf::Vector2f bulletPos, float damage);
+  
+  // 子弹与墙壁碰撞（带属性返回）
+  WallDestroyResult bulletHitWithResult(sf::Vector2f bulletPos, float damage);
+  
+  // 处理爆炸效果（移除周围8格的墙体）
+  void handleExplosion(int gridX, int gridY);
+  
+  // 获取周围8格的位置列表（用于爆炸杀伤）
+  std::vector<sf::Vector2f> getExplosionArea(int gridX, int gridY) const;
 
   // 获取起点位置
   sf::Vector2f getStartPosition() const { return m_startPosition; }
@@ -146,4 +175,8 @@ private:
   const sf::Color m_destructibleColor = sf::Color(139, 90, 43);
   const sf::Color m_destructibleDamagedColor = sf::Color(100, 60, 30);
   const sf::Color m_exitColor = sf::Color(0, 200, 0, 180);
+  // 属性墙颜色（纯色，无棕色）
+  const sf::Color m_goldWallColor = sf::Color(255, 200, 50);       // 明亮金色
+  const sf::Color m_healWallColor = sf::Color(80, 180, 255);       // 明亮蓝色
+  const sf::Color m_explosiveWallColor = sf::Color(255, 80, 80);   // 明亮红色
 };

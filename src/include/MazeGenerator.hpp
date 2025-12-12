@@ -21,6 +21,9 @@ public:
   // 设置可破坏墙比例
   void setDestructibleRatio(float ratio) { m_destructibleRatio = ratio; }
 
+  // 设置联机模式（联机模式下生成特殊方块）
+  void setMultiplayerMode(bool multiplayer) { m_multiplayerMode = multiplayer; }
+
   // 获取两个出生点（用于多人模式）
   std::pair<int, int> getSpawn1() const { return {m_spawn1X, m_spawn1Y}; }
   std::pair<int, int> getSpawn2() const { return {m_spawn2X, m_spawn2Y}; }
@@ -43,6 +46,7 @@ private:
 
   int m_enemyCount = 5;
   float m_destructibleRatio = 0.15f;
+  bool m_multiplayerMode = false;  // 是否联机模式
 
   // 起点和终点坐标
   int m_startX = 1, m_startY = 1;

@@ -7,6 +7,40 @@ bool CollisionSystem::checkBulletWallCollision(Bullet* bullet, Maze& maze)
   return maze.bulletHit(bullet->getPosition(), bullet->getDamage());
 }
 
+WallDestroyResult CollisionSystem::checkBulletWallCollisionWithResult(Bullet* bullet, Maze& maze)
+{
+  return maze.bulletHitWithResult(bullet->getPosition(), bullet->getDamage());
+}
+
+void CollisionSystem::handleWallDestroyEffect(const WallDestroyResult& result, Tank* shooter, Maze& maze)
+{
+  if (!result.destroyed || !shooter)
+    return;
+    
+  switch (result.attribute)
+  {
+    case WallAttribute::Gold:
+      // 金色墙：获得2金币
+      shooter->addCoins(2);
+      break;
+      
+    case WallAttribute::Heal:
+      // 治疗墙：恢复25%血量
+      shooter->heal(0.25f);
+      break;
+      
+    case WallAttribute::Explosive:
+      // 爆炸墙：爆炸效果已在Maze::bulletHitWithResult中处理（清除周围8格墙）
+      // 这里可以添加额外的伤害逻辑（杀死范围内的坦克/NPC）
+      // 暂时只处理墙体清除，伤害逻辑可以后续添加
+      break;
+      
+    case WallAttribute::None:
+    default:
+      break;
+  }
+}
+
 bool CollisionSystem::checkBulletTankCollision(Bullet* bullet, Tank* tank, float extraRadius)
 {
   sf::Vector2f bulletPos = bullet->getPosition();
@@ -99,9 +133,25 @@ void CollisionSystem::checkMultiplayerCollisions(
     sf::Vector2f bulletPos = bullet->getPosition();
     int bulletTeam = bullet->getTeam();
 
-    // 检查与墙壁碰撞
-    if (checkBulletWallCollision(bullet.get(), maze))
+    // 检查与墙壁碰撞（使用带属性返回的版本）
+    WallDestroyResult wallResult = checkBulletWallCollisionWithResult(bullet.get(), maze);
+    // 判断是否击中了墙（包括击中但未摧毁的情况）
+    bool hitWall = (wallResult.position.x != 0 || wallResult.position.y != 0);
+    
+    if (hitWall || wallResult.destroyed)
     {
+      // 如果墙被摧毁且有属性效果，处理增益
+      if (wallResult.destroyed)
+      {
+        // 判断子弹是谁发射的，给对应玩家加效果
+        bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+        if (isLocalPlayerBullet)
+        {
+          handleWallDestroyEffect(wallResult, player, maze);
+        }
+        // 注意：对方玩家的增益效果由对方客户端处理
+      }
+      
       bullet->setInactive();
       continue;
     }

@@ -456,9 +456,9 @@ void Game::processEvents()
               // 房主按 R：回到等待玩家界面，通知对方准备重新开始
               NetworkManager::getInstance().sendRestartRequest();
 
-              // 重新生成迷宫（使用菜单选择的NPC数量）
+              // 重新生成迷宫（使用菜单选择的NPC数量，联机模式）
               int npcCount = m_enemyOptions[m_enemyIndex];
-              m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
+              m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount, true);
               m_mpState.generatedMazeData = m_maze.getMazeData();
               NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
 
@@ -1056,10 +1056,10 @@ void Game::setupNetworkCallbacks()
     m_gameState = GameState::WaitingForPlayer;
     m_mpState.connectionStatus = "Room created! Code: " + roomCode;
     
-    // 房主立即生成迷宫并发送（使用菜单选择的NPC数量）
+    // 房主立即生成迷宫并发送（使用菜单选择的NPC数量，联机模式生成特殊方块）
     int npcCount = m_enemyOptions[m_enemyIndex];
     std::cout << "[DEBUG] Creating room with " << npcCount << " NPCs" << std::endl;
-    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
+    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount, true);
     m_mpState.generatedMazeData = m_maze.getMazeData();
     
     // 检查迷宫数据中是否有敌人标记 'X'

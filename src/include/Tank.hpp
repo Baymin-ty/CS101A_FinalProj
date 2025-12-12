@@ -52,6 +52,14 @@ public:
   // 受到伤害
   void takeDamage(float damage);
   bool isDead() const { return m_healthBar.isDead(); }
+  
+  // 治疗（恢复百分比血量）
+  void heal(float percent) {
+    float maxHp = m_healthBar.getMaxHealth();
+    float current = m_healthBar.getHealth();
+    float healAmount = maxHp * percent;
+    m_healthBar.setHealth(std::min(current + healAmount, maxHp));
+  }
 
   // 获取碰撞半径 (减小以适应迷宫通道)
   float getCollisionRadius() const { return 12.f * m_scale / 0.25f; }

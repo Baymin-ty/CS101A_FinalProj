@@ -1,6 +1,7 @@
 #include "MazeGenerator.hpp"
 #include <algorithm>
 #include <ctime>
+#include <set>
 
 MazeGenerator::MazeGenerator(int width, int height)
     : m_width(width), m_height(height), m_seed(0), m_seedSet(false)
@@ -258,7 +259,9 @@ void MazeGenerator::placeEnemies()
 
 void MazeGenerator::placeDestructibleWalls()
 {
-  // 将一些墙壁变成可破坏的
+  // 首先收集所有可以变成可破坏墙的位置
+  std::vector<std::pair<int, int>> destructibleCandidates;
+  
   for (int y = 1; y < m_height - 1; ++y)
   {
     for (int x = 1; x < m_width - 1; ++x)
@@ -290,9 +293,87 @@ void MazeGenerator::placeDestructibleWalls()
           float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
           if (roll < m_destructibleRatio)
           {
-            m_grid[y][x] = '*';
+            destructibleCandidates.push_back({x, y});
           }
         }
+      }
+    }
+  }
+  
+  // 单机模式：所有可破坏墙都是普通的（无特殊属性）
+  if (!m_multiplayerMode)
+  {
+    for (const auto& [x, y] : destructibleCandidates)
+    {
+      m_grid[y][x] = '*'; // 普通可破坏墙
+    }
+    return;
+  }
+  
+  // 联机模式：生成特殊方块
+  // 先放置爆炸墙（10%，避开边缘）
+  std::vector<std::pair<int, int>> explosiveWalls;
+  for (auto it = destructibleCandidates.begin(); it != destructibleCandidates.end();)
+  {
+    int x = it->first;
+    int y = it->second;
+    
+    // 爆炸墙不能在边缘一圈（距离边界至少2格）
+    bool nearEdge = (x <= 2 || x >= m_width - 3 || y <= 2 || y >= m_height - 3);
+    
+    if (!nearEdge)
+    {
+      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+      if (roll < 0.10f) // 10%概率变成爆炸墙
+      {
+        m_grid[y][x] = 'B'; // B = Bomb/Explosive
+        explosiveWalls.push_back({x, y});
+        it = destructibleCandidates.erase(it);
+        continue;
+      }
+    }
+    ++it;
+  }
+  
+  // 标记爆炸墙周围8格不能有增益墙
+  std::set<std::pair<int, int>> noBuffZone;
+  for (const auto& [ex, ey] : explosiveWalls)
+  {
+    for (int dy = -1; dy <= 1; ++dy)
+    {
+      for (int dx = -1; dx <= 1; ++dx)
+      {
+        if (dx == 0 && dy == 0) continue;
+        noBuffZone.insert({ex + dx, ey + dy});
+      }
+    }
+  }
+  
+  // 剩余墙体分配属性
+  for (const auto& [x, y] : destructibleCandidates)
+  {
+    // 检查是否在禁止增益区域
+    bool inNoBuffZone = noBuffZone.count({x, y}) > 0;
+    
+    if (inNoBuffZone)
+    {
+      m_grid[y][x] = '*'; // 普通可破坏墙
+    }
+    else
+    {
+      // 分配属性：50%金色，25%治疗，25%普通
+      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+      if (roll < 0.50f)
+      {
+        m_grid[y][x] = 'G'; // Gold
+      }
+      else if (roll < 0.75f)
+      {
+        m_grid[y][x] = 'H'; // Heal
+      }
+      else
+      {
+        m_grid[y][x] = '*'; // 普通
       }
     }
   }

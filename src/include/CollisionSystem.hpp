@@ -31,8 +31,14 @@ public:
   );
   
 private:
-  // 检查子弹与墙壁碰撞
+  // 检查子弹与墙壁碰撞（简单版本，单机模式用）
   static bool checkBulletWallCollision(Bullet* bullet, Maze& maze);
+  
+  // 检查子弹与墙壁碰撞（带属性版本，联机模式用）
+  static WallDestroyResult checkBulletWallCollisionWithResult(Bullet* bullet, Maze& maze);
+  
+  // 处理墙体摧毁效果（给玩家加金币/治疗）
+  static void handleWallDestroyEffect(const WallDestroyResult& result, Tank* shooter, Maze& maze);
   
   // 检查子弹与坦克碰撞
   static bool checkBulletTankCollision(Bullet* bullet, Tank* tank, float extraRadius = 5.f);

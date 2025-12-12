@@ -51,12 +51,43 @@ void Maze::loadFromString(const std::vector<std::string> &map)
         wall.shape.setOutlineThickness(1.f);
         break;
 
-      case '*': // 可破坏墙
+      case '*': // 可破坏墙（普通）
         wall.type = WallType::Destructible;
+        wall.attribute = WallAttribute::None;
         wall.health = 100.f;
         wall.maxHealth = 100.f;
         wall.shape.setFillColor(m_destructibleColor);
         wall.shape.setOutlineColor(sf::Color(100, 60, 20));
+        wall.shape.setOutlineThickness(1.f);
+        break;
+
+      case 'G': // 金色墙 - 打掉获得2金币
+        wall.type = WallType::Destructible;
+        wall.attribute = WallAttribute::Gold;
+        wall.health = 100.f;
+        wall.maxHealth = 100.f;
+        wall.shape.setFillColor(m_goldWallColor);
+        wall.shape.setOutlineColor(sf::Color(220, 170, 30)); // 金色边框
+        wall.shape.setOutlineThickness(1.f);
+        break;
+
+      case 'H': // 治疗墙 - 恢复25%血量
+        wall.type = WallType::Destructible;
+        wall.attribute = WallAttribute::Heal;
+        wall.health = 100.f;
+        wall.maxHealth = 100.f;
+        wall.shape.setFillColor(m_healWallColor);
+        wall.shape.setOutlineColor(sf::Color(50, 140, 220)); // 蓝色边框
+        wall.shape.setOutlineThickness(1.f);
+        break;
+
+      case 'B': // 爆炸墙 - 爆炸杀伤周围
+        wall.type = WallType::Destructible;
+        wall.attribute = WallAttribute::Explosive;
+        wall.health = 100.f;
+        wall.maxHealth = 100.f;
+        wall.shape.setFillColor(m_explosiveWallColor);
+        wall.shape.setOutlineColor(sf::Color(200, 50, 50)); // 红色边框
         wall.shape.setOutlineThickness(1.f);
         break;
 
@@ -92,12 +123,12 @@ void Maze::loadFromString(const std::vector<std::string> &map)
       }
     }
   }
-  
+
   // 计算每个墙体的圆角
   calculateRoundedCorners();
 }
 
-void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount)
+void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount, bool multiplayerMode)
 {
   MazeGenerator generator(width, height);
   if (seed != 0)
@@ -106,6 +137,8 @@ void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enem
   }
   // 设置NPC数量
   generator.setEnemyCount(enemyCount);
+  // 设置联机模式（联机模式下生成特殊方块）
+  generator.setMultiplayerMode(multiplayerMode);
   std::vector<std::string> mazeData = generator.generate();
   loadFromString(mazeData);
 }
@@ -122,14 +155,48 @@ void Maze::update(float dt)
       if (wall.type == WallType::Destructible)
       {
         float healthRatio = wall.health / wall.maxHealth;
-        // 插值颜色
         sf::Color color;
-        color.r = static_cast<std::uint8_t>(m_destructibleDamagedColor.r +
-                                            (m_destructibleColor.r - m_destructibleDamagedColor.r) * healthRatio);
-        color.g = static_cast<std::uint8_t>(m_destructibleDamagedColor.g +
-                                            (m_destructibleColor.g - m_destructibleDamagedColor.g) * healthRatio);
-        color.b = static_cast<std::uint8_t>(m_destructibleDamagedColor.b +
-                                            (m_destructibleColor.b - m_destructibleDamagedColor.b) * healthRatio);
+
+        // 根据墙体属性选择对应的颜色插值
+        switch (wall.attribute)
+        {
+        case WallAttribute::Gold:
+        {
+          // 金色墙：从深金色到亮金色
+          sf::Color dark(180, 140, 30);
+          color.r = static_cast<std::uint8_t>(dark.r + (m_goldWallColor.r - dark.r) * healthRatio);
+          color.g = static_cast<std::uint8_t>(dark.g + (m_goldWallColor.g - dark.g) * healthRatio);
+          color.b = static_cast<std::uint8_t>(dark.b + (m_goldWallColor.b - dark.b) * healthRatio);
+          break;
+        }
+        case WallAttribute::Heal:
+        {
+          // 蓝色墙：从深蓝色到亮蓝色
+          sf::Color dark(40, 100, 180);
+          color.r = static_cast<std::uint8_t>(dark.r + (m_healWallColor.r - dark.r) * healthRatio);
+          color.g = static_cast<std::uint8_t>(dark.g + (m_healWallColor.g - dark.g) * healthRatio);
+          color.b = static_cast<std::uint8_t>(dark.b + (m_healWallColor.b - dark.b) * healthRatio);
+          break;
+        }
+        case WallAttribute::Explosive:
+        {
+          // 红色墙：从深红色到亮红色
+          sf::Color dark(150, 40, 40);
+          color.r = static_cast<std::uint8_t>(dark.r + (m_explosiveWallColor.r - dark.r) * healthRatio);
+          color.g = static_cast<std::uint8_t>(dark.g + (m_explosiveWallColor.g - dark.g) * healthRatio);
+          color.b = static_cast<std::uint8_t>(dark.b + (m_explosiveWallColor.b - dark.b) * healthRatio);
+          break;
+        }
+        default: // WallAttribute::None - 普通可破坏墙（棕色）
+          color.r = static_cast<std::uint8_t>(m_destructibleDamagedColor.r +
+                                              (m_destructibleColor.r - m_destructibleDamagedColor.r) * healthRatio);
+          color.g = static_cast<std::uint8_t>(m_destructibleDamagedColor.g +
+                                              (m_destructibleColor.g - m_destructibleDamagedColor.g) * healthRatio);
+          color.b = static_cast<std::uint8_t>(m_destructibleDamagedColor.b +
+                                              (m_destructibleColor.b - m_destructibleDamagedColor.b) * healthRatio);
+          break;
+        }
+
         wall.shape.setFillColor(color);
       }
     }
@@ -167,43 +234,47 @@ bool Maze::checkCollision(sf::Vector2f position, float radius) const
       if (wall.type == WallType::Solid || wall.type == WallType::Destructible)
       {
         // 选择性圆角矩形与圆形碰撞检测
-        float wallLeft = c * m_tileSize + 1.f;   // 考虑1像素偏移
+        float wallLeft = c * m_tileSize + 1.f; // 考虑1像素偏移
         float wallRight = wallLeft + m_tileSize - 2.f;
         float wallTop = r * m_tileSize + 1.f;
         float wallBottom = wallTop + m_tileSize - 2.f;
-        
+
         float cornerRadius = WALL_CORNER_RADIUS;
-        
+
         // 计算内部矩形边界（不包含圆角区域）
         float innerLeft = wallLeft + cornerRadius;
         float innerRight = wallRight - cornerRadius;
         float innerTop = wallTop + cornerRadius;
         float innerBottom = wallBottom - cornerRadius;
-        
+
         // 判断位置在哪个角落区域
         bool inLeftZone = position.x < innerLeft;
         bool inRightZone = position.x > innerRight;
         bool inTopZone = position.y < innerTop;
         bool inBottomZone = position.y > innerBottom;
-        
+
         // 确定是哪个角并检查该角是否有圆角
         int cornerIndex = -1; // 0=左上, 1=右上, 2=右下, 3=左下
-        if (inLeftZone && inTopZone) cornerIndex = 0;
-        else if (inRightZone && inTopZone) cornerIndex = 1;
-        else if (inRightZone && inBottomZone) cornerIndex = 2;
-        else if (inLeftZone && inBottomZone) cornerIndex = 3;
-        
+        if (inLeftZone && inTopZone)
+          cornerIndex = 0;
+        else if (inRightZone && inTopZone)
+          cornerIndex = 1;
+        else if (inRightZone && inBottomZone)
+          cornerIndex = 2;
+        else if (inLeftZone && inBottomZone)
+          cornerIndex = 3;
+
         if (cornerIndex >= 0 && wall.roundedCorners[cornerIndex])
         {
           // 这个角是圆角 - 使用圆形碰撞检测
           float cornerCenterX = inLeftZone ? innerLeft : innerRight;
           float cornerCenterY = inTopZone ? innerTop : innerBottom;
-          
+
           float dx = position.x - cornerCenterX;
           float dy = position.y - cornerCenterY;
           float distSq = dx * dx + dy * dy;
           float combinedRadius = radius + cornerRadius;
-          
+
           if (distSq < combinedRadius * combinedRadius)
           {
             return true;
@@ -248,12 +319,126 @@ bool Maze::bulletHit(sf::Vector2f bulletPos, float damage)
     wall.health -= damage;
     if (wall.health <= 0)
     {
+      // 保存属性以便处理爆炸
+      WallAttribute attr = wall.attribute;
       wall.type = WallType::None; // 墙被摧毁
+
+      // 如果是爆炸墙，处理周围8格
+      if (attr == WallAttribute::Explosive)
+      {
+        handleExplosion(c, r);
+      }
     }
     return true;
   }
 
   return false;
+}
+
+WallDestroyResult Maze::bulletHitWithResult(sf::Vector2f bulletPos, float damage)
+{
+  WallDestroyResult result;
+
+  int c = static_cast<int>(bulletPos.x / m_tileSize);
+  int r = static_cast<int>(bulletPos.y / m_tileSize);
+
+  if (r < 0 || r >= m_rows || c < 0 || c >= m_cols)
+    return result;
+
+  Wall &wall = m_walls[r][c];
+
+  // 如果是不可破坏墙，视为命中但无摧毁效果
+  if (wall.type == WallType::Solid)
+  {
+    result.destroyed = false;
+    result.attribute = WallAttribute::None;
+    result.position = {c * m_tileSize + m_tileSize / 2.f, r * m_tileSize + m_tileSize / 2.f};
+    result.gridX = c;
+    result.gridY = r;
+    return result;
+  }
+
+  if (wall.type == WallType::Destructible)
+  {
+    wall.health -= damage;
+
+    if (wall.health <= 0)
+    {
+      // 记录摧毁信息
+      result.destroyed = true;
+      result.attribute = wall.attribute;
+      result.position = {c * m_tileSize + m_tileSize / 2.f, r * m_tileSize + m_tileSize / 2.f};
+      result.gridX = c;
+      result.gridY = r;
+
+      // 清除当前墙格
+      wall.type = WallType::None;
+
+      // 如果是爆炸属性，处理周围8格
+      if (result.attribute == WallAttribute::Explosive)
+      {
+        handleExplosion(result.gridX, result.gridY);
+      }
+    }
+    else
+    {
+      // 受伤但未摧毁
+      result.destroyed = false;
+      result.attribute = WallAttribute::None;
+      result.position = {c * m_tileSize + m_tileSize / 2.f, r * m_tileSize + m_tileSize / 2.f};
+      result.gridX = c;
+      result.gridY = r;
+    }
+
+    return result;
+  }
+
+  // 非墙体
+  return result;
+}
+
+void Maze::handleExplosion(int gridX, int gridY)
+{
+  // 移除周围8格的可破坏墙（不影响不可破坏墙和出口）
+  for (int dr = -1; dr <= 1; ++dr)
+  {
+    for (int dc = -1; dc <= 1; ++dc)
+    {
+      if (dr == 0 && dc == 0)
+        continue;
+
+      int nr = gridY + dr; // 行
+      int nc = gridX + dc; // 列
+
+      if (nr < 0 || nr >= m_rows || nc < 0 || nc >= m_cols)
+        continue;
+
+      Wall &neighbor = m_walls[nr][nc];
+      if (neighbor.type == WallType::Destructible)
+      {
+        neighbor.type = WallType::None;
+      }
+    }
+  }
+}
+
+std::vector<sf::Vector2f> Maze::getExplosionArea(int gridX, int gridY) const
+{
+  std::vector<sf::Vector2f> area;
+  for (int dx = -1; dx <= 1; ++dx)
+  {
+    for (int dy = -1; dy <= 1; ++dy)
+    {
+      if (dx == 0 && dy == 0)
+        continue;
+      int gx = gridX + dx;
+      int gy = gridY + dy;
+      if (gy < 0 || gy >= m_rows || gx < 0 || gx >= m_cols)
+        continue;
+      area.push_back({gx * m_tileSize + m_tileSize / 2.f, gy * m_tileSize + m_tileSize / 2.f});
+    }
+  }
+  return area;
 }
 
 bool Maze::isAtExit(sf::Vector2f position, float radius) const
@@ -471,7 +656,7 @@ bool Maze::isWall(int row, int col) const
 {
   if (row < 0 || row >= m_rows || col < 0 || col >= m_cols)
     return true; // 边界外视为墙
-  
+
   WallType type = m_walls[row][col].type;
   return type == WallType::Solid || type == WallType::Destructible;
 }
@@ -481,29 +666,29 @@ void Maze::calculateRoundedCorners()
   // 对于每个墙体，检查其四个角是否需要圆角
   // 规则：如果某个角的两个相邻方向都没有墙，则该角需要圆角
   // 例如：左上角需要圆角的条件是：左边没有墙 AND 上边没有墙
-  
+
   for (int r = 0; r < m_rows; ++r)
   {
     for (int c = 0; c < m_cols; ++c)
     {
       Wall &wall = m_walls[r][c];
-      
+
       // 只处理墙体
       if (wall.type != WallType::Solid && wall.type != WallType::Destructible && wall.type != WallType::Exit)
         continue;
-      
+
       // 检查四个方向的邻居
       bool hasTop = isWall(r - 1, c);
       bool hasBottom = isWall(r + 1, c);
       bool hasLeft = isWall(r, c - 1);
       bool hasRight = isWall(r, c + 1);
-      
+
       // 还需要检查对角线邻居（用于更精确的判断）
       bool hasTopLeft = isWall(r - 1, c - 1);
       bool hasTopRight = isWall(r - 1, c + 1);
       bool hasBottomLeft = isWall(r + 1, c - 1);
       bool hasBottomRight = isWall(r + 1, c + 1);
-      
+
       // 计算每个角是否需要圆角
       // 左上角：如果左边和上边都没有墙，则需要圆角
       bool roundTopLeft = !hasTop && !hasLeft;
@@ -513,11 +698,10 @@ void Maze::calculateRoundedCorners()
       bool roundBottomRight = !hasBottom && !hasRight;
       // 左下角：如果左边和下边都没有墙，则需要圆角
       bool roundBottomLeft = !hasBottom && !hasLeft;
-      
+
       // 设置圆角
       wall.roundedCorners = {roundTopLeft, roundTopRight, roundBottomRight, roundBottomLeft};
       wall.shape.setRoundedCorners(roundTopLeft, roundTopRight, roundBottomRight, roundBottomLeft);
     }
   }
 }
-
