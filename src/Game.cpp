@@ -14,7 +14,7 @@ Game::Game()
   unsigned int maxWidth = desktop.size.x * 9 / 10; // 留10%边距
   unsigned int maxHeight = desktop.size.y * 9 / 10;
 
-  // 根据宽高比计算实际尺寸
+  // 根据宽高比计算实际窗口尺寸
   if (static_cast<float>(maxWidth) / maxHeight > ASPECT_RATIO)
   {
     // 屏幕太宽，以高度为准
@@ -28,13 +28,13 @@ Game::Game()
     m_screenHeight = static_cast<unsigned int>(m_screenWidth / ASPECT_RATIO);
   }
 
-  // 创建窗口
+  // 创建窗口（使用实际尺寸）
   m_window.create(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game");
   m_window.setFramerateLimit(60);
 
-  // 初始化视图
-  m_gameView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)}));
-  m_uiView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)}));
+  // 初始化视图 - 使用固定的逻辑分辨率，保证所有屏幕看到的范围相同
+  m_gameView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)}));
+  m_uiView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)}));
 }
 
 bool Game::init()
@@ -703,10 +703,10 @@ void Game::updateCamera()
   float actualLookAhead = m_cameraLookAhead * distFactor;
   sf::Vector2f cameraTarget = playerPos + lookDir * actualLookAhead;
 
-  // 限制视角不超出迷宫边界
+  // 限制视角不超出迷宫边界（使用逻辑分辨率）
   sf::Vector2f mazeSize = m_maze.getSize();
-  float halfWidth = m_screenWidth / 2.f;
-  float halfHeight = m_screenHeight / 2.f;
+  float halfWidth = LOGICAL_WIDTH / 2.f;
+  float halfHeight = LOGICAL_HEIGHT / 2.f;
 
   cameraTarget.x = std::max(halfWidth, std::min(cameraTarget.x, mazeSize.x - halfWidth));
   cameraTarget.y = std::max(halfHeight, std::min(cameraTarget.y, mazeSize.y - halfHeight));
@@ -786,7 +786,7 @@ void Game::renderMenu()
   title.setFillColor(sf::Color::White);
   title.setStyle(sf::Text::Bold);
   sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, 80.f});
+  title.setPosition({(LOGICAL_WIDTH - titleBounds.size.x) / 2.f, 80.f});
   m_window.draw(title);
 
   // 菜单选项
@@ -819,7 +819,7 @@ void Game::renderMenu()
     }
 
     sf::FloatRect bounds = optionText.getLocalBounds();
-    optionText.setPosition({(m_screenWidth - bounds.size.x) / 2.f, startY + i * spacing});
+    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, startY + i * spacing});
     m_window.draw(optionText);
   }
 
@@ -832,7 +832,7 @@ void Game::renderMenu()
   mapInfo.setCharacterSize(20);
   mapInfo.setFillColor(sf::Color(100, 180, 100));
   sf::FloatRect mapInfoBounds = mapInfo.getLocalBounds();
-  mapInfo.setPosition({(m_screenWidth - mapInfoBounds.size.x) / 2.f, m_screenHeight - 120.f});
+  mapInfo.setPosition({(LOGICAL_WIDTH - mapInfoBounds.size.x) / 2.f, LOGICAL_HEIGHT - 120.f});
   m_window.draw(mapInfo);
 
   // 提示
@@ -841,7 +841,7 @@ void Game::renderMenu()
   hint.setCharacterSize(18);
   hint.setFillColor(sf::Color(120, 120, 120));
   sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight - 60.f});
+  hint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, LOGICAL_HEIGHT - 60.f});
   m_window.draw(hint);
 }
 
@@ -889,7 +889,7 @@ void Game::renderPaused()
   m_window.setView(m_uiView);
 
   // 半透明背景
-  sf::RectangleShape overlay({static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)});
+  sf::RectangleShape overlay({static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)});
   overlay.setFillColor(sf::Color(0, 0, 0, 180));
   m_window.draw(overlay);
 
@@ -900,7 +900,7 @@ void Game::renderPaused()
   title.setFillColor(sf::Color::Yellow);
   title.setStyle(sf::Text::Bold);
   sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, m_screenHeight / 2.f - 100.f});
+  title.setPosition({(LOGICAL_WIDTH - titleBounds.size.x) / 2.f, LOGICAL_HEIGHT / 2.f - 100.f});
   m_window.draw(title);
 
   // 提示信息
@@ -909,7 +909,7 @@ void Game::renderPaused()
   hint.setCharacterSize(28);
   hint.setFillColor(sf::Color::White);
   sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight / 2.f + 20.f});
+  hint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, LOGICAL_HEIGHT / 2.f + 20.f});
   m_window.draw(hint);
 }
 
@@ -918,7 +918,7 @@ void Game::renderGameOver()
   m_window.setView(m_uiView);
 
   // 半透明背景
-  sf::RectangleShape overlay({static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)});
+  sf::RectangleShape overlay({static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)});
   overlay.setFillColor(sf::Color(0, 0, 0, 150));
   m_window.draw(overlay);
 
@@ -955,7 +955,7 @@ void Game::renderGameOver()
 
   text.setCharacterSize(64);
   sf::FloatRect bounds = text.getLocalBounds();
-  text.setPosition({(m_screenWidth - bounds.size.x) / 2.f, m_screenHeight / 2.f - 80.f});
+  text.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, LOGICAL_HEIGHT / 2.f - 80.f});
   m_window.draw(text);
 
   sf::Text hint(m_font);
@@ -980,7 +980,7 @@ void Game::renderGameOver()
   hint.setCharacterSize(28);
   hint.setFillColor(sf::Color::White);
   sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, m_screenHeight / 2.f + 20.f});
+  hint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, LOGICAL_HEIGHT / 2.f + 20.f});
   m_window.draw(hint);
 }
 
@@ -1288,8 +1288,8 @@ MultiplayerContext Game::getMultiplayerContext()
       m_enemies,
       m_bullets,
       m_maze,
-      m_screenWidth,
-      m_screenHeight,
+      LOGICAL_WIDTH,    // 使用逻辑分辨率
+      LOGICAL_HEIGHT,   // 使用逻辑分辨率
       m_tankScale};
 }
 
@@ -1307,7 +1307,7 @@ void Game::renderConnecting()
 {
   MultiplayerHandler::renderConnecting(
       m_window, m_uiView, m_font,
-      m_screenWidth, m_screenHeight,
+      LOGICAL_WIDTH, LOGICAL_HEIGHT,
       m_mpState.connectionStatus, m_inputText,
       m_inputMode == InputMode::ServerIP);
 }
@@ -1316,7 +1316,7 @@ void Game::renderWaitingForPlayer()
 {
   MultiplayerHandler::renderWaitingForPlayer(
       m_window, m_uiView, m_font,
-      m_screenWidth, m_screenHeight,
+      LOGICAL_WIDTH, LOGICAL_HEIGHT,
       m_mpState.roomCode);
 }
 

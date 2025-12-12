@@ -82,8 +82,11 @@ private:
 
   // 配置（放在前面以便初始化列表使用）
   static constexpr float ASPECT_RATIO = 16.f / 9.f; // 固定宽高比
-  unsigned int m_screenWidth = 1280;
-  unsigned int m_screenHeight = 720;
+  // 逻辑分辨率（所有屏幕看到的游戏范围相同）
+  static constexpr unsigned int LOGICAL_WIDTH = 1920;
+  static constexpr unsigned int LOGICAL_HEIGHT = 1080;
+  unsigned int m_screenWidth = 1280;   // 实际窗口宽度
+  unsigned int m_screenHeight = 720;   // 实际窗口高度
   const float m_shootCooldown = 0.3f;
   const float m_bulletSpeed = 500.f;
   const float m_cameraLookAhead = 100.f; // 视角向瞄准方向偏移量（减小）
