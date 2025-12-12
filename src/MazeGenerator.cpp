@@ -136,14 +136,14 @@ void MazeGenerator::placeStartAndEnd()
     distancePoints.push_back({dist, {ex, ey}});
   }
 
-  // 按距离排序
+  // 按距离排序（从远到近）
   std::sort(distancePoints.begin(), distancePoints.end(),
             [](const auto &a, const auto &b)
             { return a.first > b.first; });
 
-  // 从距离最远的前 30% 中随机选一个作为终点
-  // 这样终点不一定是最远的，但保证有一定距离
-  int topCount = std::max(1, static_cast<int>(distancePoints.size() * 0.3));
+  // 从距离最远的前 10% 中随机选一个作为终点
+  // 确保起点离终点足够远
+  int topCount = std::max(1, static_cast<int>(distancePoints.size() * 0.1));
   int selectedIdx = m_rng() % topCount;
 
   m_startX = sx;
@@ -315,10 +315,11 @@ void MazeGenerator::placeMultiplayerSpawns()
     return;
   }
 
-  // 先找两个相距较远的出生点
+  // 找两个相距适中的出生点（不要太远，让玩家可以互动）
   int bestSpawn1 = -1, bestSpawn2 = -1;
-  int maxSpawnDist = 0;
-  int minSpawnDist = std::max(8, std::min(m_width, m_height) / 3); // 两出生点最小距离
+  int bestSpawnDist = 0;
+  int minSpawnDist = std::max(4, std::min(m_width, m_height) / 6); // 两出生点最小距离
+  int maxSpawnDist = std::max(10, std::min(m_width, m_height) / 3); // 两出生点最大距离
   
   // 从空地中筛选可用的出生点（排除终点和敌人位置）
   std::vector<std::pair<int, int>> spawnCandidates;
@@ -335,16 +336,20 @@ void MazeGenerator::placeMultiplayerSpawns()
     spawnCandidates = emptySpaces; // 回退
   }
 
-  // 找两个距离最远的出生点
+  // 找两个距离适中的出生点（在minSpawnDist和maxSpawnDist之间）
   for (size_t i = 0; i < spawnCandidates.size() && i < 50; ++i) {
     for (size_t j = i + 1; j < spawnCandidates.size() && j < 50; ++j) {
       auto [x1, y1] = spawnCandidates[i];
       auto [x2, y2] = spawnCandidates[j];
       int dist = std::abs(x1 - x2) + std::abs(y1 - y2);
-      if (dist > maxSpawnDist && dist >= minSpawnDist) {
-        maxSpawnDist = dist;
-        bestSpawn1 = static_cast<int>(i);
-        bestSpawn2 = static_cast<int>(j);
+      // 选择在范围内且尽量接近理想距离的点对
+      if (dist >= minSpawnDist && dist <= maxSpawnDist) {
+        // 优先选择距离适中的
+        if (bestSpawn1 < 0 || dist > bestSpawnDist) {
+          bestSpawnDist = dist;
+          bestSpawn1 = static_cast<int>(i);
+          bestSpawn2 = static_cast<int>(j);
+        }
       }
     }
   }

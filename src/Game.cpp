@@ -1669,8 +1669,10 @@ void Game::renderMultiplayer()
   exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
   m_window.draw(exitMarker);
   
-  // 渲染NPC坦克
+  // 渲染NPC坦克（跳过死亡的）
   for (const auto& npc : m_enemies) {
+    if (npc->isDead()) continue;  // 跳过死亡的NPC
+    
     npc->draw(m_window);
     
     // 如果NPC已激活，显示阵营标记
