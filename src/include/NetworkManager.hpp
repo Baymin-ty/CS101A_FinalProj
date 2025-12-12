@@ -33,6 +33,12 @@ enum class NetMessageType : uint8_t
   GameWin,       // 游戏胜利（先到终点）
   GameResult,    // 游戏结果（胜/负）
   RestartRequest, // 重新开始请求
+  
+  // NPC同步
+  NpcActivate,   // NPC激活
+  NpcUpdate,     // NPC状态更新（位置、血量等）
+  NpcShoot,      // NPC射击
+  NpcDamage,     // NPC受伤
 };
 
 // 玩家状态数据
@@ -43,6 +49,18 @@ struct PlayerState
   float turretAngle = 0;
   float health = 100;
   bool reachedExit = false;
+};
+
+// NPC状态数据
+struct NpcState
+{
+  int id = 0;
+  float x = 0, y = 0;
+  float rotation = 0;
+  float turretAngle = 0;
+  float health = 100;
+  int team = 0;
+  bool activated = false;
 };
 
 // 回调类型
@@ -58,6 +76,10 @@ using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>
 using OnGameResultCallback = std::function<void(bool isWinner)>;
 using OnRestartRequestCallback = std::function<void()>;
 using OnErrorCallback = std::function<void(const std::string& error)>;
+using OnNpcActivateCallback = std::function<void(int npcId, int team)>;
+using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
+using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
+using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
 
 class NetworkManager
 {
@@ -86,6 +108,12 @@ public:
   void sendReachExit();
   void sendGameResult(bool localWin);  // 发送游戏结果
   void sendRestartRequest();           // 发送重新开始请求
+  
+  // NPC同步
+  void sendNpcActivate(int npcId, int team);  // 发送NPC激活
+  void sendNpcUpdate(const NpcState& state);  // 发送NPC状态更新
+  void sendNpcShoot(int npcId, float x, float y, float angle);  // 发送NPC射击
+  void sendNpcDamage(int npcId, float damage);  // 发送NPC受伤
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -103,6 +131,10 @@ public:
   void setOnGameResult(OnGameResultCallback cb) { m_onGameResult = cb; }
   void setOnRestartRequest(OnRestartRequestCallback cb) { m_onRestartRequest = cb; }
   void setOnError(OnErrorCallback cb) { m_onError = cb; }
+  void setOnNpcActivate(OnNpcActivateCallback cb) { m_onNpcActivate = cb; }
+  void setOnNpcUpdate(OnNpcUpdateCallback cb) { m_onNpcUpdate = cb; }
+  void setOnNpcShoot(OnNpcShootCallback cb) { m_onNpcShoot = cb; }
+  void setOnNpcDamage(OnNpcDamageCallback cb) { m_onNpcDamage = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -134,4 +166,8 @@ private:
   OnGameResultCallback m_onGameResult;
   OnRestartRequestCallback m_onRestartRequest;
   OnErrorCallback m_onError;
+  OnNpcActivateCallback m_onNpcActivate;
+  OnNpcUpdateCallback m_onNpcUpdate;
+  OnNpcShootCallback m_onNpcShoot;
+  OnNpcDamageCallback m_onNpcDamage;
 };

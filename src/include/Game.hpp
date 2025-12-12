@@ -136,6 +136,11 @@ private:
   // 多人游戏迷宫数据
   std::vector<std::string> m_generatedMazeData;
 
+  // 多人模式：当前接近的可激活NPC（用于显示提示）
+  int m_nearbyNpcIndex = -1;
+  bool m_rKeyWasPressed = false;  // R键状态跟踪
+  bool m_rKeyJustPressed = false; // R键刚刚按下（事件驱动）
+
   bool m_gameOver = false;
   bool m_gameWon = false;
 };

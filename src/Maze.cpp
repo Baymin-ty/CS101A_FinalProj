@@ -25,6 +25,8 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   m_walls.clear();
   m_walls.resize(m_rows, std::vector<Wall>(m_cols));
   m_enemySpawnPoints.clear();
+  m_spawn1Position = {0.f, 0.f};
+  m_spawn2Position = {0.f, 0.f};
 
   for (int r = 0; r < m_rows; ++r)
   {
@@ -73,6 +75,16 @@ void Maze::loadFromString(const std::vector<std::string> &map)
         m_enemySpawnPoints.push_back({x + m_tileSize / 2.f, y + m_tileSize / 2.f});
         break;
 
+      case '1': // 多人模式出生点1
+        wall.type = WallType::None;
+        m_spawn1Position = {x + m_tileSize / 2.f, y + m_tileSize / 2.f};
+        break;
+
+      case '2': // 多人模式出生点2
+        wall.type = WallType::None;
+        m_spawn2Position = {x + m_tileSize / 2.f, y + m_tileSize / 2.f};
+        break;
+
       default: // 空地
         wall.type = WallType::None;
         break;
@@ -81,13 +93,14 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   }
 }
 
-void Maze::generateRandomMaze(int width, int height, unsigned int seed)
+void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount)
 {
   MazeGenerator generator(width, height);
   if (seed != 0) {
     generator.setSeed(seed);
   }
-  generator.setEnemyCount(0); // 多人模式不需要敌人
+  // 设置NPC数量
+  generator.setEnemyCount(enemyCount);
   std::vector<std::string> mazeData = generator.generate();
   loadFromString(mazeData);
 }

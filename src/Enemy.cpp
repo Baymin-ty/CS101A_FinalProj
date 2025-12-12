@@ -2,6 +2,7 @@
 #include "Maze.hpp"
 #include <cstdlib>
 #include <cmath>
+#include <algorithm>
 
 Enemy::Enemy()
     : m_healthBar(50.f, 6.f)
@@ -204,6 +205,18 @@ float Enemy::getTurretAngle() const
   return m_turret ? m_turret->getRotation().asDegrees() : 0.f;
 }
 
+float Enemy::getTurretRotation() const
+{
+  return getTurretAngle();
+}
+
+void Enemy::setTurretRotation(float angle)
+{
+  if (m_turret) {
+    m_turret->setRotation(sf::degrees(angle));
+  }
+}
+
 sf::Vector2f Enemy::getGunPosition() const
 {
   if (!m_turret || !m_hull)
@@ -234,16 +247,46 @@ void Enemy::takeDamage(float damage)
   m_healthBar.setHealth(m_healthBar.getHealth() - damage);
 }
 
-void Enemy::checkActivation(sf::Vector2f playerPos)
+bool Enemy::isPlayerInRange(sf::Vector2f playerPos) const
 {
+  sf::Vector2f toPlayer = playerPos - getPosition();
+  float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+  return dist < m_activationRange;
+}
+
+void Enemy::checkAutoActivation(sf::Vector2f playerPos)
+{
+  // 单人模式使用：距离450内自动激活
   if (m_activated)
     return;
 
   sf::Vector2f toPlayer = playerPos - getPosition();
   float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
 
-  if (dist < m_activationRange)
+  if (dist < 450.f)
   {
     m_activated = true;
+    m_team = 0; // 单人模式中敌人没有阵营，攻击玩家
+  }
+}
+
+void Enemy::setTargets(const std::vector<sf::Vector2f> &targets)
+{
+  m_targets = targets;
+
+  // 选择最近的目标
+  if (!m_targets.empty())
+  {
+    float minDist = std::numeric_limits<float>::max();
+    for (const auto &target : m_targets)
+    {
+      sf::Vector2f toTarget = target - getPosition();
+      float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
+      if (dist < minDist)
+      {
+        minDist = dist;
+        m_targetPos = target;
+      }
+    }
   }
 }

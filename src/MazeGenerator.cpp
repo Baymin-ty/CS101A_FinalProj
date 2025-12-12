@@ -47,6 +47,9 @@ std::vector<std::string> MazeGenerator::generate()
   // 放置可破坏墙
   placeDestructibleWalls();
 
+  // 放置多人模式出生点（在终点附近对称的两个位置）
+  placeMultiplayerSpawns();
+
   // 转换为字符串向量
   std::vector<std::string> result;
   result.reserve(m_height);
@@ -291,6 +294,104 @@ void MazeGenerator::placeDestructibleWalls()
           }
         }
       }
+    }
+  }
+}
+
+void MazeGenerator::placeMultiplayerSpawns()
+{
+  // 为多人模式找两个出生点：
+  // 1. 两个出生点离终点的距离相近（公平）
+  // 2. 两个出生点之间有一定距离
+  // 3. 两个出生点都要有到终点的路径
+  
+  auto emptySpaces = getEmptySpaces();
+  if (emptySpaces.size() < 3) {
+    // 回退到起点附近
+    m_spawn1X = m_startX;
+    m_spawn1Y = m_startY;
+    m_spawn2X = m_startX;
+    m_spawn2Y = m_startY + 2;
+    return;
+  }
+
+  // 计算每个空地到终点的距离
+  std::vector<std::tuple<int, int, int, int>> pointsWithDist; // dist, x, y, idx
+  for (size_t i = 0; i < emptySpaces.size(); ++i) {
+    auto [x, y] = emptySpaces[i];
+    // 排除起点、终点和敌人位置
+    if (m_grid[y][x] != '.' && m_grid[y][x] != 'S') continue;
+    
+    int distToEnd = std::abs(x - m_endX) + std::abs(y - m_endY);
+    int distToStart = std::abs(x - m_startX) + std::abs(y - m_startY);
+    
+    // 出生点应该离终点有一定距离
+    if (distToEnd > 5) {
+      pointsWithDist.push_back({distToEnd, x, y, static_cast<int>(i)});
+    }
+  }
+
+  if (pointsWithDist.size() < 2) {
+    m_spawn1X = m_startX;
+    m_spawn1Y = m_startY;
+    m_spawn2X = m_startX + 2;
+    m_spawn2Y = m_startY;
+    return;
+  }
+
+  // 按到终点距离排序
+  std::sort(pointsWithDist.begin(), pointsWithDist.end());
+
+  // 尝试找两个距终点距离相近但彼此有一定距离的点
+  int bestI = -1, bestJ = -1;
+  int minDistDiff = INT_MAX;
+  int minSpawnDist = std::max(5, std::min(m_width, m_height) / 4); // 两出生点最小距离
+
+  for (size_t i = 0; i < pointsWithDist.size() && i < 30; ++i) {
+    for (size_t j = i + 1; j < pointsWithDist.size() && j < 30; ++j) {
+      auto [dist1, x1, y1, idx1] = pointsWithDist[i];
+      auto [dist2, x2, y2, idx2] = pointsWithDist[j];
+      
+      int spawnDist = std::abs(x1 - x2) + std::abs(y1 - y2);
+      int distDiff = std::abs(dist1 - dist2);
+      
+      // 两出生点之间要有足够距离，且到终点距离要相近
+      if (spawnDist >= minSpawnDist && distDiff < minDistDiff) {
+        minDistDiff = distDiff;
+        bestI = static_cast<int>(i);
+        bestJ = static_cast<int>(j);
+      }
+    }
+  }
+
+  if (bestI >= 0 && bestJ >= 0) {
+    m_spawn1X = std::get<1>(pointsWithDist[bestI]);
+    m_spawn1Y = std::get<2>(pointsWithDist[bestI]);
+    m_spawn2X = std::get<1>(pointsWithDist[bestJ]);
+    m_spawn2Y = std::get<2>(pointsWithDist[bestJ]);
+  } else {
+    // 回退：使用起点和一个较远的点
+    m_spawn1X = m_startX;
+    m_spawn1Y = m_startY;
+    if (!pointsWithDist.empty()) {
+      m_spawn2X = std::get<1>(pointsWithDist.back());
+      m_spawn2Y = std::get<2>(pointsWithDist.back());
+    } else {
+      m_spawn2X = m_startX + 2;
+      m_spawn2Y = m_startY;
+    }
+  }
+
+  // 在地图上标记出生点，用 '1' 和 '2' 表示
+  // 确保位置是空地才标记
+  if (m_spawn1Y >= 0 && m_spawn1Y < m_height && m_spawn1X >= 0 && m_spawn1X < m_width) {
+    if (m_grid[m_spawn1Y][m_spawn1X] == '.' || m_grid[m_spawn1Y][m_spawn1X] == 'S') {
+      m_grid[m_spawn1Y][m_spawn1X] = '1';
+    }
+  }
+  if (m_spawn2Y >= 0 && m_spawn2Y < m_height && m_spawn2X >= 0 && m_spawn2X < m_width) {
+    if (m_grid[m_spawn2Y][m_spawn2X] == '.' || m_grid[m_spawn2Y][m_spawn2X] == 'S') {
+      m_grid[m_spawn2Y][m_spawn2X] = '2';
     }
   }
 }

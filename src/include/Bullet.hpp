@@ -40,6 +40,10 @@ public:
   // 获取伤害值
   float getDamage() const { return m_damage; }
   void setDamage(float damage) { m_damage = damage; }
+  
+  // 阵营信息（用于多人模式NPC）
+  void setTeam(int team) { m_team = team; }
+  int getTeam() const { return m_team; }
 
 private:
   std::unique_ptr<sf::Sprite> m_sprite;
@@ -53,6 +57,7 @@ private:
   float m_damage = 25.f;
   float m_speed = 500.f;
   float m_angle = 0.f;
+  int m_team = 0;  // 0=中立, 1=房主阵营, 2=非房主阵营
 };
 
 // 管理所有子弹

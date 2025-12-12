@@ -171,6 +171,85 @@ void NetworkManager::sendRestartRequest()
   sendPacket(data);
 }
 
+void NetworkManager::sendNpcActivate(int npcId, int team)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::NpcActivate));
+  data.push_back(static_cast<uint8_t>(npcId));
+  data.push_back(static_cast<uint8_t>(team));
+  sendPacket(data);
+}
+
+void NetworkManager::sendNpcUpdate(const NpcState& state)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::NpcUpdate));
+  data.push_back(static_cast<uint8_t>(state.id));
+  
+  // 位置
+  auto pushFloat = [&data](float f) {
+    uint32_t bits;
+    std::memcpy(&bits, &f, sizeof(float));
+    data.push_back(static_cast<uint8_t>(bits & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 8) & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
+  };
+  
+  pushFloat(state.x);
+  pushFloat(state.y);
+  pushFloat(state.rotation);
+  pushFloat(state.turretAngle);
+  pushFloat(state.health);
+  data.push_back(static_cast<uint8_t>(state.team));
+  data.push_back(state.activated ? 1 : 0);
+  sendPacket(data);
+}
+
+void NetworkManager::sendNpcShoot(int npcId, float x, float y, float angle)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::NpcShoot));
+  data.push_back(static_cast<uint8_t>(npcId));
+  
+  auto pushFloat = [&data](float f) {
+    uint32_t bits;
+    std::memcpy(&bits, &f, sizeof(float));
+    data.push_back(static_cast<uint8_t>(bits & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 8) & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
+    data.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
+  };
+  
+  pushFloat(x);
+  pushFloat(y);
+  pushFloat(angle);
+  sendPacket(data);
+}
+
+void NetworkManager::sendNpcDamage(int npcId, float damage)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::NpcDamage));
+  data.push_back(static_cast<uint8_t>(npcId));
+  
+  uint32_t bits;
+  std::memcpy(&bits, &damage, sizeof(float));
+  data.push_back(static_cast<uint8_t>(bits & 0xFF));
+  data.push_back(static_cast<uint8_t>((bits >> 8) & 0xFF));
+  data.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
+  data.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
+  sendPacket(data);
+}
+
 void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData)
 {
   if (!m_connected) return;
@@ -419,6 +498,59 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     if (m_onRestartRequest)
     {
       m_onRestartRequest();
+    }
+    break;
+  }
+  case NetMessageType::NpcActivate:
+  {
+    // NPC激活消息
+    if (data.size() >= 3 && m_onNpcActivate)
+    {
+      int npcId = data[1];
+      int team = data[2];
+      m_onNpcActivate(npcId, team);
+    }
+    break;
+  }
+  case NetMessageType::NpcUpdate:
+  {
+    // NPC状态更新
+    if (data.size() >= 24 && m_onNpcUpdate)
+    {
+      NpcState state;
+      state.id = data[1];
+      state.x = readFloat(2);
+      state.y = readFloat(6);
+      state.rotation = readFloat(10);
+      state.turretAngle = readFloat(14);
+      state.health = readFloat(18);
+      state.team = data[22];
+      state.activated = data[23] != 0;
+      m_onNpcUpdate(state);
+    }
+    break;
+  }
+  case NetMessageType::NpcShoot:
+  {
+    // NPC射击
+    if (data.size() >= 14 && m_onNpcShoot)
+    {
+      int npcId = data[1];
+      float x = readFloat(2);
+      float y = readFloat(6);
+      float angle = readFloat(10);
+      m_onNpcShoot(npcId, x, y, angle);
+    }
+    break;
+  }
+  case NetMessageType::NpcDamage:
+  {
+    // NPC受伤
+    if (data.size() >= 6 && m_onNpcDamage)
+    {
+      int npcId = data[1];
+      float damage = readFloat(2);
+      m_onNpcDamage(npcId, damage);
     }
     break;
   }

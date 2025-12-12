@@ -55,6 +55,11 @@ target_include_directories(CS101AFinalProj PRIVATE
 )
 target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics SFML::Network)
 
+# macOS: 链接 CoreFoundation 框架（用于获取 bundle 路径）
+if(APPLE)
+  target_link_libraries(CS101AFinalProj PRIVATE "-framework CoreFoundation")
+endif()
+
 # ============ 打包配置 ============
 set(CPACK_PACKAGE_NAME "TankMazeGame")
 set(CPACK_PACKAGE_VERSION "1.0.0")

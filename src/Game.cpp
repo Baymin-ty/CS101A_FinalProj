@@ -1,6 +1,7 @@
 #include "Game.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 Game::Game()
     : m_window(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game"),
@@ -419,8 +420,9 @@ void Game::processEvents()
               // 房主按 R：回到等待玩家界面，通知对方准备重新开始
               NetworkManager::getInstance().sendRestartRequest();
               
-              // 重新生成迷宫
-              m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0);
+              // 重新生成迷宫（使用菜单选择的NPC数量）
+              int npcCount = m_enemyOptions[m_enemyIndex];
+              m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
               m_generatedMazeData = m_maze.getMazeData();
               NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
               
@@ -481,6 +483,12 @@ void Game::processEvents()
         {
           NetworkManager::getInstance().disconnect();
           resetGame();
+        }
+        // R键激活NPC
+        if (keyPressed->code == sf::Keyboard::Key::R)
+        {
+          m_rKeyJustPressed = true;
+          std::cout << "[DEBUG] R key event detected!" << std::endl;
         }
       }
       break;
@@ -565,8 +573,8 @@ void Game::update(float dt)
   // 更新敌人
   for (auto &enemy : m_enemies)
   {
-    // 检查激活
-    enemy->checkActivation(m_player->getPosition());
+    // 单人模式：自动激活检测
+    enemy->checkAutoActivation(m_player->getPosition());
 
     enemy->setTarget(m_player->getPosition());
     enemy->update(dt, m_maze);
@@ -728,6 +736,8 @@ void Game::checkMultiplayerCollisions()
   if (!m_player || !m_otherPlayer)
     return;
 
+  int localTeam = m_player->getTeam();  // 本地玩家阵营
+
   // 检查子弹碰撞
   for (auto &bullet : m_bullets)
   {
@@ -735,6 +745,7 @@ void Game::checkMultiplayerCollisions()
       continue;
 
     sf::Vector2f bulletPos = bullet->getPosition();
+    int bulletTeam = bullet->getTeam();  // 0=玩家子弹，非0=NPC子弹的阵营
 
     // 检查与墙壁碰撞（可拆墙）
     if (m_maze.bulletHit(bulletPos, bullet->getDamage()))
@@ -743,8 +754,14 @@ void Game::checkMultiplayerCollisions()
       continue;
     }
 
-    // 检查与本地玩家的碰撞（对方子弹，BulletOwner::Enemy代表对方玩家）
-    if (bullet->getOwner() == BulletOwner::Enemy)
+    // 判断子弹是否是本地玩家发射的
+    bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+    
+    // 检查与本地玩家的碰撞
+    // 对方玩家的子弹 或 敌方NPC的子弹 可以伤害本地玩家
+    bool canHitLocalPlayer = !isLocalPlayerBullet && 
+                             (bulletTeam == 0 || bulletTeam != localTeam);
+    if (canHitLocalPlayer)
     {
       float dist = std::hypot(bulletPos.x - m_player->getPosition().x,
                                bulletPos.y - m_player->getPosition().y);
@@ -756,19 +773,51 @@ void Game::checkMultiplayerCollisions()
       }
     }
     
-    // 检查与对方玩家的碰撞（本地玩家子弹，BulletOwner::Player）
-    // 注意：这是本地模拟，实际判定应该由对方客户端处理
-    // 这里只是为了显示效果
-    if (bullet->getOwner() == BulletOwner::Player)
+    // 检查与对方玩家的碰撞
+    // 本地玩家的子弹 或 本地NPC的子弹 可以伤害对方玩家（只做视觉效果，伤害由对方客户端判定）
+    bool canHitOtherPlayer = isLocalPlayerBullet || bulletTeam == localTeam;
+    if (canHitOtherPlayer)
     {
       float dist = std::hypot(bulletPos.x - m_otherPlayer->getPosition().x,
                                bulletPos.y - m_otherPlayer->getPosition().y);
       if (dist < m_otherPlayer->getCollisionRadius() + 5.f)
       {
-        // 对方玩家被击中的效果可以在这里处理
-        // 但实际伤害判定应该由对方客户端处理
         bullet->setInactive();
         continue;
+      }
+    }
+    
+    // 检查与NPC的碰撞
+    for (auto& npc : m_enemies) {
+      if (!npc->isActivated() || npc->isDead())
+        continue;
+      
+      int npcTeam = npc->getTeam();
+      
+      // 判断子弹是否能伤害这个NPC
+      // 本地玩家子弹可以伤害敌方NPC
+      // NPC子弹可以伤害不同阵营的NPC
+      bool canDamageNpc = false;
+      if (isLocalPlayerBullet && npcTeam != localTeam) {
+        canDamageNpc = true;  // 本地玩家子弹伤害敌方NPC
+      } else if (bulletTeam != 0 && bulletTeam != npcTeam) {
+        canDamageNpc = true;  // NPC子弹伤害不同阵营的NPC
+      }
+      
+      if (canDamageNpc) {
+        float dist = std::hypot(bulletPos.x - npc->getPosition().x,
+                                 bulletPos.y - npc->getPosition().y);
+        if (dist < npc->getCollisionRadius() + 5.f) {
+          npc->takeDamage(bullet->getDamage());
+          
+          // 房主同步NPC伤害给非房主
+          if (m_isHost) {
+            NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
+          }
+          
+          bullet->setInactive();
+          break;
+        }
       }
     }
   }
@@ -833,7 +882,7 @@ void Game::renderMenu()
       std::string("Random Map: ") + (m_useRandomMap ? "ON" : "OFF"),
       std::string("Map Width: < ") + std::to_string(m_widthOptions[m_widthIndex]) + " >",
       std::string("Map Height: < ") + std::to_string(m_heightOptions[m_heightIndex]) + " >",
-      std::string("Enemies: < ") + std::to_string(m_enemyOptions[m_enemyIndex]) + " >",
+      std::string("NPCs: < ") + std::to_string(m_enemyOptions[m_enemyIndex]) + " >",
       "Exit"};
 
   for (size_t i = 0; i < options.size(); ++i)
@@ -1023,9 +1072,21 @@ void Game::setupNetworkCallbacks()
     m_gameState = GameState::WaitingForPlayer;
     m_connectionStatus = "Room created! Code: " + roomCode;
     
-    // 房主立即生成迷宫并发送
-    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0);
+    // 房主立即生成迷宫并发送（使用菜单选择的NPC数量）
+    int npcCount = m_enemyOptions[m_enemyIndex];
+    std::cout << "[DEBUG] Creating room with " << npcCount << " NPCs" << std::endl;
+    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
     m_generatedMazeData = m_maze.getMazeData();
+    
+    // 检查迷宫数据中是否有敌人标记 'X'
+    int xCount = 0;
+    for (const auto& row : m_generatedMazeData) {
+      for (char c : row) {
+        if (c == 'X') xCount++;
+      }
+    }
+    std::cout << "[DEBUG] Maze data contains " << xCount << " enemy markers (X)" << std::endl;
+    
     NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
   });
   
@@ -1057,32 +1118,65 @@ void Game::setupNetworkCallbacks()
       m_maze.loadFromString(m_generatedMazeData);
     }
     
-    // 设置玩家位置
-    sf::Vector2f startPos = m_maze.getPlayerStartPosition();
+    // 获取两个出生点位置（从迷宫数据中解析的 '1' 和 '2' 标记）
+    sf::Vector2f spawn1Pos = m_maze.getSpawn1Position();
+    sf::Vector2f spawn2Pos = m_maze.getSpawn2Position();
     
-    // 创建本地玩家并加载贴图（与单机模式一致）
+    // 如果没有设置出生点，回退到起点
+    if (spawn1Pos.x == 0 && spawn1Pos.y == 0) {
+      spawn1Pos = m_maze.getPlayerStartPosition();
+    }
+    if (spawn2Pos.x == 0 && spawn2Pos.y == 0) {
+      spawn2Pos = m_maze.getPlayerStartPosition();
+    }
+    
+    // 房主使用 spawn1，非房主使用 spawn2
+    sf::Vector2f mySpawn = m_isHost ? spawn1Pos : spawn2Pos;
+    sf::Vector2f otherSpawn = m_isHost ? spawn2Pos : spawn1Pos;
+    
+    // 创建本地玩家并加载贴图
     m_player = std::make_unique<Tank>();
     m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
                            "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
-    m_player->setPosition(startPos);
+    m_player->setPosition(mySpawn);
     m_player->setScale(m_tankScale);
+    m_player->setCoins(10);  // 初始10个金币
+    m_player->setTeam(m_isHost ? 1 : 2);  // 设置阵营
     
     // 设置第二个玩家（另一个客户端）- 使用不同颜色贴图
     m_otherPlayer = std::make_unique<Tank>();
     m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
                                 "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
-    m_otherPlayer->setPosition(startPos);
+    m_otherPlayer->setPosition(otherSpawn);
     m_otherPlayer->setScale(m_tankScale);
+    m_otherPlayer->setTeam(m_isHost ? 2 : 1);  // 对方阵营
     
     m_localPlayerReachedExit = false;
     m_otherPlayerReachedExit = false;
     
-    // 多人模式没有敌人
+    // 多人模式：生成中立NPC坦克
     m_enemies.clear();
+    
+    // 调试：检查敌人生成点数量
+    const auto& spawnPoints = m_maze.getEnemySpawnPoints();
+    std::cout << "[DEBUG] Multiplayer: Enemy spawn points count = " << spawnPoints.size() << std::endl;
+    
+    spawnEnemies();  // 使用现有的敌人生成逻辑
+    
+    std::cout << "[DEBUG] Multiplayer: Enemies spawned = " << m_enemies.size() << std::endl;
+    
+    // 将所有敌人设置为未激活状态（多人模式需要手动激活）
+    int npcId = 0;
+    for (auto& enemy : m_enemies) {
+      enemy->setId(npcId++);
+      // 多人模式下敌人默认未激活，需要玩家花费金币激活
+    }
+    
     m_bullets.clear();
+    m_nearbyNpcIndex = -1;
     
     // 初始化相机位置
-    m_gameView.setCenter(startPos);
+    m_gameView.setCenter(spawn1Pos);
     
     m_gameState = GameState::Multiplayer;
   });
@@ -1115,6 +1209,51 @@ void Game::setupNetworkCallbacks()
     // 非房主收到后自动重新开始游戏
     if (!m_isHost) {
       restartMultiplayer();
+    }
+  });
+  
+  // NPC同步回调
+  net.setOnNpcActivate([this](int npcId, int team) {
+    // 对方激活了NPC
+    if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
+      m_enemies[npcId]->activate(team);
+      std::cout << "[DEBUG] Remote NPC " << npcId << " activated with team " << team << std::endl;
+    }
+  });
+  
+  net.setOnNpcUpdate([this](const NpcState& state) {
+    // 更新NPC状态（仅非房主接收）
+    if (!m_isHost && state.id >= 0 && state.id < static_cast<int>(m_enemies.size())) {
+      auto& npc = m_enemies[state.id];
+      npc->setPosition({state.x, state.y});
+      npc->setRotation(state.rotation);
+      npc->setTurretRotation(state.turretAngle);
+      npc->setHealth(state.health);
+      if (state.activated && !npc->isActivated()) {
+        npc->activate(state.team);
+      }
+    }
+  });
+  
+  net.setOnNpcShoot([this](int npcId, float x, float y, float angle) {
+    // NPC射击（创建子弹）- 非房主接收
+    if (!m_isHost) {
+      int team = 0;
+      if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
+        team = m_enemies[npcId]->getTeam();
+      }
+      sf::Color bulletColor = (team == 1) ? sf::Color::Yellow : sf::Color::Magenta;
+      // NPC子弹使用 BulletOwner::Enemy 标识，并设置阵营
+      auto bullet = std::make_unique<Bullet>(x, y, angle, false, bulletColor);
+      bullet->setTeam(team);
+      m_bullets.push_back(std::move(bullet));
+    }
+  });
+  
+  net.setOnNpcDamage([this](int npcId, float damage) {
+    // NPC受伤
+    if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
+      m_enemies[npcId]->takeDamage(damage);
     }
   });
   
@@ -1220,8 +1359,116 @@ void Game::updateMultiplayer(float dt)
     }
   }
   
-  // 发送位置到服务器
+  // 检查玩家是否接近未激活的NPC（用于显示激活提示）
+  m_nearbyNpcIndex = -1;
+  int localTeam = m_player->getTeam();
+  sf::Vector2f playerPos = m_player->getPosition();
+  
+  for (size_t i = 0; i < m_enemies.size(); ++i) {
+    auto& npc = m_enemies[i];
+    if (!npc->isActivated()) {
+      sf::Vector2f npcPos = npc->getPosition();
+      float dx = playerPos.x - npcPos.x;
+      float dy = playerPos.y - npcPos.y;
+      float dist = std::sqrt(dx * dx + dy * dy);
+      
+      if (dist < 80.f) {  // 直接用距离判断，80像素内可激活
+        m_nearbyNpcIndex = static_cast<int>(i);
+        break;
+      }
+    }
+  }
+  
+  // 按R键激活NPC（需要花费3金币）- 使用事件驱动
+  if (m_nearbyNpcIndex >= 0 && m_rKeyJustPressed) {
+    std::cout << "[DEBUG] R key triggered! NPC index: " << m_nearbyNpcIndex << std::endl;
+    if (m_player->getCoins() >= 3) {
+      m_player->spendCoins(3);
+      m_enemies[m_nearbyNpcIndex]->activate(localTeam);
+      
+      // 发送NPC激活消息给对方
+      NetworkManager::getInstance().sendNpcActivate(m_nearbyNpcIndex, localTeam);
+      
+      std::cout << "[DEBUG] Activated NPC " << m_nearbyNpcIndex << ", coins left: " << m_player->getCoins() << std::endl;
+      m_nearbyNpcIndex = -1;
+    } else {
+      std::cout << "[DEBUG] Not enough coins to activate NPC" << std::endl;
+    }
+  }
+  m_rKeyJustPressed = false;  // 重置R键状态
+  
+  // 更新NPC坦克（房主负责更新逻辑并同步给非房主）
   auto& net = NetworkManager::getInstance();
+  
+  for (size_t i = 0; i < m_enemies.size(); ++i) {
+    auto& npc = m_enemies[i];
+    if (npc->isActivated()) {
+      int npcTeam = npc->getTeam();
+      
+      // 只有房主执行NPC AI逻辑
+      if (m_isHost) {
+        // 收集敌对目标
+        std::vector<sf::Vector2f> targets;
+        
+        // 我方玩家（如果是敌对阵营的NPC）
+        if (m_player && m_player->getTeam() != npcTeam && npcTeam != 0) {
+          targets.push_back(m_player->getPosition());
+        }
+        
+        // 对方玩家（如果是敌对阵营的NPC）
+        if (m_otherPlayer && m_otherPlayer->getTeam() != npcTeam && npcTeam != 0) {
+          targets.push_back(m_otherPlayer->getPosition());
+        }
+        
+        // 对方阵营的NPC
+        for (const auto& otherNpc : m_enemies) {
+          if (otherNpc.get() != npc.get() && 
+              otherNpc->isActivated() && 
+              otherNpc->getTeam() != npcTeam &&
+              otherNpc->getTeam() != 0) {
+            targets.push_back(otherNpc->getPosition());
+          }
+        }
+        
+        if (!targets.empty()) {
+          npc->setTargets(targets);
+        }
+        
+        npc->update(dt, m_maze);
+        
+        // NPC射击
+        if (npc->shouldShoot()) {
+          sf::Vector2f bulletPos = npc->getGunPosition();
+          float bulletAngle = npc->getTurretAngle();
+          sf::Color bulletColor = (npcTeam == 1) ? sf::Color::Yellow : sf::Color::Magenta;
+          // NPC子弹使用 BulletOwner::Enemy 标识，并设置阵营
+          auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, bulletColor);
+          bullet->setTeam(npcTeam);
+          m_bullets.push_back(std::move(bullet));
+          
+          // 同步NPC射击给非房主
+          net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
+        }
+        
+        // 定期同步NPC状态给非房主（每10帧同步一次减少网络流量）
+        static int syncCounter = 0;
+        if (++syncCounter % 10 == 0) {
+          NpcState npcState;
+          npcState.id = static_cast<int>(i);
+          npcState.x = npc->getPosition().x;
+          npcState.y = npc->getPosition().y;
+          npcState.rotation = npc->getRotation();
+          npcState.turretAngle = npc->getTurretAngle();
+          npcState.health = npc->getHealth();
+          npcState.team = npc->getTeam();
+          npcState.activated = npc->isActivated();
+          net.sendNpcUpdate(npcState);
+        }
+      }
+    }
+  }
+  
+  // 发送位置到服务器
   PlayerState state;
   state.x = m_player->getPosition().x;
   state.y = m_player->getPosition().y;
@@ -1280,8 +1527,7 @@ void Game::updateMultiplayer(float dt)
   
   // 检查对方玩家是否被打死（需要在 checkMultiplayerCollisions 中处理）
   
-  // 更新相机
-  sf::Vector2f playerPos = m_player->getPosition();
+  // 更新相机（复用之前定义的 playerPos）
   m_gameView.setCenter(playerPos);
 }
 
@@ -1416,6 +1662,29 @@ void Game::renderMultiplayer()
   exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
   m_window.draw(exitMarker);
   
+  // 渲染NPC坦克
+  for (const auto& npc : m_enemies) {
+    npc->draw(m_window);
+    
+    // 如果NPC已激活，显示阵营标记
+    if (npc->isActivated()) {
+      sf::CircleShape teamMarker(8.f);
+      if (npc->getTeam() == m_player->getTeam()) {
+        teamMarker.setFillColor(sf::Color(0, 255, 0, 200));  // 己方：绿色
+      } else {
+        teamMarker.setFillColor(sf::Color(255, 0, 0, 200));  // 敌方：红色
+      }
+      teamMarker.setPosition({npc->getPosition().x - 8.f, npc->getPosition().y - 35.f});
+      m_window.draw(teamMarker);
+    } else {
+      // 未激活的NPC显示灰色标记
+      sf::CircleShape neutralMarker(8.f);
+      neutralMarker.setFillColor(sf::Color(150, 150, 150, 200));
+      neutralMarker.setPosition({npc->getPosition().x - 8.f, npc->getPosition().y - 35.f});
+      m_window.draw(neutralMarker);
+    }
+  }
+  
   // 渲染另一个玩家
   if (m_otherPlayer) {
     m_otherPlayer->render(m_window);
@@ -1447,6 +1716,26 @@ void Game::renderMultiplayer()
   // 渲染子弹
   for (const auto& bullet : m_bullets) {
     bullet->render(m_window);
+  }
+  
+  // 如果玩家接近未激活的NPC，在NPC头上显示激活提示
+  if (m_nearbyNpcIndex >= 0 && m_nearbyNpcIndex < static_cast<int>(m_enemies.size())) {
+    auto& npc = m_enemies[m_nearbyNpcIndex];
+    sf::Vector2f npcPos = npc->getPosition();
+    
+    // 显示"Press R to activate (3 coins)"提示
+    sf::Text activateHint(m_font);
+    if (m_player->getCoins() >= 3) {
+      activateHint.setString("Press R (3 coins)");
+      activateHint.setFillColor(sf::Color::Yellow);
+    } else {
+      activateHint.setString("Need 3 coins!");
+      activateHint.setFillColor(sf::Color::Red);
+    }
+    activateHint.setCharacterSize(14);
+    sf::FloatRect hintBounds = activateHint.getLocalBounds();
+    activateHint.setPosition({npcPos.x - hintBounds.size.x / 2.f, npcPos.y - 55.f});
+    m_window.draw(activateHint);
   }
   
   // UI - 显示双方血条
@@ -1503,6 +1792,22 @@ void Game::renderMultiplayer()
   otherBar.setPosition({barX + 50.f, barY + 30.f});
   otherBar.setFillColor(sf::Color::Cyan);
   m_window.draw(otherBar);
+  
+  // 金币显示
+  sf::Text coinsText(m_font);
+  coinsText.setString("Coins: " + std::to_string(m_player ? m_player->getCoins() : 0));
+  coinsText.setCharacterSize(20);
+  coinsText.setFillColor(sf::Color::Yellow);
+  coinsText.setPosition({barX, barY + 60.f});
+  m_window.draw(coinsText);
+  
+  // 显示操作提示
+  sf::Text controlHint(m_font);
+  controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | R: Activate NPC");
+  controlHint.setCharacterSize(14);
+  controlHint.setFillColor(sf::Color(150, 150, 150));
+  controlHint.setPosition({barX, m_screenHeight - 30.f});
+  m_window.draw(controlHint);
   
   m_window.display();
 }

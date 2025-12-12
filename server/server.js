@@ -17,8 +17,13 @@ const MessageType = {
   RequestMaze: 13,
   ReachExit: 14,
   GameWin: 15,
-  GameResult: 16,      // 新增：游戏结果
-  RestartRequest: 17   // 新增：重新开始请求
+  GameResult: 16,
+  RestartRequest: 17,
+  // NPC同步
+  NpcActivate: 18,
+  NpcUpdate: 19,
+  NpcShoot: 20,
+  NpcDamage: 21
 };
 
 // 房间管理
@@ -287,6 +292,22 @@ function handleMessage(socket, data) {
       // 转发重新开始请求给其他玩家
       broadcastToRoom(room, socket, data);
       console.log(`Restart request in room ${roomCode}`);
+      break;
+    }
+
+    // NPC同步消息 - 直接转发给房间内其他玩家
+    case MessageType.NpcActivate:
+    case MessageType.NpcUpdate:
+    case MessageType.NpcShoot:
+    case MessageType.NpcDamage: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room || !room.started) break;
+
+      // 转发给其他玩家
+      broadcastToRoom(room, socket, data);
       break;
     }
   }

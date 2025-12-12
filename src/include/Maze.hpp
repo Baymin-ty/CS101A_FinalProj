@@ -59,7 +59,7 @@ public:
   void loadFromString(const std::vector<std::string> &map);
 
   // 生成随机迷宫（使用 MazeGenerator）
-  void generateRandomMaze(int width, int height, unsigned int seed = 0);
+  void generateRandomMaze(int width, int height, unsigned int seed = 0, int enemyCount = 8);
 
   // 获取迷宫数据（用于网络传输）
   std::vector<std::string> getMazeData() const { return m_mazeData; }
@@ -87,6 +87,10 @@ public:
   // 获取敌人生成点
   const std::vector<sf::Vector2f> &getEnemySpawnPoints() const { return m_enemySpawnPoints; }
 
+  // 获取多人模式出生点
+  sf::Vector2f getSpawn1Position() const { return m_spawn1Position; }
+  sf::Vector2f getSpawn2Position() const { return m_spawn2Position; }
+
   // 获取迷宫尺寸（像素）
   sf::Vector2f getSize() const { return sf::Vector2f(m_cols * m_tileSize, m_rows * m_tileSize); }
 
@@ -111,6 +115,8 @@ private:
   sf::Vector2f m_startPosition;
   sf::Vector2f m_exitPosition;
   std::vector<sf::Vector2f> m_enemySpawnPoints;
+  sf::Vector2f m_spawn1Position;  // 多人模式出生点1
+  sf::Vector2f m_spawn2Position;  // 多人模式出生点2
 
   int m_rows = 0;
   int m_cols = 0;

@@ -62,6 +62,19 @@ public:
   // 设置缩放
   void setScale(float scale) { m_scale = scale; }
 
+  // 金币系统
+  int getCoins() const { return m_coins; }
+  void setCoins(int coins) { m_coins = coins; }
+  bool spendCoins(int amount) { 
+    if (m_coins >= amount) { m_coins -= amount; return true; }
+    return false;
+  }
+  void addCoins(int amount) { m_coins += amount; }
+
+  // 阵营（用于多人模式，0=未设置，1=玩家1阵营，2=玩家2阵营）
+  int getTeam() const { return m_team; }
+  void setTeam(int team) { m_team = team; }
+
 private:
   sf::Texture m_hullTexture;
   sf::Texture m_turretTexture;
@@ -97,4 +110,10 @@ private:
   const float m_gunLength = 25.f;
 
   sf::Vector2f m_position;
+
+  // 金币系统（多人模式）
+  int m_coins = 10;  // 初始10个金币
+  
+  // 阵营（多人模式）
+  int m_team = 0;  // 0=未设置，1=玩家1，2=玩家2
 };
