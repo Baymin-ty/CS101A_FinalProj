@@ -27,6 +27,10 @@ public:
 
   // 检查是否应该射击
   bool shouldShoot();
+  
+  // 获取当前的射击目标位置（可能是玩家或可拆墙）
+  sf::Vector2f getShootTarget() const { return m_shootTarget; }
+  bool hasValidTarget() const { return m_hasValidTarget; }
 
   // 受到伤害
   void takeDamage(float damage);
@@ -96,6 +100,11 @@ private:
 
   // 多目标追踪
   std::vector<sf::Vector2f> m_targets;
+  
+  // 射击目标（可能是玩家或可拆墙）
+  sf::Vector2f m_shootTarget = {0.f, 0.f};
+  bool m_hasValidTarget = false;
+  int m_lastLineOfSightResult = 0; // 0=无阻挡, 1=可拆墙, 2=不可拆墙
 
   // 配置
   const float m_moveSpeed = 120.f;

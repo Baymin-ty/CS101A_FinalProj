@@ -108,6 +108,13 @@ public:
 
   // 网格坐标转世界坐标（返回格子中心）
   sf::Vector2f gridToWorld(GridPos grid) const;
+  
+  // 视线检测：检查从 start 到 end 是否有清晰视线
+  // 返回值：0 = 无阻挡, 1 = 有可拆墙阻挡, 2 = 有不可拆墙阻挡
+  int checkLineOfSight(sf::Vector2f start, sf::Vector2f end) const;
+  
+  // 获取视线方向上第一个被阻挡的位置（用于判断是否应该攻击可拆墙）
+  sf::Vector2f getFirstBlockedPosition(sf::Vector2f start, sf::Vector2f end) const;
 
 private:
   std::vector<std::vector<Wall>> m_walls;
