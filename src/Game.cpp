@@ -258,6 +258,7 @@ void Game::restartMultiplayer()
   m_mpState.multiplayerWin = false;
   m_gameOver = false;
   m_gameWon = false;
+  m_exitVisible = false;  // 重置终点可见状态
   m_bullets.clear();
 
   // 初始化相机位置和缩放
@@ -266,6 +267,9 @@ void Game::restartMultiplayer()
   m_currentCameraPos = startPos;
 
   m_gameState = GameState::Multiplayer;
+  
+  // 播放游戏开始BGM
+  AudioManager::getInstance().playBGM(BGMType::Start);
 }
 
 void Game::run()
@@ -308,7 +312,11 @@ void Game::run()
       break;
     case GameState::Connecting:
     case GameState::WaitingForPlayer:
-      // 等待状态不需要 update
+      // 等待状态播放菜单BGM
+      if (AudioManager::getInstance().getCurrentBGM() != BGMType::Menu)
+      {
+        AudioManager::getInstance().playBGM(BGMType::Menu);
+      }
       break;
     case GameState::Multiplayer:
       updateMultiplayer(dt);
