@@ -9,6 +9,7 @@
 #include "Maze.hpp"
 #include "MazeGenerator.hpp"
 #include "NetworkManager.hpp"
+#include "MultiplayerHandler.hpp"
 
 // 游戏状态枚举
 enum class GameState
@@ -107,15 +108,8 @@ private:
   MenuOption m_selectedOption = MenuOption::StartGame;
   bool m_useRandomMap = true;
   
-  // 多人游戏状态
-  bool m_isMultiplayer = false;
-  bool m_isHost = false;
-  bool m_localPlayerReachedExit = false;
-  bool m_otherPlayerReachedExit = false;
-  bool m_multiplayerWin = false;  // 多人模式中本地玩家是否获胜
-  std::string m_roomCode;
-  std::string m_connectionStatus = "Enter server IP:";
-  int m_npcSyncCounter = 0;  // NPC同步计数器
+  // 多人游戏状态（使用MultiplayerState结构体）
+  MultiplayerState m_mpState;
   
   // 输入
   InputMode m_inputMode = InputMode::None;
@@ -134,14 +128,12 @@ private:
   std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30};
   int m_enemyIndex = 3; // 默认 10
 
-  // 多人游戏迷宫数据
-  std::vector<std::string> m_generatedMazeData;
-
-  // 多人模式：当前接近的可激活NPC（用于显示提示）
-  int m_nearbyNpcIndex = -1;
-  bool m_rKeyWasPressed = false;  // R键状态跟踪
-  bool m_rKeyJustPressed = false; // R键刚刚按下（事件驱动）
+  // 多人模式：R键状态跟踪（事件驱动）
+  bool m_rKeyWasPressed = false;
 
   bool m_gameOver = false;
   bool m_gameWon = false;
+  
+  // 获取多人模式上下文
+  MultiplayerContext getMultiplayerContext();
 };

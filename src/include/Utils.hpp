@@ -4,7 +4,7 @@
 #include <cmath>
 
 // 全局常量
-constexpr float TILE_SIZE = 50.f;
+constexpr float TILE_SIZE = 70.f;
 
 namespace Utils
 {

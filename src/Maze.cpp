@@ -96,7 +96,8 @@ void Maze::loadFromString(const std::vector<std::string> &map)
 void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount)
 {
   MazeGenerator generator(width, height);
-  if (seed != 0) {
+  if (seed != 0)
+  {
     generator.setSeed(seed);
   }
   // 设置NPC数量
@@ -326,45 +327,53 @@ int Maze::checkLineOfSight(sf::Vector2f start, sf::Vector2f end) const
 {
   // 使用 Bresenham 线段算法检查视线
   // 返回值：0 = 无阻挡, 1 = 有可拆墙阻挡, 2 = 有不可拆墙阻挡
-  
+
   GridPos startGrid = worldToGrid(start);
   GridPos endGrid = worldToGrid(end);
-  
+
   int x0 = startGrid.x, y0 = startGrid.y;
   int x1 = endGrid.x, y1 = endGrid.y;
-  
+
   int dx = std::abs(x1 - x0);
   int dy = std::abs(y1 - y0);
   int sx = x0 < x1 ? 1 : -1;
   int sy = y0 < y1 ? 1 : -1;
   int err = dx - dy;
-  
+
   int result = 0; // 无阻挡
-  
-  while (true) {
+
+  while (true)
+  {
     // 检查当前格子
-    if (y0 >= 0 && y0 < m_rows && x0 >= 0 && x0 < m_cols) {
+    if (y0 >= 0 && y0 < m_rows && x0 >= 0 && x0 < m_cols)
+    {
       WallType type = m_walls[y0][x0].type;
-      if (type == WallType::Solid) {
+      if (type == WallType::Solid)
+      {
         return 2; // 不可拆墙阻挡
-      } else if (type == WallType::Destructible) {
+      }
+      else if (type == WallType::Destructible)
+      {
         result = 1; // 可拆墙阻挡（继续检查是否有不可拆墙）
       }
     }
-    
-    if (x0 == x1 && y0 == y1) break;
-    
+
+    if (x0 == x1 && y0 == y1)
+      break;
+
     int e2 = 2 * err;
-    if (e2 > -dy) {
+    if (e2 > -dy)
+    {
       err -= dy;
       x0 += sx;
     }
-    if (e2 < dx) {
+    if (e2 < dx)
+    {
       err += dx;
       y0 += sy;
     }
   }
-  
+
   return result;
 }
 
@@ -373,37 +382,43 @@ sf::Vector2f Maze::getFirstBlockedPosition(sf::Vector2f start, sf::Vector2f end)
   // 找到视线上第一个被阻挡的位置
   GridPos startGrid = worldToGrid(start);
   GridPos endGrid = worldToGrid(end);
-  
+
   int x0 = startGrid.x, y0 = startGrid.y;
   int x1 = endGrid.x, y1 = endGrid.y;
-  
+
   int dx = std::abs(x1 - x0);
   int dy = std::abs(y1 - y0);
   int sx = x0 < x1 ? 1 : -1;
   int sy = y0 < y1 ? 1 : -1;
   int err = dx - dy;
-  
-  while (true) {
+
+  while (true)
+  {
     // 检查当前格子
-    if (y0 >= 0 && y0 < m_rows && x0 >= 0 && x0 < m_cols) {
+    if (y0 >= 0 && y0 < m_rows && x0 >= 0 && x0 < m_cols)
+    {
       WallType type = m_walls[y0][x0].type;
-      if (type == WallType::Solid || type == WallType::Destructible) {
+      if (type == WallType::Solid || type == WallType::Destructible)
+      {
         return gridToWorld({x0, y0});
       }
     }
-    
-    if (x0 == x1 && y0 == y1) break;
-    
+
+    if (x0 == x1 && y0 == y1)
+      break;
+
     int e2 = 2 * err;
-    if (e2 > -dy) {
+    if (e2 > -dy)
+    {
       err -= dy;
       x0 += sx;
     }
-    if (e2 < dx) {
+    if (e2 < dx)
+    {
       err += dx;
       y0 += sy;
     }
   }
-  
+
   return end; // 没有阻挡，返回目标位置
 }

@@ -6,6 +6,7 @@
 #include <queue>
 #include <unordered_map>
 #include "MazeGenerator.hpp"
+#include "Utils.hpp"
 
 // 墙体类型
 enum class WallType
@@ -127,7 +128,7 @@ private:
 
   int m_rows = 0;
   int m_cols = 0;
-  float m_tileSize = 50.f;
+  float m_tileSize = TILE_SIZE;
 
   // 颜色
   const sf::Color m_solidColor = sf::Color(80, 80, 80);

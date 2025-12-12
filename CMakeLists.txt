@@ -32,6 +32,8 @@ set(SOURCES
   src/Maze.cpp
   src/MazeGenerator.cpp
   src/NetworkManager.cpp
+  src/CollisionSystem.cpp
+  src/MultiplayerHandler.cpp
 )
 
 # 头文件
@@ -45,6 +47,9 @@ set(HEADERS
   src/include/Maze.hpp
   src/include/MazeGenerator.hpp
   src/include/NetworkManager.hpp
+  src/include/CollisionSystem.hpp
+  src/include/UIHelper.hpp
+  src/include/MultiplayerHandler.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})

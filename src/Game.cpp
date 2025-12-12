@@ -1,4 +1,7 @@
 #include "Game.hpp"
+#include "include/CollisionSystem.hpp"
+#include "include/UIHelper.hpp"
+#include "include/MultiplayerHandler.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -169,20 +172,20 @@ void Game::resetGame()
   m_gameState = GameState::MainMenu;
   m_gameOver = false;
   m_gameWon = false;
-  m_multiplayerWin = false;
+  m_mpState.multiplayerWin = false;
   m_enemies.clear();
   m_bullets.clear();
   m_player.reset();
   m_otherPlayer.reset();
-  m_isMultiplayer = false;
-  m_isHost = false;
-  m_localPlayerReachedExit = false;
-  m_otherPlayerReachedExit = false;
-  m_roomCode.clear();
-  m_connectionStatus = "Enter server IP:";
+  m_mpState.isMultiplayer = false;
+  m_mpState.isHost = false;
+  m_mpState.localPlayerReachedExit = false;
+  m_mpState.otherPlayerReachedExit = false;
+  m_mpState.roomCode.clear();
+  m_mpState.connectionStatus = "Enter server IP:";
   m_inputText.clear();
   m_inputMode = InputMode::None;
-  m_generatedMazeData.clear();
+  m_mpState.generatedMazeData.clear();
 
   // 断开网络连接
   NetworkManager::getInstance().disconnect();
@@ -191,8 +194,8 @@ void Game::resetGame()
 void Game::restartMultiplayer()
 {
   // 重新开始多人游戏，使用已有的迷宫数据
-  if (!m_generatedMazeData.empty()) {
-    m_maze.loadFromString(m_generatedMazeData);
+  if (!m_mpState.generatedMazeData.empty()) {
+    m_maze.loadFromString(m_mpState.generatedMazeData);
   }
   
   // 设置玩家位置
@@ -213,9 +216,9 @@ void Game::restartMultiplayer()
   m_otherPlayer->setScale(m_tankScale);
   
   // 重置状态
-  m_localPlayerReachedExit = false;
-  m_otherPlayerReachedExit = false;
-  m_multiplayerWin = false;
+  m_mpState.localPlayerReachedExit = false;
+  m_mpState.otherPlayerReachedExit = false;
+  m_mpState.multiplayerWin = false;
   m_gameOver = false;
   m_gameWon = false;
   m_bullets.clear();
@@ -415,33 +418,33 @@ void Game::processEvents()
       {
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
-          if (m_isMultiplayer) {
-            if (m_isHost) {
+          if (m_mpState.isMultiplayer) {
+            if (m_mpState.isHost) {
               // 房主按 R：回到等待玩家界面，通知对方准备重新开始
               NetworkManager::getInstance().sendRestartRequest();
               
               // 重新生成迷宫（使用菜单选择的NPC数量）
               int npcCount = m_enemyOptions[m_enemyIndex];
               m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
-              m_generatedMazeData = m_maze.getMazeData();
-              NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
+              m_mpState.generatedMazeData = m_maze.getMazeData();
+              NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
               
               m_gameState = GameState::WaitingForPlayer;
-              m_connectionStatus = "Waiting for other player to restart...";
+              m_mpState.connectionStatus = "Waiting for other player to restart...";
               
               // 重置状态
-              m_localPlayerReachedExit = false;
-              m_otherPlayerReachedExit = false;
-              m_multiplayerWin = false;
+              m_mpState.localPlayerReachedExit = false;
+              m_mpState.otherPlayerReachedExit = false;
+              m_mpState.multiplayerWin = false;
               m_gameOver = false;
               m_gameWon = false;
               m_bullets.clear();
             } else {
               // 非房主按 R：自动重新加入上次的房间
-              if (!m_roomCode.empty()) {
-                NetworkManager::getInstance().joinRoom(m_roomCode);
+              if (!m_mpState.roomCode.empty()) {
+                NetworkManager::getInstance().joinRoom(m_mpState.roomCode);
                 m_gameState = GameState::WaitingForPlayer;
-                m_connectionStatus = "Rejoining room: " + m_roomCode;
+                m_mpState.connectionStatus = "Rejoining room: " + m_mpState.roomCode;
               } else {
                 resetGame();  // 没有房间码，返回主菜单
               }
@@ -487,7 +490,7 @@ void Game::processEvents()
         // R键激活NPC
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
-          m_rKeyJustPressed = true;
+          m_mpState.rKeyJustPressed = true;
           std::cout << "[DEBUG] R key event detected!" << std::endl;
         }
       }
@@ -675,162 +678,13 @@ void Game::updateCamera()
 
 void Game::checkCollisions()
 {
-  if (!m_player)
-    return;
-
-  // 检查子弹与墙壁、玩家、敌人的碰撞
-  for (auto &bullet : m_bullets)
-  {
-    if (!bullet->isAlive())
-      continue;
-
-    sf::Vector2f bulletPos = bullet->getPosition();
-
-    // 检查与墙壁碰撞
-    if (m_maze.bulletHit(bulletPos, bullet->getDamage()))
-    {
-      bullet->setInactive();
-      continue;
-    }
-
-    // 检查与玩家的碰撞（敌人子弹）
-    if (bullet->getOwner() == BulletOwner::Enemy)
-    {
-      float dist = std::hypot(bulletPos.x - m_player->getPosition().x,
-                               bulletPos.y - m_player->getPosition().y);
-      if (dist < m_player->getCollisionRadius() + 5.f)
-      {
-        m_player->takeDamage(bullet->getDamage());
-        bullet->setInactive();
-        continue;
-      }
-    }
-
-    // 检查与敌人的碰撞（玩家子弹）
-    if (bullet->getOwner() == BulletOwner::Player)
-    {
-      for (auto &enemy : m_enemies)
-      {
-        float dist = std::hypot(bulletPos.x - enemy->getPosition().x,
-                                 bulletPos.y - enemy->getPosition().y);
-        if (dist < enemy->getCollisionRadius() + 5.f)
-        {
-          enemy->takeDamage(bullet->getDamage());
-          bullet->setInactive();
-          break;
-        }
-      }
-    }
-  }
-
-  // 删除无效子弹
-  m_bullets.erase(
-      std::remove_if(m_bullets.begin(), m_bullets.end(),
-                     [](const std::unique_ptr<Bullet> &b)
-                     { return !b->isAlive(); }),
-      m_bullets.end());
+  CollisionSystem::checkSinglePlayerCollisions(m_player.get(), m_enemies, m_bullets, m_maze);
 }
 
 void Game::checkMultiplayerCollisions()
 {
-  if (!m_player || !m_otherPlayer)
-    return;
-
-  int localTeam = m_player->getTeam();  // 本地玩家阵营
-
-  // 检查子弹碰撞
-  for (auto &bullet : m_bullets)
-  {
-    if (!bullet->isAlive())
-      continue;
-
-    sf::Vector2f bulletPos = bullet->getPosition();
-    int bulletTeam = bullet->getTeam();  // 0=玩家子弹，非0=NPC子弹的阵营
-
-    // 检查与墙壁碰撞（可拆墙）
-    if (m_maze.bulletHit(bulletPos, bullet->getDamage()))
-    {
-      bullet->setInactive();
-      continue;
-    }
-
-    // 判断子弹是否是本地玩家发射的
-    bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
-    
-    // 检查与本地玩家的碰撞
-    // 对方玩家的子弹 或 敌方NPC的子弹 可以伤害本地玩家
-    bool canHitLocalPlayer = !isLocalPlayerBullet && 
-                             (bulletTeam == 0 || bulletTeam != localTeam);
-    if (canHitLocalPlayer)
-    {
-      float dist = std::hypot(bulletPos.x - m_player->getPosition().x,
-                               bulletPos.y - m_player->getPosition().y);
-      if (dist < m_player->getCollisionRadius() + 5.f)
-      {
-        m_player->takeDamage(bullet->getDamage());
-        bullet->setInactive();
-        continue;
-      }
-    }
-    
-    // 检查与对方玩家的碰撞
-    // 本地玩家的子弹 或 本地NPC的子弹 可以伤害对方玩家（只做视觉效果，伤害由对方客户端判定）
-    bool canHitOtherPlayer = isLocalPlayerBullet || bulletTeam == localTeam;
-    if (canHitOtherPlayer)
-    {
-      float dist = std::hypot(bulletPos.x - m_otherPlayer->getPosition().x,
-                               bulletPos.y - m_otherPlayer->getPosition().y);
-      if (dist < m_otherPlayer->getCollisionRadius() + 5.f)
-      {
-        bullet->setInactive();
-        continue;
-      }
-    }
-    
-    // 检查与NPC的碰撞
-    for (auto& npc : m_enemies) {
-      if (!npc->isActivated() || npc->isDead())
-        continue;
-      
-      int npcTeam = npc->getTeam();
-      
-      // 判断子弹是否能击中这个NPC
-      bool canHitNpc = false;
-      
-      if (isLocalPlayerBullet) {
-        // 本地玩家子弹：击中敌方NPC
-        canHitNpc = (npcTeam != localTeam && npcTeam != 0);
-      } else if (bulletTeam == 0) {
-        // 对方玩家子弹（bulletTeam=0, BulletOwner::Enemy）：击中对方的敌方NPC
-        // 对方的敌方 = 本地的己方，所以是 npcTeam == localTeam
-        canHitNpc = (npcTeam == localTeam && npcTeam != 0);
-      } else {
-        // NPC子弹：击中不同阵营的NPC
-        canHitNpc = (bulletTeam != npcTeam && npcTeam != 0);
-      }
-      
-      if (canHitNpc) {
-        float dist = std::hypot(bulletPos.x - npc->getPosition().x,
-                                 bulletPos.y - npc->getPosition().y);
-        if (dist < npc->getCollisionRadius() + 5.f) {
-          // 本地玩家子弹：本地处理伤害并同步
-          if (isLocalPlayerBullet) {
-            npc->takeDamage(bullet->getDamage());
-            NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
-          }
-          // NPC子弹伤害NPC：只有房主处理（房主控制NPC逻辑）
-          else if (bulletTeam != 0 && m_isHost) {
-            npc->takeDamage(bullet->getDamage());
-            NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
-          }
-          // 对方玩家子弹击中NPC：只消失，不处理伤害（伤害由对方客户端处理并同步）
-          
-          bullet->setInactive();
-          break;
-        }
-      }
-    }
-  }
+  CollisionSystem::checkMultiplayerCollisions(
+    m_player.get(), m_otherPlayer.get(), m_enemies, m_bullets, m_maze, m_mpState.isHost);
 }
 
 void Game::render()
@@ -1017,7 +871,7 @@ void Game::renderGameOver()
   sf::Text text(m_font);
   
   // 根据游戏模式和结果显示不同文本
-  if (m_isMultiplayer) {
+  if (m_mpState.isMultiplayer) {
     if (m_gameState == GameState::Victory) {
       text.setString("VICTORY!");
       text.setFillColor(sf::Color::Green);
@@ -1044,8 +898,8 @@ void Game::renderGameOver()
   sf::Text hint(m_font);
   
   // 多人模式显示不同的提示
-  if (m_isMultiplayer) {
-    if (m_isHost) {
+  if (m_mpState.isMultiplayer) {
+    if (m_mpState.isHost) {
       hint.setString("Press R to restart match, ESC for menu");
     } else {
       hint.setString("Press R to rejoin room, ESC for menu");
@@ -1066,68 +920,68 @@ void Game::setupNetworkCallbacks()
   auto& net = NetworkManager::getInstance();
   
   net.setOnConnected([this]() {
-    m_connectionStatus = "Connected! Choose action:";
+    m_mpState.connectionStatus = "Connected! Choose action:";
   });
   
   net.setOnDisconnected([this]() {
     if (m_gameState == GameState::Multiplayer || 
         m_gameState == GameState::WaitingForPlayer ||
         m_gameState == GameState::Connecting) {
-      m_connectionStatus = "Disconnected from server";
+      m_mpState.connectionStatus = "Disconnected from server";
       resetGame();
     }
   });
   
   net.setOnRoomCreated([this](const std::string& roomCode) {
-    m_roomCode = roomCode;
-    m_isHost = true;
+    m_mpState.roomCode = roomCode;
+    m_mpState.isHost = true;
     m_gameState = GameState::WaitingForPlayer;
-    m_connectionStatus = "Room created! Code: " + roomCode;
+    m_mpState.connectionStatus = "Room created! Code: " + roomCode;
     
     // 房主立即生成迷宫并发送（使用菜单选择的NPC数量）
     int npcCount = m_enemyOptions[m_enemyIndex];
     std::cout << "[DEBUG] Creating room with " << npcCount << " NPCs" << std::endl;
     m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
-    m_generatedMazeData = m_maze.getMazeData();
+    m_mpState.generatedMazeData = m_maze.getMazeData();
     
     // 检查迷宫数据中是否有敌人标记 'X'
     int xCount = 0;
-    for (const auto& row : m_generatedMazeData) {
+    for (const auto& row : m_mpState.generatedMazeData) {
       for (char c : row) {
         if (c == 'X') xCount++;
       }
     }
     std::cout << "[DEBUG] Maze data contains " << xCount << " enemy markers (X)" << std::endl;
     
-    NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
+    NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
   });
   
   net.setOnRoomJoined([this](const std::string& roomCode) {
-    m_roomCode = roomCode;
-    m_isHost = false;
+    m_mpState.roomCode = roomCode;
+    m_mpState.isHost = false;
     m_gameState = GameState::WaitingForPlayer;
-    m_connectionStatus = "Joined room: " + roomCode + " - Waiting for maze...";
+    m_mpState.connectionStatus = "Joined room: " + roomCode + " - Waiting for maze...";
   });
   
   net.setOnMazeData([this](const std::vector<std::string>& mazeData) {
     // 收到迷宫数据（非房主）
-    m_generatedMazeData = mazeData;
-    m_connectionStatus = "Maze received! Waiting for game start...";
+    m_mpState.generatedMazeData = mazeData;
+    m_mpState.connectionStatus = "Maze received! Waiting for game start...";
   });
   
   net.setOnRequestMaze([this]() {
     // 服务器请求迷宫数据（房主收到）
-    if (m_isHost && !m_generatedMazeData.empty()) {
-      NetworkManager::getInstance().sendMazeData(m_generatedMazeData);
+    if (m_mpState.isHost && !m_mpState.generatedMazeData.empty()) {
+      NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
     }
   });
   
   net.setOnGameStart([this]() {
-    m_isMultiplayer = true;
+    m_mpState.isMultiplayer = true;
     
     // 使用已接收/生成的迷宫数据
-    if (!m_generatedMazeData.empty()) {
-      m_maze.loadFromString(m_generatedMazeData);
+    if (!m_mpState.generatedMazeData.empty()) {
+      m_maze.loadFromString(m_mpState.generatedMazeData);
     }
     
     // 获取两个出生点位置（从迷宫数据中解析的 '1' 和 '2' 标记）
@@ -1143,8 +997,8 @@ void Game::setupNetworkCallbacks()
     }
     
     // 房主使用 spawn1，非房主使用 spawn2
-    sf::Vector2f mySpawn = m_isHost ? spawn1Pos : spawn2Pos;
-    sf::Vector2f otherSpawn = m_isHost ? spawn2Pos : spawn1Pos;
+    sf::Vector2f mySpawn = m_mpState.isHost ? spawn1Pos : spawn2Pos;
+    sf::Vector2f otherSpawn = m_mpState.isHost ? spawn2Pos : spawn1Pos;
     
     // 创建本地玩家并加载贴图
     m_player = std::make_unique<Tank>();
@@ -1153,7 +1007,7 @@ void Game::setupNetworkCallbacks()
     m_player->setPosition(mySpawn);
     m_player->setScale(m_tankScale);
     m_player->setCoins(10);  // 初始10个金币
-    m_player->setTeam(m_isHost ? 1 : 2);  // 设置阵营
+    m_player->setTeam(m_mpState.isHost ? 1 : 2);  // 设置阵营
     
     // 设置第二个玩家（另一个客户端）- 使用不同颜色贴图
     m_otherPlayer = std::make_unique<Tank>();
@@ -1161,10 +1015,10 @@ void Game::setupNetworkCallbacks()
                                 "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
     m_otherPlayer->setPosition(otherSpawn);
     m_otherPlayer->setScale(m_tankScale);
-    m_otherPlayer->setTeam(m_isHost ? 2 : 1);  // 对方阵营
+    m_otherPlayer->setTeam(m_mpState.isHost ? 2 : 1);  // 对方阵营
     
-    m_localPlayerReachedExit = false;
-    m_otherPlayerReachedExit = false;
+    m_mpState.localPlayerReachedExit = false;
+    m_mpState.otherPlayerReachedExit = false;
     
     // 多人模式：生成中立NPC坦克
     m_enemies.clear();
@@ -1185,7 +1039,7 @@ void Game::setupNetworkCallbacks()
     }
     
     m_bullets.clear();
-    m_nearbyNpcIndex = -1;
+    m_mpState.nearbyNpcIndex = -1;
     
     // 初始化相机位置
     m_gameView.setCenter(spawn1Pos);
@@ -1199,7 +1053,7 @@ void Game::setupNetworkCallbacks()
       m_otherPlayer->setRotation(state.rotation);
       m_otherPlayer->setTurretRotation(state.turretAngle);
       m_otherPlayer->setHealth(state.health);  // 同步血量
-      m_otherPlayerReachedExit = state.reachedExit;
+      m_mpState.otherPlayerReachedExit = state.reachedExit;
       
       // 注意：胜利条件改为先到终点或打死对方，不再是双方都到达
     }
@@ -1212,14 +1066,14 @@ void Game::setupNetworkCallbacks()
   
   net.setOnGameResult([this](bool isWinner) {
     // 收到对方发来的游戏结果
-    m_multiplayerWin = isWinner;
+    m_mpState.multiplayerWin = isWinner;
     m_gameState = isWinner ? GameState::Victory : GameState::GameOver;
   });
   
   net.setOnRestartRequest([this]() {
     // 对方请求重新开始（房主发起）
     // 非房主收到后自动重新开始游戏
-    if (!m_isHost) {
+    if (!m_mpState.isHost) {
       restartMultiplayer();
     }
   });
@@ -1235,7 +1089,7 @@ void Game::setupNetworkCallbacks()
   
   net.setOnNpcUpdate([this](const NpcState& state) {
     // 更新NPC状态（仅非房主接收）
-    if (!m_isHost && state.id >= 0 && state.id < static_cast<int>(m_enemies.size())) {
+    if (!m_mpState.isHost && state.id >= 0 && state.id < static_cast<int>(m_enemies.size())) {
       auto& npc = m_enemies[state.id];
       npc->setPosition({state.x, state.y});
       npc->setRotation(state.rotation);
@@ -1249,7 +1103,7 @@ void Game::setupNetworkCallbacks()
   
   net.setOnNpcShoot([this](int npcId, float x, float y, float angle) {
     // NPC射击（创建子弹）- 非房主接收
-    if (!m_isHost) {
+    if (!m_mpState.isHost) {
       int team = 0;
       if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
         team = m_enemies[npcId]->getTeam();
@@ -1270,7 +1124,7 @@ void Game::setupNetworkCallbacks()
   });
   
   net.setOnError([this](const std::string& error) {
-    m_connectionStatus = "Error: " + error;
+    m_mpState.connectionStatus = "Error: " + error;
   });
 }
 
@@ -1288,11 +1142,11 @@ void Game::processConnectingEvents(const sf::Event& event)
         case InputMode::ServerIP:
           m_serverIP = m_inputText;
           if (NetworkManager::getInstance().connect(m_serverIP, 9999)) {
-            m_connectionStatus = "Connected! Enter room code or press C to create:";
+            m_mpState.connectionStatus = "Connected! Enter room code or press C to create:";
             m_inputMode = InputMode::RoomCode;
             m_inputText = "";
           } else {
-            m_connectionStatus = "Failed to connect to " + m_serverIP;
+            m_mpState.connectionStatus = "Failed to connect to " + m_serverIP;
           }
           break;
         case InputMode::RoomCode:
@@ -1331,502 +1185,54 @@ void Game::processConnectingEvents(const sf::Event& event)
   }
 }
 
+MultiplayerContext Game::getMultiplayerContext()
+{
+  return MultiplayerContext{
+    m_window,
+    m_gameView,
+    m_uiView,
+    m_font,
+    m_player.get(),
+    m_otherPlayer.get(),
+    m_enemies,
+    m_bullets,
+    m_maze,
+    m_screenWidth,
+    m_screenHeight,
+    m_tankScale
+  };
+}
+
 void Game::updateMultiplayer(float dt)
 {
-  if (!m_player) return;
+  // R键状态已经在 processEvents 中通过事件驱动设置
   
-  // 获取鼠标在世界坐标中的位置
-  sf::Vector2i mousePixelPos = sf::Mouse::getPosition(m_window);
-  sf::Vector2f mouseWorldPos = m_window.mapPixelToCoords(mousePixelPos, m_gameView);
-  
-  // 保存旧位置
-  sf::Vector2f oldPos = m_player->getPosition();
-  sf::Vector2f movement = m_player->getMovement(dt);
-  
-  // 更新本地玩家
-  m_player->update(dt, mouseWorldPos);
-  
-  // 碰撞检测（与单人模式相同）
-  sf::Vector2f newPos = m_player->getPosition();
-  float radius = m_player->getCollisionRadius();
-  
-  if (m_maze.checkCollision(newPos, radius)) {
-    sf::Vector2f posX = {oldPos.x + movement.x, oldPos.y};
-    sf::Vector2f posY = {oldPos.x, oldPos.y + movement.y};
-    
-    bool canMoveX = !m_maze.checkCollision(posX, radius);
-    bool canMoveY = !m_maze.checkCollision(posY, radius);
-    
-    if (canMoveX && canMoveY) {
-      if (std::abs(movement.x) > std::abs(movement.y))
-        m_player->setPosition(posX);
-      else
-        m_player->setPosition(posY);
-    } else if (canMoveX) {
-      m_player->setPosition(posX);
-    } else if (canMoveY) {
-      m_player->setPosition(posY);
-    } else {
-      m_player->setPosition(oldPos);
-    }
-  }
-  
-  // 检查玩家是否接近未激活的NPC（用于显示激活提示）
-  m_nearbyNpcIndex = -1;
-  int localTeam = m_player->getTeam();
-  sf::Vector2f playerPos = m_player->getPosition();
-  
-  for (size_t i = 0; i < m_enemies.size(); ++i) {
-    auto& npc = m_enemies[i];
-    if (!npc->isActivated()) {
-      sf::Vector2f npcPos = npc->getPosition();
-      float dx = playerPos.x - npcPos.x;
-      float dy = playerPos.y - npcPos.y;
-      float dist = std::sqrt(dx * dx + dy * dy);
-      
-      if (dist < 80.f) {  // 直接用距离判断，80像素内可激活
-        m_nearbyNpcIndex = static_cast<int>(i);
-        break;
-      }
-    }
-  }
-  
-  // 按R键激活NPC（需要花费3金币）- 使用事件驱动
-  if (m_nearbyNpcIndex >= 0 && m_rKeyJustPressed) {
-    std::cout << "[DEBUG] R key triggered! NPC index: " << m_nearbyNpcIndex << std::endl;
-    if (m_player->getCoins() >= 3) {
-      m_player->spendCoins(3);
-      m_enemies[m_nearbyNpcIndex]->activate(localTeam);
-      
-      // 发送NPC激活消息给对方
-      NetworkManager::getInstance().sendNpcActivate(m_nearbyNpcIndex, localTeam);
-      
-      std::cout << "[DEBUG] Activated NPC " << m_nearbyNpcIndex << ", coins left: " << m_player->getCoins() << std::endl;
-      m_nearbyNpcIndex = -1;
-    } else {
-      std::cout << "[DEBUG] Not enough coins to activate NPC" << std::endl;
-    }
-  }
-  m_rKeyJustPressed = false;  // 重置R键状态
-  
-  // 更新NPC坦克（房主负责更新逻辑并同步给非房主）
-  auto& net = NetworkManager::getInstance();
-  
-  for (size_t i = 0; i < m_enemies.size(); ++i) {
-    auto& npc = m_enemies[i];
-    // 跳过死亡的NPC
-    if (npc->isDead())
-      continue;
-    if (npc->isActivated()) {
-      int npcTeam = npc->getTeam();
-      
-      // 只有房主执行NPC AI逻辑
-      if (m_isHost) {
-        // 收集敌对目标
-        std::vector<sf::Vector2f> targets;
-        
-        // 我方玩家（如果是敌对阵营的NPC）
-        if (m_player && m_player->getTeam() != npcTeam && npcTeam != 0) {
-          targets.push_back(m_player->getPosition());
-        }
-        
-        // 对方玩家（如果是敌对阵营的NPC）
-        if (m_otherPlayer && m_otherPlayer->getTeam() != npcTeam && npcTeam != 0) {
-          targets.push_back(m_otherPlayer->getPosition());
-        }
-        
-        // 对方阵营的NPC（排除死亡的）
-        for (const auto& otherNpc : m_enemies) {
-          if (otherNpc.get() != npc.get() && 
-              otherNpc->isActivated() && 
-              !otherNpc->isDead() &&
-              otherNpc->getTeam() != npcTeam &&
-              otherNpc->getTeam() != 0) {
-            targets.push_back(otherNpc->getPosition());
-          }
-        }
-        
-        if (!targets.empty()) {
-          npc->setTargets(targets);
-        }
-        
-        npc->update(dt, m_maze);
-        
-        // NPC射击
-        if (npc->shouldShoot()) {
-          sf::Vector2f bulletPos = npc->getGunPosition();
-          float bulletAngle = npc->getTurretAngle();
-          sf::Color bulletColor = (npcTeam == 1) ? sf::Color::Yellow : sf::Color::Magenta;
-          // NPC子弹使用 BulletOwner::Enemy 标识，并设置阵营
-          auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, bulletColor);
-          bullet->setTeam(npcTeam);
-          m_bullets.push_back(std::move(bullet));
-          
-          // 同步NPC射击给非房主
-          net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
-        }
-        
-        // 定期同步NPC状态给非房主（每5帧同步一次减少网络流量）
-        // 使用NPC的id来错开同步时机，避免所有NPC同时同步
-        m_npcSyncCounter++;
-        if ((m_npcSyncCounter + static_cast<int>(i)) % 5 == 0) {
-          NpcState npcState;
-          npcState.id = static_cast<int>(i);
-          npcState.x = npc->getPosition().x;
-          npcState.y = npc->getPosition().y;
-          npcState.rotation = npc->getRotation();
-          npcState.turretAngle = npc->getTurretAngle();
-          npcState.health = npc->getHealth();
-          npcState.team = npc->getTeam();
-          npcState.activated = npc->isActivated();
-          net.sendNpcUpdate(npcState);
-        }
-      }
-    }
-  }
-  
-  // 发送位置到服务器
-  PlayerState state;
-  state.x = m_player->getPosition().x;
-  state.y = m_player->getPosition().y;
-  state.rotation = m_player->getRotation();
-  state.turretAngle = m_player->getTurretRotation();
-  state.health = m_player->getHealth();
-  state.reachedExit = m_localPlayerReachedExit;
-  net.sendPosition(state);
-  
-  // 处理射击
-  if (m_player->hasFiredBullet()) {
-    sf::Vector2f bulletPos = m_player->getBulletSpawnPosition();
-    float bulletAngle = m_player->getTurretRotation();
-    m_bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true));
-    net.sendShoot(bulletPos.x, bulletPos.y, bulletAngle);
-  }
-  
-  // 更新迷宫（可拆墙动画等）
-  m_maze.update(dt);
-  
-  // 更新子弹
-  for (auto& bullet : m_bullets) {
-    bullet->update(dt);
-  }
-  
-  // 子弹碰撞检测（与单人模式类似）
-  checkMultiplayerCollisions();
-  
-  // 删除超出范围的子弹
-  m_bullets.erase(
-    std::remove_if(m_bullets.begin(), m_bullets.end(),
-      [](const std::unique_ptr<Bullet>& b) { return !b->isAlive(); }),
-    m_bullets.end());
-  
-  // 检查玩家是否到达终点（先到达者获胜）
-  sf::Vector2f exitPos = m_maze.getExitPosition();
-  float distToExit = std::hypot(m_player->getPosition().x - exitPos.x,
-                                 m_player->getPosition().y - exitPos.y);
-  
-  if (distToExit < TILE_SIZE && !m_localPlayerReachedExit) {
-    m_localPlayerReachedExit = true;
-    // 先到达终点，获胜！
-    m_multiplayerWin = true;
-    net.sendGameResult(true);  // 通知对方我赢了
-    m_gameState = GameState::Victory;
-    return;
-  }
-  
-  // 检查本地玩家是否死亡（被对方打死，失败）
-  if (m_player->isDead()) {
-    m_multiplayerWin = false;
-    net.sendGameResult(false);  // 通知对方我输了（对方赢）
-    m_gameState = GameState::GameOver;
-    return;
-  }
-  
-  // 检查对方玩家是否被打死（需要在 checkMultiplayerCollisions 中处理）
-  
-  // 更新相机（复用之前定义的 playerPos）
-  m_gameView.setCenter(playerPos);
+  auto ctx = getMultiplayerContext();
+  MultiplayerHandler::update(ctx, m_mpState, dt,
+    [this]() { m_gameState = GameState::Victory; },
+    [this]() { m_gameState = GameState::GameOver; }
+  );
 }
 
 void Game::renderConnecting()
 {
-  m_window.setView(m_uiView);
-  m_window.clear(sf::Color(30, 30, 50));
-  
-  sf::Text title(m_font);
-  title.setString("Multiplayer");
-  title.setCharacterSize(48);
-  title.setFillColor(sf::Color::White);
-  sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, 80.f});
-  m_window.draw(title);
-  
-  sf::Text status(m_font);
-  status.setString(m_connectionStatus);
-  status.setCharacterSize(24);
-  status.setFillColor(sf::Color::Yellow);
-  sf::FloatRect statusBounds = status.getLocalBounds();
-  status.setPosition({(m_screenWidth - statusBounds.size.x) / 2.f, 180.f});
-  m_window.draw(status);
-  
-  sf::Text inputLabel(m_font);
-  if (m_inputMode == InputMode::ServerIP) {
-    inputLabel.setString("Server IP:");
-  } else {
-    inputLabel.setString("Room Code (or press C to create):");
-  }
-  inputLabel.setCharacterSize(24);
-  inputLabel.setFillColor(sf::Color::White);
-  sf::FloatRect labelBounds = inputLabel.getLocalBounds();
-  inputLabel.setPosition({(m_screenWidth - labelBounds.size.x) / 2.f, 260.f});
-  m_window.draw(inputLabel);
-  
-  // 输入框背景
-  sf::RectangleShape inputBox({400.f, 50.f});
-  inputBox.setFillColor(sf::Color(50, 50, 70));
-  inputBox.setOutlineColor(sf::Color::White);
-  inputBox.setOutlineThickness(2.f);
-  inputBox.setPosition({(m_screenWidth - 400.f) / 2.f, 300.f});
-  m_window.draw(inputBox);
-  
-  sf::Text inputText(m_font);
-  inputText.setString(m_inputText + "_");
-  inputText.setCharacterSize(28);
-  inputText.setFillColor(sf::Color::White);
-  inputText.setPosition({(m_screenWidth - 400.f) / 2.f + 10.f, 308.f});
-  m_window.draw(inputText);
-  
-  sf::Text hint(m_font);
-  hint.setString("Press ENTER to confirm, ESC to cancel");
-  hint.setCharacterSize(20);
-  hint.setFillColor(sf::Color(150, 150, 150));
-  sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, 400.f});
-  m_window.draw(hint);
-  
-  m_window.display();
+  MultiplayerHandler::renderConnecting(
+    m_window, m_uiView, m_font,
+    m_screenWidth, m_screenHeight,
+    m_mpState.connectionStatus, m_inputText,
+    m_inputMode == InputMode::ServerIP);
 }
 
 void Game::renderWaitingForPlayer()
 {
-  m_window.setView(m_uiView);
-  m_window.clear(sf::Color(30, 30, 50));
-  
-  sf::Text title(m_font);
-  title.setString("Waiting for Player");
-  title.setCharacterSize(48);
-  title.setFillColor(sf::Color::White);
-  sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({(m_screenWidth - titleBounds.size.x) / 2.f, 80.f});
-  m_window.draw(title);
-  
-  sf::Text roomInfo(m_font);
-  roomInfo.setString("Room Code: " + m_roomCode);
-  roomInfo.setCharacterSize(36);
-  roomInfo.setFillColor(sf::Color::Green);
-  sf::FloatRect roomBounds = roomInfo.getLocalBounds();
-  roomInfo.setPosition({(m_screenWidth - roomBounds.size.x) / 2.f, 200.f});
-  m_window.draw(roomInfo);
-  
-  sf::Text hint(m_font);
-  hint.setString("Share this code with your friend!");
-  hint.setCharacterSize(24);
-  hint.setFillColor(sf::Color::Yellow);
-  sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({(m_screenWidth - hintBounds.size.x) / 2.f, 280.f});
-  m_window.draw(hint);
-  
-  // 动画点
-  static float dotTime = 0;
-  dotTime += 0.016f;
-  int dots = static_cast<int>(dotTime * 2) % 4;
-  std::string waiting = "Waiting";
-  for (int i = 0; i < dots; i++) waiting += ".";
-  
-  sf::Text waitText(m_font);
-  waitText.setString(waiting);
-  waitText.setCharacterSize(28);
-  waitText.setFillColor(sf::Color::White);
-  sf::FloatRect waitBounds = waitText.getLocalBounds();
-  waitText.setPosition({(m_screenWidth - waitBounds.size.x) / 2.f, 360.f});
-  m_window.draw(waitText);
-  
-  sf::Text escHint(m_font);
-  escHint.setString("Press ESC to cancel");
-  escHint.setCharacterSize(20);
-  escHint.setFillColor(sf::Color(150, 150, 150));
-  sf::FloatRect escBounds = escHint.getLocalBounds();
-  escHint.setPosition({(m_screenWidth - escBounds.size.x) / 2.f, 450.f});
-  m_window.draw(escHint);
-  
-  m_window.display();
+  MultiplayerHandler::renderWaitingForPlayer(
+    m_window, m_uiView, m_font,
+    m_screenWidth, m_screenHeight,
+    m_mpState.roomCode);
 }
 
 void Game::renderMultiplayer()
 {
-  m_window.clear(sf::Color(30, 30, 30));
-  m_window.setView(m_gameView);
-  
-  // 渲染迷宫
-  m_maze.render(m_window);
-  
-  // 渲染终点
-  sf::Vector2f exitPos = m_maze.getExitPosition();
-  sf::RectangleShape exitMarker({TILE_SIZE * 0.8f, TILE_SIZE * 0.8f});
-  exitMarker.setFillColor(sf::Color(0, 255, 0, 100));
-  exitMarker.setOutlineColor(sf::Color::Green);
-  exitMarker.setOutlineThickness(3.f);
-  exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
-  m_window.draw(exitMarker);
-  
-  // 渲染NPC坦克（跳过死亡的）
-  for (const auto& npc : m_enemies) {
-    if (npc->isDead()) continue;  // 跳过死亡的NPC
-    
-    npc->draw(m_window);
-    
-    // 如果NPC已激活，显示阵营标记
-    if (npc->isActivated()) {
-      sf::CircleShape teamMarker(8.f);
-      if (npc->getTeam() == m_player->getTeam()) {
-        teamMarker.setFillColor(sf::Color(0, 255, 0, 200));  // 己方：绿色
-      } else {
-        teamMarker.setFillColor(sf::Color(255, 0, 0, 200));  // 敌方：红色
-      }
-      teamMarker.setPosition({npc->getPosition().x - 8.f, npc->getPosition().y - 35.f});
-      m_window.draw(teamMarker);
-    } else {
-      // 未激活的NPC显示灰色标记
-      sf::CircleShape neutralMarker(8.f);
-      neutralMarker.setFillColor(sf::Color(150, 150, 150, 200));
-      neutralMarker.setPosition({npc->getPosition().x - 8.f, npc->getPosition().y - 35.f});
-      m_window.draw(neutralMarker);
-    }
-  }
-  
-  // 渲染另一个玩家
-  if (m_otherPlayer) {
-    m_otherPlayer->render(m_window);
-    
-    // 如果另一个玩家到达终点，显示标记
-    if (m_otherPlayerReachedExit) {
-      sf::CircleShape marker(15.f);
-      marker.setFillColor(sf::Color(0, 255, 0, 150));
-      marker.setPosition({m_otherPlayer->getPosition().x - 15.f, 
-                          m_otherPlayer->getPosition().y - 40.f});
-      m_window.draw(marker);
-    }
-  }
-  
-  // 渲染本地玩家
-  if (m_player) {
-    m_player->render(m_window);
-    
-    // 如果本地玩家到达终点，显示标记
-    if (m_localPlayerReachedExit) {
-      sf::CircleShape marker(15.f);
-      marker.setFillColor(sf::Color(0, 255, 0, 150));
-      marker.setPosition({m_player->getPosition().x - 15.f, 
-                          m_player->getPosition().y - 40.f});
-      m_window.draw(marker);
-    }
-  }
-  
-  // 渲染子弹
-  for (const auto& bullet : m_bullets) {
-    bullet->render(m_window);
-  }
-  
-  // 如果玩家接近未激活的NPC，在NPC头上显示激活提示
-  if (m_nearbyNpcIndex >= 0 && m_nearbyNpcIndex < static_cast<int>(m_enemies.size())) {
-    auto& npc = m_enemies[m_nearbyNpcIndex];
-    sf::Vector2f npcPos = npc->getPosition();
-    
-    // 显示"Press R to activate (3 coins)"提示
-    sf::Text activateHint(m_font);
-    if (m_player->getCoins() >= 3) {
-      activateHint.setString("Press R (3 coins)");
-      activateHint.setFillColor(sf::Color::Yellow);
-    } else {
-      activateHint.setString("Need 3 coins!");
-      activateHint.setFillColor(sf::Color::Red);
-    }
-    activateHint.setCharacterSize(14);
-    sf::FloatRect hintBounds = activateHint.getLocalBounds();
-    activateHint.setPosition({npcPos.x - hintBounds.size.x / 2.f, npcPos.y - 55.f});
-    m_window.draw(activateHint);
-  }
-  
-  // UI - 显示双方血条
-  m_window.setView(m_uiView);
-  
-  // 本地玩家血条 (Self)
-  float barWidth = 150.f;
-  float barHeight = 20.f;
-  float barX = 20.f;
-  float barY = 20.f;
-  
-  // Self 标签
-  sf::Text selfLabel(m_font);
-  selfLabel.setString("Self");
-  selfLabel.setCharacterSize(18);
-  selfLabel.setFillColor(sf::Color::White);
-  selfLabel.setPosition({barX, barY - 2.f});
-  m_window.draw(selfLabel);
-  
-  // Self 血条背景
-  sf::RectangleShape selfBarBg({barWidth, barHeight});
-  selfBarBg.setPosition({barX + 50.f, barY});
-  selfBarBg.setFillColor(sf::Color(60, 60, 60));
-  selfBarBg.setOutlineColor(sf::Color::White);
-  selfBarBg.setOutlineThickness(2.f);
-  m_window.draw(selfBarBg);
-  
-  // Self 血条
-  float selfHealthPercent = m_player ? (m_player->getHealth() / 100.f) : 0.f;
-  sf::RectangleShape selfBar({barWidth * selfHealthPercent, barHeight});
-  selfBar.setPosition({barX + 50.f, barY});
-  selfBar.setFillColor(sf::Color::Green);
-  m_window.draw(selfBar);
-  
-  // Other 标签
-  sf::Text otherLabel(m_font);
-  otherLabel.setString("Other");
-  otherLabel.setCharacterSize(18);
-  otherLabel.setFillColor(sf::Color::White);
-  otherLabel.setPosition({barX, barY + 30.f - 2.f});
-  m_window.draw(otherLabel);
-  
-  // Other 血条背景
-  sf::RectangleShape otherBarBg({barWidth, barHeight});
-  otherBarBg.setPosition({barX + 50.f, barY + 30.f});
-  otherBarBg.setFillColor(sf::Color(60, 60, 60));
-  otherBarBg.setOutlineColor(sf::Color::White);
-  otherBarBg.setOutlineThickness(2.f);
-  m_window.draw(otherBarBg);
-  
-  // Other 血条
-  float otherHealthPercent = m_otherPlayer ? (m_otherPlayer->getHealth() / 100.f) : 0.f;
-  sf::RectangleShape otherBar({barWidth * otherHealthPercent, barHeight});
-  otherBar.setPosition({barX + 50.f, barY + 30.f});
-  otherBar.setFillColor(sf::Color::Cyan);
-  m_window.draw(otherBar);
-  
-  // 金币显示
-  sf::Text coinsText(m_font);
-  coinsText.setString("Coins: " + std::to_string(m_player ? m_player->getCoins() : 0));
-  coinsText.setCharacterSize(20);
-  coinsText.setFillColor(sf::Color::Yellow);
-  coinsText.setPosition({barX, barY + 60.f});
-  m_window.draw(coinsText);
-  
-  // 显示操作提示
-  sf::Text controlHint(m_font);
-  controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | R: Activate NPC");
-  controlHint.setCharacterSize(14);
-  controlHint.setFillColor(sf::Color(150, 150, 150));
-  controlHint.setPosition({barX, m_screenHeight - 30.f});
-  m_window.draw(controlHint);
-  
-  m_window.display();
+  auto ctx = getMultiplayerContext();
+  MultiplayerHandler::renderMultiplayer(ctx, m_mpState);
 }
