@@ -1450,9 +1450,10 @@ void Game::updateMultiplayer(float dt)
           net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
         }
         
-        // 定期同步NPC状态给非房主（每10帧同步一次减少网络流量）
-        static int syncCounter = 0;
-        if (++syncCounter % 10 == 0) {
+        // 定期同步NPC状态给非房主（每5帧同步一次减少网络流量）
+        // 使用NPC的id来错开同步时机，避免所有NPC同时同步
+        m_npcSyncCounter++;
+        if ((m_npcSyncCounter + static_cast<int>(i)) % 5 == 0) {
           NpcState npcState;
           npcState.id = static_cast<int>(i);
           npcState.x = npc->getPosition().x;

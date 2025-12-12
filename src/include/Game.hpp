@@ -115,6 +115,7 @@ private:
   bool m_multiplayerWin = false;  // 多人模式中本地玩家是否获胜
   std::string m_roomCode;
   std::string m_connectionStatus = "Enter server IP:";
+  int m_npcSyncCounter = 0;  // NPC同步计数器
   
   // 输入
   InputMode m_inputMode = InputMode::None;

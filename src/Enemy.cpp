@@ -39,6 +39,16 @@ void Enemy::setPosition(sf::Vector2f position)
   {
     m_hull->setPosition(position);
   }
+  // 同步更新炮塔位置
+  if (m_turret)
+  {
+    m_turret->setPosition(position);
+  }
+  // 同步更新血条位置
+  sf::Vector2f healthBarPos = position;
+  healthBarPos.x -= 25.f;
+  healthBarPos.y -= 45.f;
+  m_healthBar.setPosition(healthBarPos);
 }
 
 void Enemy::setTarget(sf::Vector2f targetPos)
