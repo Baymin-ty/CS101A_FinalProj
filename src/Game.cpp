@@ -312,11 +312,13 @@ void Game::run()
       break;
     case GameState::Multiplayer:
       updateMultiplayer(dt);
-      // 检查是否看到终点，切换BGM
+      // 检查是否看到终点，切换BGM并同步给对方
       if (!m_exitVisible && isExitInView())
       {
         m_exitVisible = true;
         AudioManager::getInstance().playBGM(BGMType::Climax);
+        // 通知对方也开始播放高潮BGM
+        NetworkManager::getInstance().sendClimaxStart();
       }
       break;
     case GameState::GameOver:
@@ -1048,6 +1050,14 @@ void Game::setupNetworkCallbacks()
         m_gameState == GameState::Connecting) {
       m_mpState.connectionStatus = "Disconnected from server";
       resetGame();
+    } });
+
+  // 对方看到出口，同步播放高潮BGM
+  net.setOnClimaxStart([this]()
+                       {
+    if (!m_exitVisible) {
+      m_exitVisible = true;
+      AudioManager::getInstance().playBGM(BGMType::Climax);
     } });
 
   // 对方玩家离开房间，返回等待状态

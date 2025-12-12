@@ -40,6 +40,9 @@ enum class NetMessageType : uint8_t
   NpcShoot,      // NPC射击
   NpcDamage,     // NPC受伤
   
+  // 音乐同步
+  ClimaxStart,   // 开始播放高潮BGM
+  
   // 玩家离开
   PlayerLeft,    // 对方玩家离开房间
 };
@@ -84,6 +87,7 @@ using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
 using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
 using OnPlayerLeftCallback = std::function<void(bool becameHost)>;
+using OnClimaxStartCallback = std::function<void()>;
 
 class NetworkManager
 {
@@ -118,6 +122,7 @@ public:
   void sendNpcUpdate(const NpcState& state);  // 发送NPC状态更新
   void sendNpcShoot(int npcId, float x, float y, float angle);  // 发送NPC射击
   void sendNpcDamage(int npcId, float damage);  // 发送NPC受伤
+  void sendClimaxStart();  // 发送开始播放高潮BGM
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -140,6 +145,7 @@ public:
   void setOnNpcShoot(OnNpcShootCallback cb) { m_onNpcShoot = cb; }
   void setOnNpcDamage(OnNpcDamageCallback cb) { m_onNpcDamage = cb; }
   void setOnPlayerLeft(OnPlayerLeftCallback cb) { m_onPlayerLeft = cb; }
+  void setOnClimaxStart(OnClimaxStartCallback cb) { m_onClimaxStart = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -176,4 +182,5 @@ private:
   OnNpcShootCallback m_onNpcShoot;
   OnNpcDamageCallback m_onNpcDamage;
   OnPlayerLeftCallback m_onPlayerLeft;
+  OnClimaxStartCallback m_onClimaxStart;
 };

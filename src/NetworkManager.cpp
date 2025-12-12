@@ -171,6 +171,15 @@ void NetworkManager::sendRestartRequest()
   sendPacket(data);
 }
 
+void NetworkManager::sendClimaxStart()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::ClimaxStart));
+  sendPacket(data);
+}
+
 void NetworkManager::sendNpcActivate(int npcId, int team)
 {
   if (!m_connected) return;
@@ -561,6 +570,15 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     {
       bool becameHost = (data.size() >= 2) ? (data[1] != 0) : false;
       m_onPlayerLeft(becameHost);
+    }
+    break;
+  }
+  case NetMessageType::ClimaxStart:
+  {
+    // 对方看到出口，开始播放高潮BGM
+    if (m_onClimaxStart)
+    {
+      m_onClimaxStart();
     }
     break;
   }
