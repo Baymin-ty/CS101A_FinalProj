@@ -301,8 +301,8 @@ void MazeGenerator::placeDestructibleWalls()
 void MazeGenerator::placeMultiplayerSpawns()
 {
   // 为多人模式找两个出生点和一个合适的终点：
-  // 1. 两个出生点之间有一定距离（对战公平）
-  // 2. 终点离两个出生点都比较远（增加游戏难度和时间）
+  // 1. 两个出生点在地图中部区域，有一定距离
+  // 2. 终点在地图边缘/四周区域
   // 3. 两个出生点到终点的距离要相近（公平）
   
   auto emptySpaces = getEmptySpaces();
@@ -315,83 +315,139 @@ void MazeGenerator::placeMultiplayerSpawns()
     return;
   }
 
-  // 找两个相距适中的出生点（不要太远，让玩家可以互动）
-  int bestSpawn1 = -1, bestSpawn2 = -1;
-  int bestSpawnDist = 0;
-  int minSpawnDist = std::max(4, std::min(m_width, m_height) / 6); // 两出生点最小距离
-  int maxSpawnDist = std::max(10, std::min(m_width, m_height) / 3); // 两出生点最大距离
-  
-  // 从空地中筛选可用的出生点（排除终点和敌人位置）
+  // 定义地图中部区域（中间50%的区域）
+  int centerMarginX = m_width / 4;
+  int centerMarginY = m_height / 4;
+  int centerMinX = centerMarginX;
+  int centerMaxX = m_width - centerMarginX;
+  int centerMinY = centerMarginY;
+  int centerMaxY = m_height - centerMarginY;
+
+  // 定义边缘区域（距边界25%以内）
+  auto isEdgeArea = [&](int x, int y) {
+    return x < centerMarginX || x >= m_width - centerMarginX ||
+           y < centerMarginY || y >= m_height - centerMarginY;
+  };
+
+  // 筛选中部区域的空地作为出生点候选
   std::vector<std::pair<int, int>> spawnCandidates;
   for (const auto& [x, y] : emptySpaces) {
     if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
-      // 排除离边界太近的点
-      if (x > 2 && x < m_width - 3 && y > 2 && y < m_height - 3) {
+      // 在中部区域
+      if (x >= centerMinX && x < centerMaxX && y >= centerMinY && y < centerMaxY) {
         spawnCandidates.push_back({x, y});
       }
     }
   }
   
-  if (spawnCandidates.size() < 2) {
-    spawnCandidates = emptySpaces; // 回退
-  }
-
-  // 找两个距离适中的出生点（在minSpawnDist和maxSpawnDist之间）
-  for (size_t i = 0; i < spawnCandidates.size() && i < 50; ++i) {
-    for (size_t j = i + 1; j < spawnCandidates.size() && j < 50; ++j) {
-      auto [x1, y1] = spawnCandidates[i];
-      auto [x2, y2] = spawnCandidates[j];
-      int dist = std::abs(x1 - x2) + std::abs(y1 - y2);
-      // 选择在范围内且尽量接近理想距离的点对
-      if (dist >= minSpawnDist && dist <= maxSpawnDist) {
-        // 优先选择距离适中的
-        if (bestSpawn1 < 0 || dist > bestSpawnDist) {
-          bestSpawnDist = dist;
-          bestSpawn1 = static_cast<int>(i);
-          bestSpawn2 = static_cast<int>(j);
+  // 如果中部候选太少，扩大范围
+  if (spawnCandidates.size() < 10) {
+    spawnCandidates.clear();
+    int smallMarginX = m_width / 6;
+    int smallMarginY = m_height / 6;
+    for (const auto& [x, y] : emptySpaces) {
+      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+        if (x >= smallMarginX && x < m_width - smallMarginX && 
+            y >= smallMarginY && y < m_height - smallMarginY) {
+          spawnCandidates.push_back({x, y});
         }
       }
     }
   }
 
-  if (bestSpawn1 >= 0 && bestSpawn2 >= 0) {
-    m_spawn1X = spawnCandidates[bestSpawn1].first;
-    m_spawn1Y = spawnCandidates[bestSpawn1].second;
-    m_spawn2X = spawnCandidates[bestSpawn2].first;
-    m_spawn2Y = spawnCandidates[bestSpawn2].second;
-  } else {
-    // 回退：使用起点和对角位置
-    m_spawn1X = 3;
-    m_spawn1Y = 3;
-    m_spawn2X = m_width - 4;
-    m_spawn2Y = m_height - 4;
+  if (spawnCandidates.size() < 2) {
+    spawnCandidates = emptySpaces; // 回退
   }
 
-  // 现在重新放置终点：找一个离两个出生点都比较远的位置，从候选中随机选择
-  std::vector<std::tuple<int, int, int>> endCandidates; // {x, y, minDist}
+  // 随机打乱候选点
+  std::shuffle(spawnCandidates.begin(), spawnCandidates.end(), m_rng);
+
+  // 找两个有一定距离的出生点
+  int minSpawnDist = std::max(3, std::min(m_width, m_height) / 8); // 最小距离
+  int maxSpawnDist = std::max(8, std::min(m_width, m_height) / 4); // 最大距离
   
-  for (const auto& [x, y] : emptySpaces) {
-    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
-      int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
-      int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
-      int minDist = std::min(distToSpawn1, distToSpawn2);
-      
-      // 确保两个出生点到终点的距离差不要太大（公平性）
-      int distDiff = std::abs(distToSpawn1 - distToSpawn2);
-      if (distDiff < minDist / 2) {
-        endCandidates.push_back({x, y, minDist});
+  // 收集符合条件的出生点对
+  std::vector<std::pair<int, int>> validSpawnPairs; // 存储索引对
+  for (size_t i = 0; i < spawnCandidates.size() && i < 30; ++i) {
+    for (size_t j = i + 1; j < spawnCandidates.size() && j < 30; ++j) {
+      auto [x1, y1] = spawnCandidates[i];
+      auto [x2, y2] = spawnCandidates[j];
+      int dist = std::abs(x1 - x2) + std::abs(y1 - y2);
+      if (dist >= minSpawnDist && dist <= maxSpawnDist) {
+        validSpawnPairs.push_back({static_cast<int>(i), static_cast<int>(j)});
       }
     }
   }
 
-  // 按距离排序（从远到近）
+  // 从有效的出生点对中随机选择一对
+  if (!validSpawnPairs.empty()) {
+    int pairIdx = m_rng() % validSpawnPairs.size();
+    auto [idx1, idx2] = validSpawnPairs[pairIdx];
+    m_spawn1X = spawnCandidates[idx1].first;
+    m_spawn1Y = spawnCandidates[idx1].second;
+    m_spawn2X = spawnCandidates[idx2].first;
+    m_spawn2Y = spawnCandidates[idx2].second;
+  } else if (spawnCandidates.size() >= 2) {
+    // 回退：直接选前两个
+    m_spawn1X = spawnCandidates[0].first;
+    m_spawn1Y = spawnCandidates[0].second;
+    m_spawn2X = spawnCandidates[1].first;
+    m_spawn2Y = spawnCandidates[1].second;
+  } else {
+    // 最终回退
+    m_spawn1X = m_width / 2 - 2;
+    m_spawn1Y = m_height / 2;
+    m_spawn2X = m_width / 2 + 2;
+    m_spawn2Y = m_height / 2;
+  }
+
+  // 筛选边缘区域的空地作为终点候选，并计算到两个出生点的距离
+  std::vector<std::tuple<int, int, int, int>> endCandidates; // {x, y, minDist, distDiff}
+  
+  for (const auto& [x, y] : emptySpaces) {
+    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+      // 优先选择边缘区域的点
+      if (isEdgeArea(x, y)) {
+        int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
+        int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
+        int minDist = std::min(distToSpawn1, distToSpawn2);
+        int distDiff = std::abs(distToSpawn1 - distToSpawn2);
+        
+        // 确保两个出生点到终点的距离差不要太大（公平性）
+        if (distDiff <= std::max(3, minDist / 3)) {
+          endCandidates.push_back({x, y, minDist, distDiff});
+        }
+      }
+    }
+  }
+
+  // 如果边缘区域候选太少，也加入一些非边缘但距离较远的点
+  if (endCandidates.size() < 5) {
+    for (const auto& [x, y] : emptySpaces) {
+      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+        if (!isEdgeArea(x, y)) {
+          int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
+          int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
+          int minDist = std::min(distToSpawn1, distToSpawn2);
+          int distDiff = std::abs(distToSpawn1 - distToSpawn2);
+          
+          // 要求距离较远
+          if (minDist > std::min(m_width, m_height) / 3 && distDiff <= std::max(3, minDist / 3)) {
+            endCandidates.push_back({x, y, minDist, distDiff});
+          }
+        }
+      }
+    }
+  }
+
+  // 按距离排序（从远到近），优先选择距离远的
   std::sort(endCandidates.begin(), endCandidates.end(),
             [](const auto &a, const auto &b) { return std::get<2>(a) > std::get<2>(b); });
 
-  // 从距离最远的前 20% 中随机选一个作为终点
+  // 从距离最远的前 30% 中随机选一个作为终点
   int bestEndX = m_endX, bestEndY = m_endY;
   if (!endCandidates.empty()) {
-    int topCount = std::max(1, static_cast<int>(endCandidates.size() * 0.2));
+    int topCount = std::max(1, static_cast<int>(endCandidates.size() * 0.3));
     int selectedIdx = m_rng() % topCount;
     bestEndX = std::get<0>(endCandidates[selectedIdx]);
     bestEndY = std::get<1>(endCandidates[selectedIdx]);
