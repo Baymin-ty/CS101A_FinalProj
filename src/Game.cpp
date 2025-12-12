@@ -703,10 +703,14 @@ void Game::updateCamera()
   float actualLookAhead = m_cameraLookAhead * distFactor;
   sf::Vector2f cameraTarget = playerPos + lookDir * actualLookAhead;
 
-  // 限制视角不超出迷宫边界（使用逻辑分辨率）
+  // 缩放后的视野范围
+  float zoomedWidth = LOGICAL_WIDTH * VIEW_ZOOM;
+  float zoomedHeight = LOGICAL_HEIGHT * VIEW_ZOOM;
+
+  // 限制视角不超出迷宫边界（使用缩放后的视野范围）
   sf::Vector2f mazeSize = m_maze.getSize();
-  float halfWidth = LOGICAL_WIDTH / 2.f;
-  float halfHeight = LOGICAL_HEIGHT / 2.f;
+  float halfWidth = zoomedWidth / 2.f;
+  float halfHeight = zoomedHeight / 2.f;
 
   cameraTarget.x = std::max(halfWidth, std::min(cameraTarget.x, mazeSize.x - halfWidth));
   cameraTarget.y = std::max(halfHeight, std::min(cameraTarget.y, mazeSize.y - halfHeight));
@@ -726,7 +730,9 @@ void Game::updateCamera()
     m_currentCameraPos.y += (cameraTarget.y - m_currentCameraPos.y) * lerpFactor;
   }
 
+  // 设置视图中心和缩放
   m_gameView.setCenter(m_currentCameraPos);
+  m_gameView.setSize({zoomedWidth, zoomedHeight});
 }
 
 void Game::checkCollisions()
@@ -1288,8 +1294,8 @@ MultiplayerContext Game::getMultiplayerContext()
       m_enemies,
       m_bullets,
       m_maze,
-      LOGICAL_WIDTH,    // 使用逻辑分辨率
-      LOGICAL_HEIGHT,   // 使用逻辑分辨率
+      LOGICAL_WIDTH,  // 使用逻辑分辨率
+      LOGICAL_HEIGHT, // 使用逻辑分辨率
       m_tankScale};
 }
 

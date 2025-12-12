@@ -85,11 +85,12 @@ private:
   // 逻辑分辨率（所有屏幕看到的游戏范围相同）
   static constexpr unsigned int LOGICAL_WIDTH = 1920;
   static constexpr unsigned int LOGICAL_HEIGHT = 1080;
+  static constexpr float VIEW_ZOOM = 0.75f; // 视图缩放（小于1表示放大，看到更小范围）
   unsigned int m_screenWidth = 1280;   // 实际窗口宽度
   unsigned int m_screenHeight = 720;   // 实际窗口高度
   const float m_shootCooldown = 0.3f;
   const float m_bulletSpeed = 500.f;
-  const float m_cameraLookAhead = 100.f; // 视角向瞄准方向偏移量（减小）
+  const float m_cameraLookAhead = 100.f; // 视角向瞄准方向偏移量
   const float m_cameraSmoothSpeed = 3.f; // 相机平滑跟随速度（越小越平滑）
   const float m_tankScale = 0.4f;
   
