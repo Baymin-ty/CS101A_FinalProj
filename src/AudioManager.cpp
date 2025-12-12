@@ -76,6 +76,20 @@ bool AudioManager::init(const std::string& assetPath)
   }
   m_sfxBuffers[SFXType::CollectCoins] = buffer;
   
+  if (!buffer.loadFromFile(assetPath + "Bingo.mp3"))
+  {
+    std::cerr << "[Audio] Failed to load Bingo.mp3" << std::endl;
+    return false;
+  }
+  m_sfxBuffers[SFXType::Bingo] = buffer;
+  
+  if (!buffer.loadFromFile(assetPath + "TankWaling.mp3"))
+  {
+    std::cerr << "[Audio] Failed to load TankWaling.mp3" << std::endl;
+    return false;
+  }
+  m_sfxBuffers[SFXType::TankWalking] = buffer;
+  
   m_initialized = true;
   std::cout << "[Audio] Audio system initialized successfully" << std::endl;
   return true;
@@ -178,6 +192,43 @@ void AudioManager::playSFXGlobal(SFXType type)
   sound->play();
   
   m_activeSounds.push_back(std::move(sound));
+}
+
+void AudioManager::playLoopSFX(SFXType type)
+{
+  // 如果已经在播放，不重复创建
+  auto it = m_loopSounds.find(type);
+  if (it != m_loopSounds.end() && it->second->getStatus() == sf::Sound::Status::Playing)
+    return;
+  
+  auto bufferIt = m_sfxBuffers.find(type);
+  if (bufferIt == m_sfxBuffers.end())
+    return;
+  
+  auto sound = std::make_unique<sf::Sound>(bufferIt->second);
+  sound->setLooping(true);
+  sound->setVolume(m_sfxVolume);
+  sound->play();
+  
+  m_loopSounds[type] = std::move(sound);
+}
+
+void AudioManager::stopLoopSFX(SFXType type)
+{
+  auto it = m_loopSounds.find(type);
+  if (it != m_loopSounds.end())
+  {
+    it->second->stop();
+    m_loopSounds.erase(it);
+  }
+}
+
+bool AudioManager::isLoopSFXPlaying(SFXType type) const
+{
+  auto it = m_loopSounds.find(type);
+  if (it != m_loopSounds.end())
+    return it->second->getStatus() == sf::Sound::Status::Playing;
+  return false;
 }
 
 void AudioManager::setSFXVolume(float volume)

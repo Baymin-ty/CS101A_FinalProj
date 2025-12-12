@@ -21,7 +21,9 @@ enum class SFXType
   BulletHitWall,       // 子弹击中墙体
   BulletHitTank,       // 子弹击中坦克/NPC
   Explode,             // 爆炸（坦克死亡/红色墙爆炸）
-  CollectCoins         // 收集金币（黄色墙被打掉）
+  CollectCoins,        // 收集金币（黄色墙被打掉）
+  Bingo,               // 蓝色治疗墙被打掉
+  TankWalking          // 坦克移动
 };
 
 class AudioManager
@@ -43,6 +45,11 @@ public:
   
   // 音效播放（无位置，全局音效）
   void playSFXGlobal(SFXType type);
+  
+  // 循环音效控制（用于坦克移动等）
+  void playLoopSFX(SFXType type);
+  void stopLoopSFX(SFXType type);
+  bool isLoopSFXPlaying(SFXType type) const;
   
   // 设置音效音量
   void setSFXVolume(float volume); // 0-100
@@ -83,6 +90,9 @@ private:
   
   float m_sfxVolume = 70.f;
   float m_listeningRange = 800.f; // 默认听音范围（像素）
+  
+  // 循环音效实例
+  std::unordered_map<SFXType, std::unique_ptr<sf::Sound>> m_loopSounds;
   
   bool m_initialized = false;
 };

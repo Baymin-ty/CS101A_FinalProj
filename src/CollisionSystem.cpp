@@ -32,8 +32,8 @@ void CollisionSystem::handleWallDestroyEffect(const WallDestroyResult& result, T
     case WallAttribute::Heal:
       // 治疗墙：恢复25%血量
       shooter->heal(0.25f);
-      // 播放收集金币音效（治疗也用这个）
-      AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
+      // 播放 bingo 音效
+      AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
       break;
       
     case WallAttribute::Explosive:
