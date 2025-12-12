@@ -1,108 +1,125 @@
 # Tank Maze 🎮
 
-一个基于 SFML 3.0 的坦克迷宫游戏，支持单人模式和双人联机对战。
+A tank maze game built with SFML 3.0, featuring single-player and multiplayer modes.
 
-## 游戏简介
+## Game Overview
 
-在随机生成的迷宫中驾驶坦克，击败敌人或与好友对战！游戏提供两种模式：
+Navigate your tank through randomly generated mazes! The game offers two exciting modes:
 
-- **单人模式**：在迷宫中击败所有 NPC 敌人并到达终点
-- **多人模式**：两名玩家实时联机对战，先到达终点或击败对方者获胜
+- **Single Player**: Navigate through the maze, avoid or defeat NPCs, and reach the exit
+- **Multiplayer**: Real-time online battle - race to the exit or defeat your opponent
 
-## 游戏特性
+## Features
 
-- 🎲 **随机迷宫生成**：每局游戏都有独特的迷宫布局
-- 🎯 **可自定义设置**：地图尺寸、敌人数量均可调节
-- 💥 **可破坏墙壁**：部分墙壁可被子弹摧毁，开辟新路径
-- 🌐 **实时联机对战**：基于 TCP 的双人联机系统
-- 🎨 **精美坦克贴图**：多种颜色的坦克外观
+- 🎲 **Random Maze Generation**: Every game features a unique maze layout
+- 🎯 **Customizable Settings**: Adjust map size and NPC count
+- 💥 **Destructible Walls**: Some walls can be destroyed by bullets to create new paths
+- 🎨 **Special Walls** (Multiplayer only):
+  - 🟡 **Gold Walls**: Earn 2 coins when destroyed
+  - 🔵 **Heal Walls**: Restore 25% health when destroyed
+  - 🔴 **Explosive Walls**: Explode and destroy surrounding walls
+- 🌐 **Real-time Multiplayer**: TCP-based two-player online system
+- 🎵 **Dynamic Audio**: Background music and sound effects with distance-based volume
+- 🤖 **NPC System**: In multiplayer, spend coins to recruit NPCs to fight for you
 
-## 操作说明
+## Controls
 
-| 按键 | 功能 |
-|------|------|
-| W/A/S/D | 移动坦克 |
-| 鼠标移动 | 控制炮塔方向 |
-| 鼠标左键 | 射击 |
-| ESC | 暂停/返回菜单 |
-| R | 重新开始 |
+| Key | Action |
+|-----|--------|
+| W/A/S/D | Move tank |
+| Mouse | Aim turret |
+| Left Click (Hold) | Continuous fire |
+| E | Recruit nearby NPC (Multiplayer, costs 5 coins) |
+| ESC | Pause / Return to menu |
+| P | Pause game |
+| R | Restart |
 
-## 游戏模式
+## Game Modes
 
-### 单人模式
+### Single Player
 
-1. 在主菜单选择 **Start Game**
-2. 可调节以下设置：
-   - **Random Map**: 开启/关闭随机地图
-   - **Map Width**: 地图宽度 (21-71)
-   - **Map Height**: 地图高度 (15-51)
-   - **Enemies**: 敌人数量 (3-30)
-3. 击败所有敌人并到达绿色终点即可获胜
+1. Select **Start Game** from the main menu
+2. Customize your game:
+   - **Map Width**: 21-151
+   - **Map Height**: 15-101
+   - **NPCs**: 3-100
+3. Navigate through the maze and reach the green exit to win
 
-### 多人模式
+**Note**: You don't need to defeat all NPCs - just reach the exit!
 
-1. 启动服务器：`node server/server.js`
-2. 在主菜单选择 **Multiplayer**
-3. 输入服务器 IP 地址（本地测试使用 127.0.0.1）
-4. **创建房间**：按 `C` 键创建房间，获得房间码
-5. **加入房间**：输入房间码加入已创建的房间
-6. 两名玩家都加入后游戏自动开始
+### Multiplayer
 
-**胜利条件**：
-- 先到达绿色终点
-- 或击败对方玩家
+1. Start the server: `node server/server.js`
+2. Select **Multiplayer** from the main menu
+3. Enter the server IP address (use 127.0.0.1 for local testing)
+4. **Create Room**: Press `C` to create a room and get a room code
+5. **Join Room**: Enter a room code to join an existing room
+6. Game starts automatically when both players are ready
 
-**重新开始**：
-- 房主按 R：重新生成迷宫，等待对方玩家
-- 非房主按 R：自动重新加入房间
+**Victory Conditions**:
+- First to reach the green exit wins
+- Or defeat your opponent
 
-## 编译与运行
+**Special Mechanics**:
+- Destroy gold walls to earn coins
+- Spend 5 coins to recruit a nearby NPC (press E when prompted)
+- Recruited NPCs will fight for you
+- When either player sees the exit, epic battle music begins for both!
 
-### 依赖
+**Restart**:
+- Host presses R: Regenerates maze, waits for other player
+- Guest presses R: Automatically rejoins the room
+
+## Building & Running
+
+### Prerequisites
 
 - CMake 3.16+
-- C++17 编译器
-- SFML 3.0（自动通过 FetchContent 下载）
-- Node.js（仅多人模式服务器需要）
+- C++20 compiler
+- SFML 3.0 (automatically downloaded via FetchContent)
+- Node.js (required for multiplayer server only)
 
-### 编译
+### Build
 
 ```bash
 mkdir Build && cd Build
 cmake ..
-make
+make -j
 ```
 
-### 运行
+### Run
 
 ```bash
-# 单人模式
-./CS101AFinalProj
+# Single Player (from project root)
+./Build/CS101AFinalProj.app/Contents/MacOS/CS101AFinalProj
 
-# 多人模式（先启动服务器）
-node ../server/server.js &
-./CS101AFinalProj
+# Multiplayer (start server first)
+node server/server.js &
+./Build/CS101AFinalProj.app/Contents/MacOS/CS101AFinalProj
 ```
 
-## 项目结构
+## Project Structure
 
 ```
 CS101A_FinalProj/
-├── CMakeLists.txt          # CMake 构建配置
-├── README.md               # 项目说明文档
+├── CMakeLists.txt          # CMake build configuration
+├── README.md               # Project documentation
 │
-├── src/                    # 源代码目录
-│   ├── main.cpp            # 程序入口
-│   ├── Game.cpp            # 游戏主逻辑（状态管理、渲染、事件处理）
-│   ├── Tank.cpp            # 坦克类（玩家控制、移动、射击）
-│   ├── Enemy.cpp           # 敌人 AI（巡逻、追踪、攻击）
-│   ├── Bullet.cpp          # 子弹类（移动、碰撞）
-│   ├── Maze.cpp            # 迷宫类（地图数据、渲染、碰撞检测）
-│   ├── MazeGenerator.cpp   # 迷宫生成器（随机迷宫算法）
-│   ├── HealthBar.cpp       # 血条 UI 组件
-│   ├── NetworkManager.cpp  # 网络管理（TCP 连接、消息收发）
+├── src/                    # Source code
+│   ├── main.cpp            # Entry point
+│   ├── Game.cpp            # Main game logic (state management, rendering)
+│   ├── Tank.cpp            # Tank class (player control, movement, shooting)
+│   ├── Enemy.cpp           # NPC AI (patrol, chase, attack)
+│   ├── Bullet.cpp          # Bullet physics and collision
+│   ├── Maze.cpp            # Maze data, rendering, collision detection
+│   ├── MazeGenerator.cpp   # Random maze generation (DFS algorithm)
+│   ├── HealthBar.cpp       # Health bar UI component
+│   ├── NetworkManager.cpp  # Network management (TCP connection)
+│   ├── AudioManager.cpp    # Audio system (BGM, SFX with distance attenuation)
+│   ├── CollisionSystem.cpp # Collision detection and handling
+│   ├── MultiplayerHandler.cpp # Multiplayer game logic
 │   │
-│   └── include/            # 头文件目录
+│   └── include/            # Header files
 │       ├── Game.hpp
 │       ├── Tank.hpp
 │       ├── Enemy.hpp
@@ -111,50 +128,71 @@ CS101A_FinalProj/
 │       ├── MazeGenerator.hpp
 │       ├── HealthBar.hpp
 │       ├── NetworkManager.hpp
-│       └── Utils.hpp       # 工具函数（角度计算、常量定义）
+│       ├── AudioManager.hpp
+│       ├── CollisionSystem.hpp
+│       └── Utils.hpp
 │
-├── server/                 # 多人游戏服务器
-│   └── server.js           # Node.js TCP 服务器
+├── server/                 # Multiplayer server
+│   └── server.js           # Node.js TCP server
 │
-├── tank_assets/            # 游戏资源
-│   ├── PNG/                # 坦克贴图
-│   │   ├── Hulls_Color_A/  # 玩家坦克车身
-│   │   ├── Hulls_Color_B/  # 敌人/对手坦克车身
-│   │   ├── Weapon_Color_A/ # 玩家炮塔
-│   │   └── Weapon_Color_B/ # 敌人/对手炮塔
-│   └── ...
+├── tank_assets/            # Tank sprites
+│   └── PNG/
+│       ├── Hulls_Color_A/  # Player tank hull
+│       ├── Hulls_Color_B/  # Opponent/NPC tank hull
+│       ├── Weapon_Color_A/ # Player turret
+│       └── Weapon_Color_B/ # Opponent/NPC turret
 │
-├── Build/                  # 编译输出目录
-└── .vscode/                # VS Code 配置
+├── music_assets/           # Audio files
+│   ├── menu.mp3            # Menu background music
+│   ├── start.mp3           # Game start background music
+│   ├── climax.mp3          # Battle climax music (when exit is visible)
+│   ├── shoot.mp3           # Shooting sound effect
+│   ├── explode.mp3         # Explosion sound effect
+│   ├── Bingo.mp3           # Heal wall destroyed sound
+│   └── collectCoins.mp3    # Coin collection sound
+│
+└── Build/                  # Build output directory
 ```
 
-## 核心模块说明
+## Core Modules
 
-| 模块 | 功能 |
-|------|------|
-| `Game` | 游戏主循环、状态机、场景渲染、事件分发 |
-| `Tank` | 坦克实体，处理输入、移动、旋转、射击 |
-| `Enemy` | 敌人 AI，包含巡逻、追踪、攻击行为 |
-| `Bullet` | 子弹物理、碰撞检测、伤害计算 |
-| `Maze` | 迷宫数据结构、瓦片渲染、墙壁碰撞 |
-| `MazeGenerator` | 使用 DFS 算法生成随机迷宫 |
-| `NetworkManager` | 单例网络管理器，处理 TCP 通信 |
-| `HealthBar` | 血条 UI 绘制 |
+| Module | Description |
+|--------|-------------|
+| `Game` | Main game loop, state machine, scene rendering, event handling |
+| `Tank` | Tank entity - input handling, movement, rotation, shooting |
+| `Enemy` | NPC AI - patrol, chase, and attack behaviors |
+| `Bullet` | Bullet physics, collision detection, damage calculation |
+| `Maze` | Maze data structure, tile rendering, wall collision |
+| `MazeGenerator` | DFS-based random maze generation |
+| `NetworkManager` | Singleton network manager for TCP communication |
+| `AudioManager` | Singleton audio manager with BGM and distance-based SFX |
+| `CollisionSystem` | Centralized collision detection and effect handling |
 
-## 网络协议
+## Network Protocol
 
-多人模式使用自定义二进制协议，消息格式：
+Multiplayer mode uses a custom binary protocol:
 
 ```
 [2 bytes: length][1 byte: type][payload...]
 ```
 
-主要消息类型：
-- `CreateRoom` / `JoinRoom`：房间操作
-- `MazeData`：迷宫数据同步
-- `PlayerUpdate`：玩家状态同步（位置、角度、血量）
-- `PlayerShoot`：射击事件
-- `GameResult`：游戏结果
+Message Types:
+- `CreateRoom` / `JoinRoom`: Room operations
+- `MazeData`: Maze data synchronization
+- `PlayerUpdate`: Player state sync (position, angle, health)
+- `PlayerShoot`: Shooting events
+- `NpcActivate` / `NpcUpdate`: NPC recruitment and state sync
+- `ClimaxStart`: Music synchronization
+- `GameResult`: Game outcome
+
+## Audio System
+
+- **Background Music**: 
+  - Menu → Start → Climax (when exit becomes visible)
+  - Synchronized across players in multiplayer
+- **Sound Effects**: Distance-based volume attenuation
+  - Closer sounds are louder
+  - Maximum hearing range: 800 pixels
 
 ## License
 
