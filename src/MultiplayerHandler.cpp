@@ -56,8 +56,17 @@ void MultiplayerHandler::update(
   // 处理NPC激活
   handleNpcActivation(ctx, state);
 
-  // 更新NPC AI（仅房主）
-  updateNpcAI(ctx, state, dt);
+  // 更新NPC AI（仅房主）或插值更新（非房主）
+  if (state.isHost) {
+    updateNpcAI(ctx, state, dt);
+  } else {
+    // 非房主：更新NPC插值
+    for (auto& npc : ctx.enemies) {
+      if (!npc->isDead()) {
+        npc->updateInterpolation(dt);
+      }
+    }
+  }
 
   // 发送位置到服务器
   auto& net = NetworkManager::getInstance();
@@ -219,9 +228,9 @@ void MultiplayerHandler::updateNpcAI(
           net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
         }
 
-        // 定期同步NPC状态
+        // 定期同步NPC状态（每3帧同步一次，提高流畅度）
         state.npcSyncCounter++;
-        if ((state.npcSyncCounter + static_cast<int>(i)) % 5 == 0) {
+        if ((state.npcSyncCounter + static_cast<int>(i)) % 3 == 0) {
           NpcState npcState;
           npcState.id = static_cast<int>(i);
           npcState.x = npc->getPosition().x;

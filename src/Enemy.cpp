@@ -189,47 +189,58 @@ void Enemy::update(float dt, const Maze &maze)
   sf::Vector2f bestTarget = m_targetPos;
   int bestLOS = 2; // 默认假设最差情况（不可拆墙阻挡）
   float bestDist = 999999.f;
-  
+
   // 如果有多个目标，选择最容易攻击的
   std::vector<sf::Vector2f> allTargets = m_targets;
-  if (allTargets.empty()) {
+  if (allTargets.empty())
+  {
     allTargets.push_back(m_targetPos);
   }
-  
-  for (const auto& target : allTargets) {
+
+  for (const auto &target : allTargets)
+  {
     sf::Vector2f toTarget = target - m_hull->getPosition();
     float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
     int los = maze.checkLineOfSight(m_hull->getPosition(), target);
-    
+
     // 优先选择：无阻挡 > 可拆墙 > 不可拆墙，距离作为次要因素
-    if (los < bestLOS || (los == bestLOS && dist < bestDist)) {
+    if (los < bestLOS || (los == bestLOS && dist < bestDist))
+    {
       bestLOS = los;
       bestDist = dist;
       bestTarget = target;
     }
   }
-  
+
   m_lastLineOfSightResult = bestLOS;
-  
+
   // 根据视线检测结果决定射击目标
-  if (bestLOS == 0) {
+  if (bestLOS == 0)
+  {
     // 无阻挡，直接瞄准目标
     m_shootTarget = bestTarget;
     m_hasValidTarget = true;
-  } else if (bestLOS == 1) {
+  }
+  else if (bestLOS == 1)
+  {
     // 有可拆墙阻挡，瞄准可拆墙
     m_shootTarget = maze.getFirstBlockedPosition(m_hull->getPosition(), bestTarget);
     m_hasValidTarget = true;
-  } else {
+  }
+  else
+  {
     // 不可拆墙阻挡，不射击，继续移动寻找更好的位置
     m_hasValidTarget = false;
   }
-  
+
   // 炮塔朝向射击目标（如果有有效目标）
-  if (m_hasValidTarget) {
+  if (m_hasValidTarget)
+  {
     float angle = Utils::getAngle(m_turret->getPosition(), m_shootTarget);
     m_turret->setRotation(sf::degrees(angle));
-  } else {
+  }
+  else
+  {
     // 没有有效目标时，炮塔朝向移动方向
     float angle = Utils::getAngle(m_turret->getPosition(), bestTarget);
     m_turret->setRotation(sf::degrees(angle));
@@ -269,7 +280,8 @@ float Enemy::getTurretRotation() const
 
 void Enemy::setTurretRotation(float angle)
 {
-  if (m_turret) {
+  if (m_turret)
+  {
     m_turret->setRotation(sf::degrees(angle));
   }
 }
@@ -290,7 +302,7 @@ bool Enemy::shouldShoot()
   // 只有激活后才会射击
   if (!m_activated)
     return false;
-  
+
   // 没有有效目标时不射击（不可拆墙阻挡）
   if (!m_hasValidTarget)
     return false;
@@ -349,5 +361,69 @@ void Enemy::setTargets(const std::vector<sf::Vector2f> &targets)
         m_targetPos = target;
       }
     }
+  }
+}
+
+void Enemy::setNetworkTarget(sf::Vector2f pos, float rotation, float turretAngle)
+{
+  m_networkTargetPos = pos;
+  m_networkTargetRotation = rotation;
+  m_networkTargetTurretAngle = turretAngle;
+}
+
+void Enemy::updateInterpolation(float dt)
+{
+  if (!m_isRemote)
+    return;
+
+  // 使用线性插值（lerp）平滑过渡到目标位置
+  // 插值因子：越大越快跟上，0.1-0.3之间比较平滑
+  float lerpFactor = std::min(1.0f, m_interpSpeed * dt);
+
+  // 位置插值
+  sf::Vector2f currentPos = getPosition();
+  sf::Vector2f diff = m_networkTargetPos - currentPos;
+  float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+
+  if (dist > 1.f)
+  {
+    // 如果距离太远（瞬移情况），直接设置位置
+    if (dist > 500.f)
+    {
+      setPosition(m_networkTargetPos);
+    }
+    else
+    {
+      // 线性插值
+      sf::Vector2f newPos = currentPos + diff * lerpFactor;
+      setPosition(newPos);
+    }
+  }
+
+  // 角度插值
+  float currentRotation = getRotation();
+  float rotDiff = m_networkTargetRotation - currentRotation;
+  // 处理角度跨越
+  while (rotDiff > 180.f)
+    rotDiff -= 360.f;
+  while (rotDiff < -180.f)
+    rotDiff += 360.f;
+
+  if (std::abs(rotDiff) > 1.f)
+  {
+    setRotation(currentRotation + rotDiff * lerpFactor);
+  }
+
+  // 炮塔角度插值
+  float currentTurret = getTurretRotation();
+  float turretDiff = m_networkTargetTurretAngle - currentTurret;
+  while (turretDiff > 180.f)
+    turretDiff -= 360.f;
+  while (turretDiff < -180.f)
+    turretDiff += 360.f;
+
+  if (std::abs(turretDiff) > 1.f)
+  {
+    setTurretRotation(currentTurret + turretDiff * lerpFactor);
   }
 }

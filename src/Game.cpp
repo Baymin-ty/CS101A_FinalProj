@@ -7,12 +7,34 @@
 #include <iostream>
 
 Game::Game()
-    : m_window(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game"),
-      m_gameView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)})),
-      m_uiView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)})),
-      m_mazeGenerator(31, 21) // 默认中等尺寸
+    : m_mazeGenerator(31, 21) // 默认中等尺寸
 {
+  // 获取桌面尺寸，计算最大窗口大小（保持16:9比例）
+  auto desktop = sf::VideoMode::getDesktopMode();
+  unsigned int maxWidth = desktop.size.x * 9 / 10; // 留10%边距
+  unsigned int maxHeight = desktop.size.y * 9 / 10;
+
+  // 根据宽高比计算实际尺寸
+  if (static_cast<float>(maxWidth) / maxHeight > ASPECT_RATIO)
+  {
+    // 屏幕太宽，以高度为准
+    m_screenHeight = maxHeight;
+    m_screenWidth = static_cast<unsigned int>(m_screenHeight * ASPECT_RATIO);
+  }
+  else
+  {
+    // 屏幕太高，以宽度为准
+    m_screenWidth = maxWidth;
+    m_screenHeight = static_cast<unsigned int>(m_screenWidth / ASPECT_RATIO);
+  }
+
+  // 创建窗口
+  m_window.create(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game");
   m_window.setFramerateLimit(60);
+
+  // 初始化视图
+  m_gameView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)}));
+  m_uiView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight)}));
 }
 
 bool Game::init()
@@ -194,27 +216,28 @@ void Game::resetGame()
 void Game::restartMultiplayer()
 {
   // 重新开始多人游戏，使用已有的迷宫数据
-  if (!m_mpState.generatedMazeData.empty()) {
+  if (!m_mpState.generatedMazeData.empty())
+  {
     m_maze.loadFromString(m_mpState.generatedMazeData);
   }
-  
+
   // 设置玩家位置
   sf::Vector2f startPos = m_maze.getPlayerStartPosition();
-  
+
   // 重新创建本地玩家
   m_player = std::make_unique<Tank>();
   m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
                          "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
   m_player->setPosition(startPos);
   m_player->setScale(m_tankScale);
-  
+
   // 重新创建其他玩家
   m_otherPlayer = std::make_unique<Tank>();
   m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
-                               "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+                              "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
   m_otherPlayer->setPosition(startPos);
   m_otherPlayer->setScale(m_tankScale);
-  
+
   // 重置状态
   m_mpState.localPlayerReachedExit = false;
   m_mpState.otherPlayerReachedExit = false;
@@ -222,10 +245,10 @@ void Game::restartMultiplayer()
   m_gameOver = false;
   m_gameWon = false;
   m_bullets.clear();
-  
+
   // 初始化相机位置
   m_gameView.setCenter(startPos);
-  
+
   m_gameState = GameState::Multiplayer;
 }
 
@@ -372,6 +395,12 @@ void Game::processEvents()
       m_window.close();
     }
 
+    // 处理窗口大小变化，保持宽高比
+    if (const auto *resized = event->getIf<sf::Event::Resized>())
+    {
+      handleWindowResize();
+    }
+
     switch (m_gameState)
     {
     case GameState::MainMenu:
@@ -418,20 +447,22 @@ void Game::processEvents()
       {
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
-          if (m_mpState.isMultiplayer) {
-            if (m_mpState.isHost) {
+          if (m_mpState.isMultiplayer)
+          {
+            if (m_mpState.isHost)
+            {
               // 房主按 R：回到等待玩家界面，通知对方准备重新开始
               NetworkManager::getInstance().sendRestartRequest();
-              
+
               // 重新生成迷宫（使用菜单选择的NPC数量）
               int npcCount = m_enemyOptions[m_enemyIndex];
               m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount);
               m_mpState.generatedMazeData = m_maze.getMazeData();
               NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
-              
+
               m_gameState = GameState::WaitingForPlayer;
               m_mpState.connectionStatus = "Waiting for other player to restart...";
-              
+
               // 重置状态
               m_mpState.localPlayerReachedExit = false;
               m_mpState.otherPlayerReachedExit = false;
@@ -439,17 +470,24 @@ void Game::processEvents()
               m_gameOver = false;
               m_gameWon = false;
               m_bullets.clear();
-            } else {
+            }
+            else
+            {
               // 非房主按 R：自动重新加入上次的房间
-              if (!m_mpState.roomCode.empty()) {
+              if (!m_mpState.roomCode.empty())
+              {
                 NetworkManager::getInstance().joinRoom(m_mpState.roomCode);
                 m_gameState = GameState::WaitingForPlayer;
                 m_mpState.connectionStatus = "Rejoining room: " + m_mpState.roomCode;
-              } else {
-                resetGame();  // 没有房间码，返回主菜单
+              }
+              else
+              {
+                resetGame(); // 没有房间码，返回主菜单
               }
             }
-          } else {
+          }
+          else
+          {
             startGame(); // 单机模式重新开始
           }
         }
@@ -648,8 +686,8 @@ void Game::updateCamera()
   float mouseDist = std::sqrt(toMouse.x * toMouse.x + toMouse.y * toMouse.y);
 
   // 根据鼠标距离计算视角偏移量（距离越远偏移越大）
-  const float minDist = 50.f;  // 小于此距离不偏移
-  const float maxDist = 300.f; // 大于此距离最大偏移
+  const float minDist = 100.f; // 小于此距离不偏移
+  const float maxDist = 400.f; // 大于此距离最大偏移
   float distFactor = 0.f;
   if (mouseDist > minDist)
   {
@@ -673,7 +711,22 @@ void Game::updateCamera()
   cameraTarget.x = std::max(halfWidth, std::min(cameraTarget.x, mazeSize.x - halfWidth));
   cameraTarget.y = std::max(halfHeight, std::min(cameraTarget.y, mazeSize.y - halfHeight));
 
-  m_gameView.setCenter(cameraTarget);
+  // 平滑插值到目标位置（减少晃动感）
+  float dt = 1.f / 60.f; // 假设60fps
+  float lerpFactor = 1.f - std::exp(-m_cameraSmoothSpeed * dt);
+
+  // 初始化相机位置
+  if (m_currentCameraPos.x == 0.f && m_currentCameraPos.y == 0.f)
+  {
+    m_currentCameraPos = cameraTarget;
+  }
+  else
+  {
+    m_currentCameraPos.x += (cameraTarget.x - m_currentCameraPos.x) * lerpFactor;
+    m_currentCameraPos.y += (cameraTarget.y - m_currentCameraPos.y) * lerpFactor;
+  }
+
+  m_gameView.setCenter(m_currentCameraPos);
 }
 
 void Game::checkCollisions()
@@ -684,7 +737,7 @@ void Game::checkCollisions()
 void Game::checkMultiplayerCollisions()
 {
   CollisionSystem::checkMultiplayerCollisions(
-    m_player.get(), m_otherPlayer.get(), m_enemies, m_bullets, m_maze, m_mpState.isHost);
+      m_player.get(), m_otherPlayer.get(), m_enemies, m_bullets, m_maze, m_mpState.isHost);
 }
 
 void Game::render()
@@ -815,7 +868,8 @@ void Game::renderGame()
   // 绘制敌人（跳过死亡的）
   for (const auto &enemy : m_enemies)
   {
-    if (!enemy->isDead()) {
+    if (!enemy->isDead())
+    {
       enemy->draw(m_window);
     }
   }
@@ -869,45 +923,60 @@ void Game::renderGameOver()
   m_window.draw(overlay);
 
   sf::Text text(m_font);
-  
+
   // 根据游戏模式和结果显示不同文本
-  if (m_mpState.isMultiplayer) {
-    if (m_gameState == GameState::Victory) {
+  if (m_mpState.isMultiplayer)
+  {
+    if (m_gameState == GameState::Victory)
+    {
       text.setString("VICTORY!");
       text.setFillColor(sf::Color::Green);
-    } else {
+    }
+    else
+    {
       text.setString("DEFEATED!");
       text.setFillColor(sf::Color::Red);
     }
-  } else {
+  }
+  else
+  {
     // 单机模式
-    if (m_gameWon) {
+    if (m_gameWon)
+    {
       text.setString("YOU WIN!");
       text.setFillColor(sf::Color::Green);
-    } else {
+    }
+    else
+    {
       text.setString("GAME OVER");
       text.setFillColor(sf::Color::Red);
     }
   }
-  
+
   text.setCharacterSize(64);
   sf::FloatRect bounds = text.getLocalBounds();
   text.setPosition({(m_screenWidth - bounds.size.x) / 2.f, m_screenHeight / 2.f - 80.f});
   m_window.draw(text);
 
   sf::Text hint(m_font);
-  
+
   // 多人模式显示不同的提示
-  if (m_mpState.isMultiplayer) {
-    if (m_mpState.isHost) {
+  if (m_mpState.isMultiplayer)
+  {
+    if (m_mpState.isHost)
+    {
       hint.setString("Press R to restart match, ESC for menu");
-    } else {
+    }
+    else
+    {
       hint.setString("Press R to rejoin room, ESC for menu");
     }
-  } else {
+  }
+  else
+  {
     hint.setString("Press R to restart, ESC for menu");
   }
-  
+
   hint.setCharacterSize(28);
   hint.setFillColor(sf::Color::White);
   sf::FloatRect hintBounds = hint.getLocalBounds();
@@ -917,22 +986,22 @@ void Game::renderGameOver()
 
 void Game::setupNetworkCallbacks()
 {
-  auto& net = NetworkManager::getInstance();
-  
-  net.setOnConnected([this]() {
-    m_mpState.connectionStatus = "Connected! Choose action:";
-  });
-  
-  net.setOnDisconnected([this]() {
+  auto &net = NetworkManager::getInstance();
+
+  net.setOnConnected([this]()
+                     { m_mpState.connectionStatus = "Connected! Choose action:"; });
+
+  net.setOnDisconnected([this]()
+                        {
     if (m_gameState == GameState::Multiplayer || 
         m_gameState == GameState::WaitingForPlayer ||
         m_gameState == GameState::Connecting) {
       m_mpState.connectionStatus = "Disconnected from server";
       resetGame();
-    }
-  });
-  
-  net.setOnRoomCreated([this](const std::string& roomCode) {
+    } });
+
+  net.setOnRoomCreated([this](const std::string &roomCode)
+                       {
     m_mpState.roomCode = roomCode;
     m_mpState.isHost = true;
     m_gameState = GameState::WaitingForPlayer;
@@ -953,30 +1022,30 @@ void Game::setupNetworkCallbacks()
     }
     std::cout << "[DEBUG] Maze data contains " << xCount << " enemy markers (X)" << std::endl;
     
-    NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
-  });
-  
-  net.setOnRoomJoined([this](const std::string& roomCode) {
+    NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData); });
+
+  net.setOnRoomJoined([this](const std::string &roomCode)
+                      {
     m_mpState.roomCode = roomCode;
     m_mpState.isHost = false;
     m_gameState = GameState::WaitingForPlayer;
-    m_mpState.connectionStatus = "Joined room: " + roomCode + " - Waiting for maze...";
-  });
-  
-  net.setOnMazeData([this](const std::vector<std::string>& mazeData) {
+    m_mpState.connectionStatus = "Joined room: " + roomCode + " - Waiting for maze..."; });
+
+  net.setOnMazeData([this](const std::vector<std::string> &mazeData)
+                    {
     // 收到迷宫数据（非房主）
     m_mpState.generatedMazeData = mazeData;
-    m_mpState.connectionStatus = "Maze received! Waiting for game start...";
-  });
-  
-  net.setOnRequestMaze([this]() {
+    m_mpState.connectionStatus = "Maze received! Waiting for game start..."; });
+
+  net.setOnRequestMaze([this]()
+                       {
     // 服务器请求迷宫数据（房主收到）
     if (m_mpState.isHost && !m_mpState.generatedMazeData.empty()) {
       NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData);
-    }
-  });
-  
-  net.setOnGameStart([this]() {
+    } });
+
+  net.setOnGameStart([this]()
+                     {
     m_mpState.isMultiplayer = true;
     
     // 使用已接收/生成的迷宫数据
@@ -1044,10 +1113,10 @@ void Game::setupNetworkCallbacks()
     // 初始化相机位置
     m_gameView.setCenter(spawn1Pos);
     
-    m_gameState = GameState::Multiplayer;
-  });
-  
-  net.setOnPlayerUpdate([this](const PlayerState& state) {
+    m_gameState = GameState::Multiplayer; });
+
+  net.setOnPlayerUpdate([this](const PlayerState &state)
+                        {
     if (m_otherPlayer) {
       m_otherPlayer->setPosition({state.x, state.y});
       m_otherPlayer->setRotation(state.rotation);
@@ -1056,52 +1125,61 @@ void Game::setupNetworkCallbacks()
       m_mpState.otherPlayerReachedExit = state.reachedExit;
       
       // 注意：胜利条件改为先到终点或打死对方，不再是双方都到达
-    }
-  });
-  
-  net.setOnPlayerShoot([this](float x, float y, float angle) {
+    } });
+
+  net.setOnPlayerShoot([this](float x, float y, float angle)
+                       {
     // 创建另一个玩家的子弹
-    m_bullets.push_back(std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan));
-  });
-  
-  net.setOnGameResult([this](bool isWinner) {
+    m_bullets.push_back(std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan)); });
+
+  net.setOnGameResult([this](bool isWinner)
+                      {
     // 收到对方发来的游戏结果
     m_mpState.multiplayerWin = isWinner;
-    m_gameState = isWinner ? GameState::Victory : GameState::GameOver;
-  });
-  
-  net.setOnRestartRequest([this]() {
+    m_gameState = isWinner ? GameState::Victory : GameState::GameOver; });
+
+  net.setOnRestartRequest([this]()
+                          {
     // 对方请求重新开始（房主发起）
     // 非房主收到后自动重新开始游戏
     if (!m_mpState.isHost) {
       restartMultiplayer();
-    }
-  });
-  
+    } });
+
   // NPC同步回调
-  net.setOnNpcActivate([this](int npcId, int team) {
+  net.setOnNpcActivate([this](int npcId, int team)
+                       {
     // 对方激活了NPC
     if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
       m_enemies[npcId]->activate(team);
       std::cout << "[DEBUG] Remote NPC " << npcId << " activated with team " << team << std::endl;
-    }
-  });
-  
-  net.setOnNpcUpdate([this](const NpcState& state) {
-    // 更新NPC状态（仅非房主接收）
+    } });
+
+  net.setOnNpcUpdate([this](const NpcState &state)
+                     {
+    // 更新NPC状态（仅非房主接收）- 使用插值平滑移动
     if (!m_mpState.isHost && state.id >= 0 && state.id < static_cast<int>(m_enemies.size())) {
       auto& npc = m_enemies[state.id];
-      npc->setPosition({state.x, state.y});
-      npc->setRotation(state.rotation);
-      npc->setTurretRotation(state.turretAngle);
+      
+      // 第一次收到更新时直接设置位置（避免从错误位置插值）
+      bool wasRemote = npc->getPosition().x > 0.1f || npc->getPosition().y > 0.1f;
+      if (!wasRemote) {
+        npc->setPosition({state.x, state.y});
+        npc->setRotation(state.rotation);
+        npc->setTurretRotation(state.turretAngle);
+      }
+      
+      // 设置为远程控制模式并更新目标状态
+      npc->setIsRemote(true);
+      npc->setNetworkTarget({state.x, state.y}, state.rotation, state.turretAngle);
       npc->setHealth(state.health);
       if (state.activated && !npc->isActivated()) {
         npc->activate(state.team);
       }
-    }
-  });
-  
-  net.setOnNpcShoot([this](int npcId, float x, float y, float angle) {
+    } });
+
+  net.setOnNpcShoot([this](int npcId, float x, float y, float angle)
+                    {
     // NPC射击（创建子弹）- 非房主接收
     if (!m_mpState.isHost) {
       int team = 0;
@@ -1113,73 +1191,86 @@ void Game::setupNetworkCallbacks()
       auto bullet = std::make_unique<Bullet>(x, y, angle, false, bulletColor);
       bullet->setTeam(team);
       m_bullets.push_back(std::move(bullet));
-    }
-  });
-  
-  net.setOnNpcDamage([this](int npcId, float damage) {
+    } });
+
+  net.setOnNpcDamage([this](int npcId, float damage)
+                     {
     // NPC受伤
     if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
       m_enemies[npcId]->takeDamage(damage);
-    }
-  });
-  
-  net.setOnError([this](const std::string& error) {
-    m_mpState.connectionStatus = "Error: " + error;
-  });
+    } });
+
+  net.setOnError([this](const std::string &error)
+                 { m_mpState.connectionStatus = "Error: " + error; });
 }
 
-void Game::processConnectingEvents(const sf::Event& event)
+void Game::processConnectingEvents(const sf::Event &event)
 {
-  if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
-    if (keyPressed->code == sf::Keyboard::Key::Escape) {
+  if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>())
+  {
+    if (keyPressed->code == sf::Keyboard::Key::Escape)
+    {
       NetworkManager::getInstance().disconnect();
       resetGame();
       return;
     }
-    
-    if (keyPressed->code == sf::Keyboard::Key::Enter) {
-      switch (m_inputMode) {
-        case InputMode::ServerIP:
-          m_serverIP = m_inputText;
-          if (NetworkManager::getInstance().connect(m_serverIP, 9999)) {
-            m_mpState.connectionStatus = "Connected! Enter room code or press C to create:";
-            m_inputMode = InputMode::RoomCode;
-            m_inputText = "";
-          } else {
-            m_mpState.connectionStatus = "Failed to connect to " + m_serverIP;
-          }
-          break;
-        case InputMode::RoomCode:
-          if (!m_inputText.empty()) {
-            NetworkManager::getInstance().joinRoom(m_inputText);
-          }
-          break;
-        default:
-          break;
+
+    if (keyPressed->code == sf::Keyboard::Key::Enter)
+    {
+      switch (m_inputMode)
+      {
+      case InputMode::ServerIP:
+        m_serverIP = m_inputText;
+        if (NetworkManager::getInstance().connect(m_serverIP, 9999))
+        {
+          m_mpState.connectionStatus = "Connected! Enter room code or press C to create:";
+          m_inputMode = InputMode::RoomCode;
+          m_inputText = "";
+        }
+        else
+        {
+          m_mpState.connectionStatus = "Failed to connect to " + m_serverIP;
+        }
+        break;
+      case InputMode::RoomCode:
+        if (!m_inputText.empty())
+        {
+          NetworkManager::getInstance().joinRoom(m_inputText);
+        }
+        break;
+      default:
+        break;
       }
     }
-    
+
     // 按 C 创建房间
-    if (keyPressed->code == sf::Keyboard::Key::C && 
+    if (keyPressed->code == sf::Keyboard::Key::C &&
         m_inputMode == InputMode::RoomCode &&
-        NetworkManager::getInstance().isConnected()) {
+        NetworkManager::getInstance().isConnected())
+    {
       NetworkManager::getInstance().createRoom(m_mazeWidth, m_mazeHeight);
     }
-    
+
     // 退格键
-    if (keyPressed->code == sf::Keyboard::Key::Backspace && !m_inputText.empty()) {
+    if (keyPressed->code == sf::Keyboard::Key::Backspace && !m_inputText.empty())
+    {
       m_inputText.pop_back();
     }
   }
-  
+
   // 文本输入
-  if (const auto* textEntered = event.getIf<sf::Event::TextEntered>()) {
-    if (m_inputMode == InputMode::RoomCode) {
+  if (const auto *textEntered = event.getIf<sf::Event::TextEntered>())
+  {
+    if (m_inputMode == InputMode::RoomCode)
+    {
       // 房间号只允许输入数字，最多4位
-      if (textEntered->unicode >= '0' && textEntered->unicode <= '9' && m_inputText.length() < 4) {
+      if (textEntered->unicode >= '0' && textEntered->unicode <= '9' && m_inputText.length() < 4)
+      {
         m_inputText += static_cast<char>(textEntered->unicode);
       }
-    } else if (textEntered->unicode >= 32 && textEntered->unicode < 127) {
+    }
+    else if (textEntered->unicode >= 32 && textEntered->unicode < 127)
+    {
       m_inputText += static_cast<char>(textEntered->unicode);
     }
   }
@@ -1188,51 +1279,73 @@ void Game::processConnectingEvents(const sf::Event& event)
 MultiplayerContext Game::getMultiplayerContext()
 {
   return MultiplayerContext{
-    m_window,
-    m_gameView,
-    m_uiView,
-    m_font,
-    m_player.get(),
-    m_otherPlayer.get(),
-    m_enemies,
-    m_bullets,
-    m_maze,
-    m_screenWidth,
-    m_screenHeight,
-    m_tankScale
-  };
+      m_window,
+      m_gameView,
+      m_uiView,
+      m_font,
+      m_player.get(),
+      m_otherPlayer.get(),
+      m_enemies,
+      m_bullets,
+      m_maze,
+      m_screenWidth,
+      m_screenHeight,
+      m_tankScale};
 }
 
 void Game::updateMultiplayer(float dt)
 {
   // R键状态已经在 processEvents 中通过事件驱动设置
-  
+
   auto ctx = getMultiplayerContext();
-  MultiplayerHandler::update(ctx, m_mpState, dt,
-    [this]() { m_gameState = GameState::Victory; },
-    [this]() { m_gameState = GameState::GameOver; }
-  );
+  MultiplayerHandler::update(ctx, m_mpState, dt, [this]()
+                             { m_gameState = GameState::Victory; }, [this]()
+                             { m_gameState = GameState::GameOver; });
 }
 
 void Game::renderConnecting()
 {
   MultiplayerHandler::renderConnecting(
-    m_window, m_uiView, m_font,
-    m_screenWidth, m_screenHeight,
-    m_mpState.connectionStatus, m_inputText,
-    m_inputMode == InputMode::ServerIP);
+      m_window, m_uiView, m_font,
+      m_screenWidth, m_screenHeight,
+      m_mpState.connectionStatus, m_inputText,
+      m_inputMode == InputMode::ServerIP);
 }
 
 void Game::renderWaitingForPlayer()
 {
   MultiplayerHandler::renderWaitingForPlayer(
-    m_window, m_uiView, m_font,
-    m_screenWidth, m_screenHeight,
-    m_mpState.roomCode);
+      m_window, m_uiView, m_font,
+      m_screenWidth, m_screenHeight,
+      m_mpState.roomCode);
 }
 
 void Game::renderMultiplayer()
 {
   auto ctx = getMultiplayerContext();
   MultiplayerHandler::renderMultiplayer(ctx, m_mpState);
+}
+
+void Game::handleWindowResize()
+{
+  sf::Vector2u windowSize = m_window.getSize();
+  float windowRatio = static_cast<float>(windowSize.x) / windowSize.y;
+
+  sf::FloatRect viewport;
+
+  if (windowRatio > ASPECT_RATIO)
+  {
+    // 窗口太宽，左右留黑边
+    float viewportWidth = ASPECT_RATIO / windowRatio;
+    viewport = sf::FloatRect({(1.f - viewportWidth) / 2.f, 0.f}, {viewportWidth, 1.f});
+  }
+  else
+  {
+    // 窗口太高，上下留黑边
+    float viewportHeight = windowRatio / ASPECT_RATIO;
+    viewport = sf::FloatRect({0.f, (1.f - viewportHeight) / 2.f}, {1.f, viewportHeight});
+  }
+
+  m_gameView.setViewport(viewport);
+  m_uiView.setViewport(viewport);
 }
