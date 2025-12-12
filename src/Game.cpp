@@ -794,26 +794,36 @@ void Game::checkMultiplayerCollisions()
       
       int npcTeam = npc->getTeam();
       
-      // 判断子弹是否能伤害这个NPC
-      // 本地玩家子弹可以伤害敌方NPC
-      // NPC子弹可以伤害不同阵营的NPC
-      bool canDamageNpc = false;
-      if (isLocalPlayerBullet && npcTeam != localTeam) {
-        canDamageNpc = true;  // 本地玩家子弹伤害敌方NPC
-      } else if (bulletTeam != 0 && bulletTeam != npcTeam) {
-        canDamageNpc = true;  // NPC子弹伤害不同阵营的NPC
+      // 判断子弹是否能击中这个NPC
+      bool canHitNpc = false;
+      
+      if (isLocalPlayerBullet) {
+        // 本地玩家子弹：击中敌方NPC
+        canHitNpc = (npcTeam != localTeam && npcTeam != 0);
+      } else if (bulletTeam == 0) {
+        // 对方玩家子弹（bulletTeam=0, BulletOwner::Enemy）：击中对方的敌方NPC
+        // 对方的敌方 = 本地的己方，所以是 npcTeam == localTeam
+        canHitNpc = (npcTeam == localTeam && npcTeam != 0);
+      } else {
+        // NPC子弹：击中不同阵营的NPC
+        canHitNpc = (bulletTeam != npcTeam && npcTeam != 0);
       }
       
-      if (canDamageNpc) {
+      if (canHitNpc) {
         float dist = std::hypot(bulletPos.x - npc->getPosition().x,
                                  bulletPos.y - npc->getPosition().y);
         if (dist < npc->getCollisionRadius() + 5.f) {
-          // 只有本地玩家的子弹才在本地处理伤害并同步
+          // 本地玩家子弹：本地处理伤害并同步
           if (isLocalPlayerBullet) {
             npc->takeDamage(bullet->getDamage());
-            // 发送NPC伤害消息给对方（双向同步）
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
           }
+          // NPC子弹伤害NPC：只有房主处理（房主控制NPC逻辑）
+          else if (bulletTeam != 0 && m_isHost) {
+            npc->takeDamage(bullet->getDamage());
+            NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
+          }
+          // 对方玩家子弹击中NPC：只消失，不处理伤害（伤害由对方客户端处理并同步）
           
           bullet->setInactive();
           break;
