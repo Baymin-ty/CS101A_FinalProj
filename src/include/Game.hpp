@@ -30,7 +30,6 @@ enum class MenuOption
 {
   StartGame,
   Multiplayer,
-  ToggleRandomMap,
   MapWidth,
   MapHeight,
   EnemyCount,
@@ -116,7 +115,6 @@ private:
   // 游戏状态
   GameState m_gameState = GameState::MainMenu;
   MenuOption m_selectedOption = MenuOption::StartGame;
-  bool m_useRandomMap = true;
 
   // 多人游戏状态（使用MultiplayerState结构体）
   MultiplayerState m_mpState;
