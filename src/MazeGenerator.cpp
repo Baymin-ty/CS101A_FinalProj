@@ -367,9 +367,8 @@ void MazeGenerator::placeMultiplayerSpawns()
     m_spawn2Y = m_height - 4;
   }
 
-  // 现在重新放置终点：找一个离两个出生点都比较远的位置
-  int bestEndX = m_endX, bestEndY = m_endY;
-  int maxMinDist = 0; // 最大化 min(distToSpawn1, distToSpawn2)
+  // 现在重新放置终点：找一个离两个出生点都比较远的位置，从候选中随机选择
+  std::vector<std::tuple<int, int, int>> endCandidates; // {x, y, minDist}
   
   for (const auto& [x, y] : emptySpaces) {
     if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
@@ -377,15 +376,25 @@ void MazeGenerator::placeMultiplayerSpawns()
       int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
       int minDist = std::min(distToSpawn1, distToSpawn2);
       
-      // 找一个离两个出生点都尽量远的点作为终点
-      // 同时确保两个出生点到终点的距离差不要太大（公平性）
+      // 确保两个出生点到终点的距离差不要太大（公平性）
       int distDiff = std::abs(distToSpawn1 - distToSpawn2);
-      if (minDist > maxMinDist && distDiff < minDist / 2) {
-        maxMinDist = minDist;
-        bestEndX = x;
-        bestEndY = y;
+      if (distDiff < minDist / 2) {
+        endCandidates.push_back({x, y, minDist});
       }
     }
+  }
+
+  // 按距离排序（从远到近）
+  std::sort(endCandidates.begin(), endCandidates.end(),
+            [](const auto &a, const auto &b) { return std::get<2>(a) > std::get<2>(b); });
+
+  // 从距离最远的前 20% 中随机选一个作为终点
+  int bestEndX = m_endX, bestEndY = m_endY;
+  if (!endCandidates.empty()) {
+    int topCount = std::max(1, static_cast<int>(endCandidates.size() * 0.2));
+    int selectedIdx = m_rng() % topCount;
+    bestEndX = std::get<0>(endCandidates[selectedIdx]);
+    bestEndY = std::get<1>(endCandidates[selectedIdx]);
   }
 
   // 更新终点位置
