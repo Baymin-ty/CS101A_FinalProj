@@ -1169,7 +1169,12 @@ void Game::processConnectingEvents(const sf::Event& event)
   
   // 文本输入
   if (const auto* textEntered = event.getIf<sf::Event::TextEntered>()) {
-    if (textEntered->unicode >= 32 && textEntered->unicode < 127) {
+    if (m_inputMode == InputMode::RoomCode) {
+      // 房间号只允许输入数字，最多4位
+      if (textEntered->unicode >= '0' && textEntered->unicode <= '9' && m_inputText.length() < 4) {
+        m_inputText += static_cast<char>(textEntered->unicode);
+      }
+    } else if (textEntered->unicode >= 32 && textEntered->unicode < 127) {
       m_inputText += static_cast<char>(textEntered->unicode);
     }
   }

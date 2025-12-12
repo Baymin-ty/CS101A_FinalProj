@@ -24,13 +24,9 @@ const MessageType = {
 // 房间管理
 const rooms = new Map();
 
-// 生成随机房间码
+// 生成随机房间码（纯4位数字）
 function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  const code = Math.floor(1000 + Math.random() * 9000).toString();
   return code;
 }
 
