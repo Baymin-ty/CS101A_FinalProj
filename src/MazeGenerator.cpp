@@ -300,10 +300,10 @@ void MazeGenerator::placeDestructibleWalls()
 
 void MazeGenerator::placeMultiplayerSpawns()
 {
-  // 为多人模式找两个出生点：
-  // 1. 两个出生点离终点的距离相近（公平）
-  // 2. 两个出生点之间有一定距离
-  // 3. 两个出生点都要有到终点的路径
+  // 为多人模式找两个出生点和一个合适的终点：
+  // 1. 两个出生点之间有一定距离（对战公平）
+  // 2. 终点离两个出生点都比较远（增加游戏难度和时间）
+  // 3. 两个出生点到终点的距离要相近（公平）
   
   auto emptySpaces = getEmptySpaces();
   if (emptySpaces.size() < 3) {
@@ -315,71 +315,83 @@ void MazeGenerator::placeMultiplayerSpawns()
     return;
   }
 
-  // 计算每个空地到终点的距离
-  std::vector<std::tuple<int, int, int, int>> pointsWithDist; // dist, x, y, idx
-  for (size_t i = 0; i < emptySpaces.size(); ++i) {
-    auto [x, y] = emptySpaces[i];
-    // 排除起点、终点和敌人位置
-    if (m_grid[y][x] != '.' && m_grid[y][x] != 'S') continue;
-    
-    int distToEnd = std::abs(x - m_endX) + std::abs(y - m_endY);
-    int distToStart = std::abs(x - m_startX) + std::abs(y - m_startY);
-    
-    // 出生点应该离终点有一定距离
-    if (distToEnd > 5) {
-      pointsWithDist.push_back({distToEnd, x, y, static_cast<int>(i)});
+  // 先找两个相距较远的出生点
+  int bestSpawn1 = -1, bestSpawn2 = -1;
+  int maxSpawnDist = 0;
+  int minSpawnDist = std::max(8, std::min(m_width, m_height) / 3); // 两出生点最小距离
+  
+  // 从空地中筛选可用的出生点（排除终点和敌人位置）
+  std::vector<std::pair<int, int>> spawnCandidates;
+  for (const auto& [x, y] : emptySpaces) {
+    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+      // 排除离边界太近的点
+      if (x > 2 && x < m_width - 3 && y > 2 && y < m_height - 3) {
+        spawnCandidates.push_back({x, y});
+      }
     }
   }
-
-  if (pointsWithDist.size() < 2) {
-    m_spawn1X = m_startX;
-    m_spawn1Y = m_startY;
-    m_spawn2X = m_startX + 2;
-    m_spawn2Y = m_startY;
-    return;
+  
+  if (spawnCandidates.size() < 2) {
+    spawnCandidates = emptySpaces; // 回退
   }
 
-  // 按到终点距离排序
-  std::sort(pointsWithDist.begin(), pointsWithDist.end());
-
-  // 尝试找两个距终点距离相近但彼此有一定距离的点
-  int bestI = -1, bestJ = -1;
-  int minDistDiff = INT_MAX;
-  int minSpawnDist = std::max(5, std::min(m_width, m_height) / 4); // 两出生点最小距离
-
-  for (size_t i = 0; i < pointsWithDist.size() && i < 30; ++i) {
-    for (size_t j = i + 1; j < pointsWithDist.size() && j < 30; ++j) {
-      auto [dist1, x1, y1, idx1] = pointsWithDist[i];
-      auto [dist2, x2, y2, idx2] = pointsWithDist[j];
-      
-      int spawnDist = std::abs(x1 - x2) + std::abs(y1 - y2);
-      int distDiff = std::abs(dist1 - dist2);
-      
-      // 两出生点之间要有足够距离，且到终点距离要相近
-      if (spawnDist >= minSpawnDist && distDiff < minDistDiff) {
-        minDistDiff = distDiff;
-        bestI = static_cast<int>(i);
-        bestJ = static_cast<int>(j);
+  // 找两个距离最远的出生点
+  for (size_t i = 0; i < spawnCandidates.size() && i < 50; ++i) {
+    for (size_t j = i + 1; j < spawnCandidates.size() && j < 50; ++j) {
+      auto [x1, y1] = spawnCandidates[i];
+      auto [x2, y2] = spawnCandidates[j];
+      int dist = std::abs(x1 - x2) + std::abs(y1 - y2);
+      if (dist > maxSpawnDist && dist >= minSpawnDist) {
+        maxSpawnDist = dist;
+        bestSpawn1 = static_cast<int>(i);
+        bestSpawn2 = static_cast<int>(j);
       }
     }
   }
 
-  if (bestI >= 0 && bestJ >= 0) {
-    m_spawn1X = std::get<1>(pointsWithDist[bestI]);
-    m_spawn1Y = std::get<2>(pointsWithDist[bestI]);
-    m_spawn2X = std::get<1>(pointsWithDist[bestJ]);
-    m_spawn2Y = std::get<2>(pointsWithDist[bestJ]);
+  if (bestSpawn1 >= 0 && bestSpawn2 >= 0) {
+    m_spawn1X = spawnCandidates[bestSpawn1].first;
+    m_spawn1Y = spawnCandidates[bestSpawn1].second;
+    m_spawn2X = spawnCandidates[bestSpawn2].first;
+    m_spawn2Y = spawnCandidates[bestSpawn2].second;
   } else {
-    // 回退：使用起点和一个较远的点
-    m_spawn1X = m_startX;
-    m_spawn1Y = m_startY;
-    if (!pointsWithDist.empty()) {
-      m_spawn2X = std::get<1>(pointsWithDist.back());
-      m_spawn2Y = std::get<2>(pointsWithDist.back());
-    } else {
-      m_spawn2X = m_startX + 2;
-      m_spawn2Y = m_startY;
+    // 回退：使用起点和对角位置
+    m_spawn1X = 3;
+    m_spawn1Y = 3;
+    m_spawn2X = m_width - 4;
+    m_spawn2Y = m_height - 4;
+  }
+
+  // 现在重新放置终点：找一个离两个出生点都比较远的位置
+  int bestEndX = m_endX, bestEndY = m_endY;
+  int maxMinDist = 0; // 最大化 min(distToSpawn1, distToSpawn2)
+  
+  for (const auto& [x, y] : emptySpaces) {
+    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+      int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
+      int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
+      int minDist = std::min(distToSpawn1, distToSpawn2);
+      
+      // 找一个离两个出生点都尽量远的点作为终点
+      // 同时确保两个出生点到终点的距离差不要太大（公平性）
+      int distDiff = std::abs(distToSpawn1 - distToSpawn2);
+      if (minDist > maxMinDist && distDiff < minDist / 2) {
+        maxMinDist = minDist;
+        bestEndX = x;
+        bestEndY = y;
+      }
     }
+  }
+
+  // 更新终点位置
+  if (bestEndX != m_endX || bestEndY != m_endY) {
+    // 清除旧终点
+    if (m_grid[m_endY][m_endX] == 'E') {
+      m_grid[m_endY][m_endX] = '.';
+    }
+    m_endX = bestEndX;
+    m_endY = bestEndY;
+    m_grid[m_endY][m_endX] = 'E';
   }
 
   // 在地图上标记出生点，用 '1' 和 '2' 表示
