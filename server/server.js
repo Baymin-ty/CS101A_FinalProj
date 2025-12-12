@@ -71,6 +71,13 @@ function handleMessage(socket, data) {
       break;
     }
 
+    case MessageType.Disconnect: {
+      console.log('Client requested disconnect');
+      // 触发清理逻辑（与close事件相同）
+      socket.end(); // 这会触发close事件，进而调用cleanupPlayer
+      break;
+    }
+
     case MessageType.CreateRoom: {
       // 读取迷宫尺寸
       const mazeWidth = data.readUInt16LE(1);
@@ -306,30 +313,15 @@ const server = net.createServer((socket) => {
   console.log(`Client connected from ${socket.remoteAddress}`);
 
   let buffer = Buffer.alloc(0);
+  let isCleanedUp = false; // 防止重复清理
 
-  socket.on('data', (data) => {
-    buffer = Buffer.concat([buffer, data]);
+  // 清理玩家从房间中移除的函数
+  function cleanupPlayer() {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
 
-    // 处理所有完整的消息
-    while (buffer.length >= 2) {
-      const msgLen = buffer.readUInt16LE(0);
-      if (buffer.length < 2 + msgLen) break;
+    console.log('Cleaning up player...');
 
-      const msgData = buffer.slice(2, 2 + msgLen);
-      buffer = buffer.slice(2 + msgLen);
-
-      try {
-        handleMessage(socket, msgData);
-      } catch (e) {
-        console.error('Error handling message:', e);
-      }
-    }
-  });
-
-  socket.on('close', () => {
-    console.log('Client disconnected');
-
-    // 清理房间
     if (socket.roomCode) {
       const room = rooms.get(socket.roomCode);
       if (room) {
@@ -355,19 +347,48 @@ const server = net.createServer((socket) => {
 
           // 通知剩余玩家对方已离开，并告知是否成为新房主
           for (const player of room.players) {
-            const playerLeftMsg = Buffer.alloc(2);
-            playerLeftMsg[0] = MessageType.PlayerLeft;
-            playerLeftMsg[1] = player.isHost ? 1 : 0; // 告知客户端是否是新房主
-            sendMessage(player.socket, playerLeftMsg);
+            try {
+              const playerLeftMsg = Buffer.alloc(2);
+              playerLeftMsg[0] = MessageType.PlayerLeft;
+              playerLeftMsg[1] = player.isHost ? 1 : 0;
+              sendMessage(player.socket, playerLeftMsg);
+            } catch (e) {
+              console.error('Error sending PlayerLeft message:', e.message);
+            }
           }
           console.log(`Notified remaining players in room ${socket.roomCode}`);
         }
       }
     }
+  }
+
+  socket.on('data', (data) => {
+    buffer = Buffer.concat([buffer, data]);
+
+    // 处理所有完整的消息
+    while (buffer.length >= 2) {
+      const msgLen = buffer.readUInt16LE(0);
+      if (buffer.length < 2 + msgLen) break;
+
+      const msgData = buffer.slice(2, 2 + msgLen);
+      buffer = buffer.slice(2 + msgLen);
+
+      try {
+        handleMessage(socket, msgData);
+      } catch (e) {
+        console.error('Error handling message:', e);
+      }
+    }
+  });
+
+  socket.on('close', () => {
+    console.log('Client disconnected (close event)');
+    cleanupPlayer();
   });
 
   socket.on('error', (err) => {
     console.error('Socket error:', err.message);
+    cleanupPlayer();
   });
 });
 
