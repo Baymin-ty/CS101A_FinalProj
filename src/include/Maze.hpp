@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include "MazeGenerator.hpp"
 #include "Utils.hpp"
+#include "RoundedRectangle.hpp"
 
 // 墙体类型
 enum class WallType
@@ -17,15 +18,19 @@ enum class WallType
   Exit          // 出口
 };
 
+// 圆角半径常量
+constexpr float WALL_CORNER_RADIUS = 12.f;
+
 // 单个墙体
 struct Wall
 {
-  sf::RectangleShape shape;
+  SelectiveRoundedRectShape shape;
   WallType type;
   float health;
   float maxHealth;
+  std::array<bool, 4> roundedCorners; // [左上, 右上, 右下, 左下]
 
-  Wall() : type(WallType::None), health(0), maxHealth(0) {}
+  Wall() : shape({0, 0}, WALL_CORNER_RADIUS, 6), type(WallType::None), health(0), maxHealth(0), roundedCorners({false, false, false, false}) {}
 };
 
 // 网格坐标
@@ -118,6 +123,12 @@ public:
   sf::Vector2f getFirstBlockedPosition(sf::Vector2f start, sf::Vector2f end) const;
 
 private:
+  // 检查某个格子是否是墙（用于圆角计算）
+  bool isWall(int row, int col) const;
+  
+  // 计算所有墙体的圆角
+  void calculateRoundedCorners();
+
   std::vector<std::vector<Wall>> m_walls;
   std::vector<std::string> m_mazeData;  // 保存原始迷宫数据用于网络传输
   sf::Vector2f m_startPosition;

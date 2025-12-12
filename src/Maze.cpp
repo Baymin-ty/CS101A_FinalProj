@@ -39,6 +39,7 @@ void Maze::loadFromString(const std::vector<std::string> &map)
       float y = r * m_tileSize;
 
       wall.shape.setSize({m_tileSize - 2.f, m_tileSize - 2.f});
+      wall.shape.setCornerRadius(WALL_CORNER_RADIUS);
       wall.shape.setPosition({x + 1.f, y + 1.f});
 
       switch (ch)
@@ -91,6 +92,9 @@ void Maze::loadFromString(const std::vector<std::string> &map)
       }
     }
   }
+  
+  // 计算每个墙体的圆角
+  calculateRoundedCorners();
 }
 
 void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount)
@@ -162,22 +166,62 @@ bool Maze::checkCollision(sf::Vector2f position, float radius) const
       const Wall &wall = m_walls[r][c];
       if (wall.type == WallType::Solid || wall.type == WallType::Destructible)
       {
-        // 矩形与圆形碰撞检测
-        float wallLeft = c * m_tileSize;
-        float wallRight = wallLeft + m_tileSize;
-        float wallTop = r * m_tileSize;
-        float wallBottom = wallTop + m_tileSize;
-
-        // 找到最近点
-        float closestX = std::max(wallLeft, std::min(position.x, wallRight));
-        float closestY = std::max(wallTop, std::min(position.y, wallBottom));
-
-        float dx = position.x - closestX;
-        float dy = position.y - closestY;
-
-        if (dx * dx + dy * dy < radius * radius)
+        // 选择性圆角矩形与圆形碰撞检测
+        float wallLeft = c * m_tileSize + 1.f;   // 考虑1像素偏移
+        float wallRight = wallLeft + m_tileSize - 2.f;
+        float wallTop = r * m_tileSize + 1.f;
+        float wallBottom = wallTop + m_tileSize - 2.f;
+        
+        float cornerRadius = WALL_CORNER_RADIUS;
+        
+        // 计算内部矩形边界（不包含圆角区域）
+        float innerLeft = wallLeft + cornerRadius;
+        float innerRight = wallRight - cornerRadius;
+        float innerTop = wallTop + cornerRadius;
+        float innerBottom = wallBottom - cornerRadius;
+        
+        // 判断位置在哪个角落区域
+        bool inLeftZone = position.x < innerLeft;
+        bool inRightZone = position.x > innerRight;
+        bool inTopZone = position.y < innerTop;
+        bool inBottomZone = position.y > innerBottom;
+        
+        // 确定是哪个角并检查该角是否有圆角
+        int cornerIndex = -1; // 0=左上, 1=右上, 2=右下, 3=左下
+        if (inLeftZone && inTopZone) cornerIndex = 0;
+        else if (inRightZone && inTopZone) cornerIndex = 1;
+        else if (inRightZone && inBottomZone) cornerIndex = 2;
+        else if (inLeftZone && inBottomZone) cornerIndex = 3;
+        
+        if (cornerIndex >= 0 && wall.roundedCorners[cornerIndex])
         {
-          return true;
+          // 这个角是圆角 - 使用圆形碰撞检测
+          float cornerCenterX = inLeftZone ? innerLeft : innerRight;
+          float cornerCenterY = inTopZone ? innerTop : innerBottom;
+          
+          float dx = position.x - cornerCenterX;
+          float dy = position.y - cornerCenterY;
+          float distSq = dx * dx + dy * dy;
+          float combinedRadius = radius + cornerRadius;
+          
+          if (distSq < combinedRadius * combinedRadius)
+          {
+            return true;
+          }
+        }
+        else
+        {
+          // 直角或边缘区域 - 普通矩形碰撞检测
+          float closestX = std::max(wallLeft, std::min(position.x, wallRight));
+          float closestY = std::max(wallTop, std::min(position.y, wallBottom));
+
+          float dx = position.x - closestX;
+          float dy = position.y - closestY;
+
+          if (dx * dx + dy * dy < radius * radius)
+          {
+            return true;
+          }
         }
       }
     }
@@ -422,3 +466,58 @@ sf::Vector2f Maze::getFirstBlockedPosition(sf::Vector2f start, sf::Vector2f end)
 
   return end; // 没有阻挡，返回目标位置
 }
+
+bool Maze::isWall(int row, int col) const
+{
+  if (row < 0 || row >= m_rows || col < 0 || col >= m_cols)
+    return true; // 边界外视为墙
+  
+  WallType type = m_walls[row][col].type;
+  return type == WallType::Solid || type == WallType::Destructible;
+}
+
+void Maze::calculateRoundedCorners()
+{
+  // 对于每个墙体，检查其四个角是否需要圆角
+  // 规则：如果某个角的两个相邻方向都没有墙，则该角需要圆角
+  // 例如：左上角需要圆角的条件是：左边没有墙 AND 上边没有墙
+  
+  for (int r = 0; r < m_rows; ++r)
+  {
+    for (int c = 0; c < m_cols; ++c)
+    {
+      Wall &wall = m_walls[r][c];
+      
+      // 只处理墙体
+      if (wall.type != WallType::Solid && wall.type != WallType::Destructible && wall.type != WallType::Exit)
+        continue;
+      
+      // 检查四个方向的邻居
+      bool hasTop = isWall(r - 1, c);
+      bool hasBottom = isWall(r + 1, c);
+      bool hasLeft = isWall(r, c - 1);
+      bool hasRight = isWall(r, c + 1);
+      
+      // 还需要检查对角线邻居（用于更精确的判断）
+      bool hasTopLeft = isWall(r - 1, c - 1);
+      bool hasTopRight = isWall(r - 1, c + 1);
+      bool hasBottomLeft = isWall(r + 1, c - 1);
+      bool hasBottomRight = isWall(r + 1, c + 1);
+      
+      // 计算每个角是否需要圆角
+      // 左上角：如果左边和上边都没有墙，则需要圆角
+      bool roundTopLeft = !hasTop && !hasLeft;
+      // 右上角：如果右边和上边都没有墙，则需要圆角
+      bool roundTopRight = !hasTop && !hasRight;
+      // 右下角：如果右边和下边都没有墙，则需要圆角
+      bool roundBottomRight = !hasBottom && !hasRight;
+      // 左下角：如果左边和下边都没有墙，则需要圆角
+      bool roundBottomLeft = !hasBottom && !hasLeft;
+      
+      // 设置圆角
+      wall.roundedCorners = {roundTopLeft, roundTopRight, roundBottomRight, roundBottomLeft};
+      wall.shape.setRoundedCorners(roundTopLeft, roundTopRight, roundBottomRight, roundBottomLeft);
+    }
+  }
+}
+
