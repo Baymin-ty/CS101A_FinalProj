@@ -808,10 +808,10 @@ void Game::checkMultiplayerCollisions()
         float dist = std::hypot(bulletPos.x - npc->getPosition().x,
                                  bulletPos.y - npc->getPosition().y);
         if (dist < npc->getCollisionRadius() + 5.f) {
-          npc->takeDamage(bullet->getDamage());
-          
-          // 房主同步NPC伤害给非房主
-          if (m_isHost) {
+          // 只有本地玩家的子弹才在本地处理伤害并同步
+          if (isLocalPlayerBullet) {
+            npc->takeDamage(bullet->getDamage());
+            // 发送NPC伤害消息给对方（双向同步）
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
           }
           
@@ -948,10 +948,12 @@ void Game::renderGame()
     m_player->draw(m_window);
   }
 
-  // 绘制敌人
+  // 绘制敌人（跳过死亡的）
   for (const auto &enemy : m_enemies)
   {
-    enemy->draw(m_window);
+    if (!enemy->isDead()) {
+      enemy->draw(m_window);
+    }
   }
 
   // 切换到 UI 视图绘制 UI
@@ -1402,6 +1404,9 @@ void Game::updateMultiplayer(float dt)
   
   for (size_t i = 0; i < m_enemies.size(); ++i) {
     auto& npc = m_enemies[i];
+    // 跳过死亡的NPC
+    if (npc->isDead())
+      continue;
     if (npc->isActivated()) {
       int npcTeam = npc->getTeam();
       
@@ -1420,10 +1425,11 @@ void Game::updateMultiplayer(float dt)
           targets.push_back(m_otherPlayer->getPosition());
         }
         
-        // 对方阵营的NPC
+        // 对方阵营的NPC（排除死亡的）
         for (const auto& otherNpc : m_enemies) {
           if (otherNpc.get() != npc.get() && 
               otherNpc->isActivated() && 
+              !otherNpc->isDead() &&
               otherNpc->getTeam() != npcTeam &&
               otherNpc->getTeam() != 0) {
             targets.push_back(otherNpc->getPosition());
