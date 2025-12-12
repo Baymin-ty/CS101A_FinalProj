@@ -10,6 +10,7 @@
 #include "MazeGenerator.hpp"
 #include "NetworkManager.hpp"
 #include "MultiplayerHandler.hpp"
+#include "AudioManager.hpp"
 
 // 游戏状态枚举
 enum class GameState
@@ -142,7 +143,13 @@ private:
 
   bool m_gameOver = false;
   bool m_gameWon = false;
+  
+  // 音频相关
+  bool m_exitVisible = false;  // 终点是否在视野内
 
   // 获取多人模式上下文
   MultiplayerContext getMultiplayerContext();
+  
+  // 检查终点是否在玩家视野内
+  bool isExitInView() const;
 };

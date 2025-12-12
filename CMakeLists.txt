@@ -34,6 +34,7 @@ set(SOURCES
   src/NetworkManager.cpp
   src/CollisionSystem.cpp
   src/MultiplayerHandler.cpp
+  src/AudioManager.cpp
 )
 
 # 头文件
@@ -50,6 +51,7 @@ set(HEADERS
   src/include/CollisionSystem.hpp
   src/include/UIHelper.hpp
   src/include/MultiplayerHandler.hpp
+  src/include/AudioManager.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})
@@ -58,7 +60,7 @@ target_include_directories(CS101AFinalProj PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/include
 )
-target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics SFML::Network)
+target_link_libraries(CS101AFinalProj PRIVATE SFML::Graphics SFML::Network SFML::Audio)
 
 # macOS: 链接 CoreFoundation 框架（用于获取 bundle 路径）
 if(APPLE)

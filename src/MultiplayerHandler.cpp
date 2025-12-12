@@ -2,6 +2,7 @@
 #include "include/UIHelper.hpp"
 #include "include/CollisionSystem.hpp"
 #include "include/Utils.hpp"
+#include "include/AudioManager.hpp"
 #include <cmath>
 #include <iostream>
 
@@ -85,6 +86,9 @@ void MultiplayerHandler::update(
     float bulletAngle = ctx.player->getTurretRotation();
     ctx.bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true));
     net.sendShoot(bulletPos.x, bulletPos.y, bulletAngle);
+    
+    // 播放射击音效
+    AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
   }
 
   // 更新迷宫
@@ -226,6 +230,9 @@ void MultiplayerHandler::updateNpcAI(
           bullet->setTeam(npcTeam);
           ctx.bullets.push_back(std::move(bullet));
           net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
+          
+          // 播放NPC射击音效（基于本地玩家位置的距离衰减）
+          AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
         }
 
         // 定期同步NPC状态（每3帧同步一次，提高流畅度）

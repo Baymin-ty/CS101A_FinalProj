@@ -1,4 +1,5 @@
 #include "include/CollisionSystem.hpp"
+#include "include/AudioManager.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -16,23 +17,29 @@ void CollisionSystem::handleWallDestroyEffect(const WallDestroyResult& result, T
 {
   if (!result.destroyed || !shooter)
     return;
+  
+  sf::Vector2f listenerPos = shooter->getPosition();
     
   switch (result.attribute)
   {
     case WallAttribute::Gold:
       // 金色墙：获得2金币
       shooter->addCoins(2);
+      // 播放收集金币音效
+      AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
       break;
       
     case WallAttribute::Heal:
       // 治疗墙：恢复25%血量
       shooter->heal(0.25f);
+      // 播放收集金币音效（治疗也用这个）
+      AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
       break;
       
     case WallAttribute::Explosive:
       // 爆炸墙：爆炸效果已在Maze::bulletHitWithResult中处理（清除周围8格墙）
-      // 这里可以添加额外的伤害逻辑（杀死范围内的坦克/NPC）
-      // 暂时只处理墙体清除，伤害逻辑可以后续添加
+      // 播放爆炸音效
+      AudioManager::getInstance().playSFX(SFXType::Explode, result.position, listenerPos);
       break;
       
     case WallAttribute::None:
@@ -65,6 +72,8 @@ void CollisionSystem::checkSinglePlayerCollisions(
 {
   if (!player)
     return;
+  
+  sf::Vector2f listenerPos = player->getPosition();
 
   // 检查子弹与墙壁、玩家、敌人的碰撞
   for (auto& bullet : bullets)
@@ -75,6 +84,8 @@ void CollisionSystem::checkSinglePlayerCollisions(
     // 检查与墙壁碰撞
     if (checkBulletWallCollision(bullet.get(), maze))
     {
+      // 播放子弹击中墙壁音效
+      AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bullet->getPosition(), listenerPos);
       bullet->setInactive();
       continue;
     }
@@ -85,6 +96,8 @@ void CollisionSystem::checkSinglePlayerCollisions(
       if (checkBulletTankCollision(bullet.get(), player))
       {
         player->takeDamage(bullet->getDamage());
+        // 播放子弹击中坦克音效
+        AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bullet->getPosition(), listenerPos);
         bullet->setInactive();
         continue;
       }
@@ -98,6 +111,15 @@ void CollisionSystem::checkSinglePlayerCollisions(
         if (checkBulletNpcCollision(bullet.get(), enemy.get()))
         {
           enemy->takeDamage(bullet->getDamage());
+          // 播放子弹击中坦克音效
+          AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bullet->getPosition(), listenerPos);
+          
+          // 如果敌人死亡，播放爆炸音效
+          if (enemy->isDead())
+          {
+            AudioManager::getInstance().playSFX(SFXType::Explode, enemy->getPosition(), listenerPos);
+          }
+          
           bullet->setInactive();
           break;
         }
@@ -124,6 +146,7 @@ void CollisionSystem::checkMultiplayerCollisions(
     return;
 
   int localTeam = player->getTeam();
+  sf::Vector2f listenerPos = player->getPosition();
 
   for (auto& bullet : bullets)
   {
@@ -140,6 +163,9 @@ void CollisionSystem::checkMultiplayerCollisions(
     
     if (hitWall || wallResult.destroyed)
     {
+      // 播放子弹击中墙壁音效
+      AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
+      
       // 如果墙被摧毁且有属性效果，处理增益
       if (wallResult.destroyed)
       {
@@ -167,6 +193,14 @@ void CollisionSystem::checkMultiplayerCollisions(
       if (checkBulletTankCollision(bullet.get(), player))
       {
         player->takeDamage(bullet->getDamage());
+        // 播放子弹击中坦克音效
+        AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bulletPos, listenerPos);
+        
+        // 如果本地玩家死亡，播放爆炸音效
+        if (player->isDead())
+        {
+          AudioManager::getInstance().playSFX(SFXType::Explode, player->getPosition(), listenerPos);
+        }
         bullet->setInactive();
         continue;
       }
@@ -178,6 +212,8 @@ void CollisionSystem::checkMultiplayerCollisions(
     {
       if (checkBulletTankCollision(bullet.get(), otherPlayer))
       {
+        // 播放子弹击中坦克音效
+        AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bulletPos, listenerPos);
         bullet->setInactive();
         continue;
       }
@@ -211,17 +247,32 @@ void CollisionSystem::checkMultiplayerCollisions(
       {
         if (checkBulletNpcCollision(bullet.get(), npc.get()))
         {
+          // 播放子弹击中坦克音效
+          AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bulletPos, listenerPos);
+          
           // 本地玩家子弹：本地处理伤害并同步
           if (isLocalPlayerBullet)
           {
             npc->takeDamage(bullet->getDamage());
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
+            
+            // 如果NPC死亡，播放爆炸音效
+            if (npc->isDead())
+            {
+              AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
+            }
           }
           // NPC子弹伤害NPC：只有房主处理
           else if (bulletTeam != 0 && isHost)
           {
             npc->takeDamage(bullet->getDamage());
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
+            
+            // 如果NPC死亡，播放爆炸音效
+            if (npc->isDead())
+            {
+              AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
+            }
           }
 
           bullet->setInactive();

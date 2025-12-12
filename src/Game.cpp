@@ -91,6 +91,16 @@ bool Game::init()
     return false;
   }
 
+  // 初始化音频系统
+  if (!AudioManager::getInstance().init("music_assets/"))
+  {
+    std::cerr << "Warning: Failed to initialize audio system" << std::endl;
+    // 音频初始化失败不阻止游戏运行
+  }
+  
+  // 设置听音范围（基于视野大小）
+  AudioManager::getInstance().setListeningRange(LOGICAL_WIDTH * VIEW_ZOOM * 0.6f);
+
   // 设置网络回调
   setupNetworkCallbacks();
 
@@ -169,6 +179,10 @@ void Game::startGame()
   m_gameState = GameState::Playing;
   m_gameOver = false;
   m_gameWon = false;
+  m_exitVisible = false;  // 重置终点可见状态
+  
+  // 播放游戏开始BGM
+  AudioManager::getInstance().playBGM(BGMType::Start);
 }
 
 void Game::spawnEnemies()
@@ -256,22 +270,38 @@ void Game::restartMultiplayer()
 
 void Game::run()
 {
+  // 开始播放菜单BGM
+  AudioManager::getInstance().playBGM(BGMType::Menu);
+  
   while (m_window.isOpen())
   {
     float dt = m_clock.restart().asSeconds();
 
     // 处理网络消息
     NetworkManager::getInstance().update();
+    
+    // 更新音频系统（清理已播放完的音效）
+    AudioManager::getInstance().update();
 
     processEvents();
 
     switch (m_gameState)
     {
     case GameState::MainMenu:
-      // 菜单不需要 update
+      // 菜单播放菜单BGM
+      if (AudioManager::getInstance().getCurrentBGM() != BGMType::Menu)
+      {
+        AudioManager::getInstance().playBGM(BGMType::Menu);
+      }
       break;
     case GameState::Playing:
       update(dt);
+      // 检查是否看到终点，切换BGM
+      if (!m_exitVisible && isExitInView())
+      {
+        m_exitVisible = true;
+        AudioManager::getInstance().playBGM(BGMType::Climax);
+      }
       break;
     case GameState::Paused:
       // 暂停状态不需要 update
@@ -282,6 +312,12 @@ void Game::run()
       break;
     case GameState::Multiplayer:
       updateMultiplayer(dt);
+      // 检查是否看到终点，切换BGM
+      if (!m_exitVisible && isExitInView())
+      {
+        m_exitVisible = true;
+        AudioManager::getInstance().playBGM(BGMType::Climax);
+      }
       break;
     case GameState::GameOver:
     case GameState::Victory:
@@ -611,6 +647,9 @@ void Game::update(float dt)
     sf::Vector2f bulletPos = m_player->getBulletSpawnPosition();
     float bulletAngle = m_player->getTurretRotation();
     m_bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true));
+    
+    // 播放射击音效
+    AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, m_player->getPosition());
   }
 
   // 更新敌人
@@ -628,6 +667,9 @@ void Game::update(float dt)
       sf::Vector2f bulletPos = enemy->getGunPosition();
       float bulletAngle = enemy->getTurretAngle();
       m_bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, sf::Color::Red));
+      
+      // 播放射击音效（基于玩家位置的距离衰减）
+      AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, m_player->getPosition());
     }
   }
 
@@ -1164,6 +1206,10 @@ void Game::setupNetworkCallbacks()
     m_gameView.setSize({LOGICAL_WIDTH * VIEW_ZOOM, LOGICAL_HEIGHT * VIEW_ZOOM});
     m_currentCameraPos = spawn1Pos;
     
+    // 重置终点可见状态并播放开始BGM
+    m_exitVisible = false;
+    AudioManager::getInstance().playBGM(BGMType::Start);
+    
     m_gameState = GameState::Multiplayer; });
 
   net.setOnPlayerUpdate([this](const PlayerState &state)
@@ -1181,7 +1227,13 @@ void Game::setupNetworkCallbacks()
   net.setOnPlayerShoot([this](float x, float y, float angle)
                        {
     // 创建另一个玩家的子弹
-    m_bullets.push_back(std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan)); });
+    m_bullets.push_back(std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan));
+    
+    // 播放对方射击音效（基于本地玩家位置的距离衰减）
+    if (m_player)
+    {
+      AudioManager::getInstance().playSFX(SFXType::Shoot, {x, y}, m_player->getPosition());
+    } });
 
   net.setOnGameResult([this](bool isWinner)
                       {
@@ -1242,6 +1294,12 @@ void Game::setupNetworkCallbacks()
       auto bullet = std::make_unique<Bullet>(x, y, angle, false, bulletColor);
       bullet->setTeam(team);
       m_bullets.push_back(std::move(bullet));
+      
+      // 播放NPC射击音效（基于本地玩家位置的距离衰减）
+      if (m_player)
+      {
+        AudioManager::getInstance().playSFX(SFXType::Shoot, {x, y}, m_player->getPosition());
+      }
     } });
 
   net.setOnNpcDamage([this](int npcId, float damage)
@@ -1399,4 +1457,21 @@ void Game::handleWindowResize()
 
   m_gameView.setViewport(viewport);
   m_uiView.setViewport(viewport);
+}
+
+bool Game::isExitInView() const
+{
+  if (!m_player)
+    return false;
+    
+  sf::Vector2f exitPos = m_maze.getExitPosition();
+  sf::Vector2f viewCenter = m_gameView.getCenter();
+  sf::Vector2f viewSize = m_gameView.getSize();
+  
+  // 检查终点是否在当前视野范围内
+  float halfWidth = viewSize.x / 2.f;
+  float halfHeight = viewSize.y / 2.f;
+  
+  return (exitPos.x >= viewCenter.x - halfWidth && exitPos.x <= viewCenter.x + halfWidth &&
+          exitPos.y >= viewCenter.y - halfHeight && exitPos.y <= viewCenter.y + halfHeight);
 }
