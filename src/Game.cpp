@@ -1008,6 +1008,37 @@ void Game::setupNetworkCallbacks()
       resetGame();
     } });
 
+  // 对方玩家离开房间，返回等待状态
+  net.setOnPlayerLeft([this]()
+                      {
+    if (m_gameState == GameState::Multiplayer) {
+      // 清理游戏状态
+      m_otherPlayer.reset();
+      m_enemies.clear();
+      m_bullets.clear();
+      
+      // 重置多人游戏状态
+      m_mpState.localPlayerReachedExit = false;
+      m_mpState.otherPlayerReachedExit = false;
+      m_mpState.multiplayerWin = false;
+      m_gameOver = false;
+      m_gameWon = false;
+      
+      // 返回等待玩家状态
+      m_gameState = GameState::WaitingForPlayer;
+      m_mpState.connectionStatus = "Other player left. Waiting for new player...";
+      
+      // 房主需要重新生成地图
+      if (m_mpState.isHost) {
+        int npcCount = m_enemyOptions[m_enemyIndex];
+        m_mazeGenerator = MazeGenerator(m_mazeWidth, m_mazeHeight);
+        m_mazeGenerator.setEnemyCount(npcCount);
+        auto mazeData = m_mazeGenerator.generate();
+        m_maze.loadFromString(mazeData);
+        NetworkManager::getInstance().sendMazeData(mazeData);
+      }
+    } });
+
   net.setOnRoomCreated([this](const std::string &roomCode)
                        {
     m_mpState.roomCode = roomCode;

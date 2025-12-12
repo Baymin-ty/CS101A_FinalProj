@@ -123,7 +123,7 @@ private:
   // 输入
   InputMode m_inputMode = InputMode::None;
   std::string m_inputText;
-  std::string m_serverIP = "127.0.0.1";
+  std::string m_serverIP = "183.131.51.191";
 
   // 地图尺寸选项
   std::vector<int> m_widthOptions = {21, 31, 41, 51, 61, 71};

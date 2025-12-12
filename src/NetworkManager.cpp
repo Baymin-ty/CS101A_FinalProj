@@ -554,6 +554,15 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     }
     break;
   }
+  case NetMessageType::PlayerLeft:
+  {
+    // 对方玩家离开房间
+    if (m_onPlayerLeft)
+    {
+      m_onPlayerLeft();
+    }
+    break;
+  }
   default:
     break;
   }

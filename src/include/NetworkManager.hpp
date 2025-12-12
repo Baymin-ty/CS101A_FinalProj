@@ -39,6 +39,9 @@ enum class NetMessageType : uint8_t
   NpcUpdate,     // NPC状态更新（位置、血量等）
   NpcShoot,      // NPC射击
   NpcDamage,     // NPC受伤
+  
+  // 玩家离开
+  PlayerLeft,    // 对方玩家离开房间
 };
 
 // 玩家状态数据
@@ -80,6 +83,7 @@ using OnNpcActivateCallback = std::function<void(int npcId, int team)>;
 using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
 using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
+using OnPlayerLeftCallback = std::function<void()>;
 
 class NetworkManager
 {
@@ -135,6 +139,7 @@ public:
   void setOnNpcUpdate(OnNpcUpdateCallback cb) { m_onNpcUpdate = cb; }
   void setOnNpcShoot(OnNpcShootCallback cb) { m_onNpcShoot = cb; }
   void setOnNpcDamage(OnNpcDamageCallback cb) { m_onNpcDamage = cb; }
+  void setOnPlayerLeft(OnPlayerLeftCallback cb) { m_onPlayerLeft = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -170,4 +175,5 @@ private:
   OnNpcUpdateCallback m_onNpcUpdate;
   OnNpcShootCallback m_onNpcShoot;
   OnNpcDamageCallback m_onNpcDamage;
+  OnPlayerLeftCallback m_onPlayerLeft;
 };

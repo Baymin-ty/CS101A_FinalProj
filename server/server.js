@@ -23,7 +23,9 @@ const MessageType = {
   NpcActivate: 18,
   NpcUpdate: 19,
   NpcShoot: 20,
-  NpcDamage: 21
+  NpcDamage: 21,
+  // 玩家离开
+  PlayerLeft: 22
 };
 
 // 房间管理
@@ -122,7 +124,7 @@ function handleMessage(socket, data) {
       // 如果有第二个玩家在等待，发送迷宫数据给他并开始游戏
       if (room.players.length === 2 && !room.started) {
         room.started = true;
-        
+
         // 发送迷宫数据给第二个玩家
         const guest = room.players.find(p => !p.isHost);
         if (guest) {
@@ -183,7 +185,7 @@ function handleMessage(socket, data) {
       // 如果房主已经发送了迷宫数据，直接发送给新玩家并开始游戏
       if (room.mazeData) {
         room.started = true;
-        
+
         // 发送迷宫数据给新玩家
         sendMessage(socket, room.mazeData);
         console.log(`Sent existing maze data to new player in room ${roomCode}`);
@@ -345,17 +347,33 @@ const server = net.createServer((socket) => {
     if (socket.roomCode) {
       const room = rooms.get(socket.roomCode);
       if (room) {
+        const wasHost = socket.isHost;
         room.players = room.players.filter(p => p.socket !== socket);
+
         if (room.players.length === 0) {
           rooms.delete(socket.roomCode);
           console.log(`Room ${socket.roomCode} deleted`);
         } else {
-          // 通知其他玩家
-          const disconnectMsg = Buffer.alloc(1);
-          disconnectMsg[0] = MessageType.Disconnect;
+          // 重置房间状态，让剩余玩家回到等待状态
+          room.started = false;
           for (const player of room.players) {
-            sendMessage(player.socket, disconnectMsg);
+            player.reachedExit = false;
           }
+
+          // 如果离开的是房主，让剩余玩家成为新房主
+          if (wasHost && room.players.length > 0) {
+            room.players[0].isHost = true;
+            room.players[0].socket.isHost = true;
+            console.log(`New host assigned in room ${socket.roomCode}`);
+          }
+
+          // 通知剩余玩家对方已离开
+          const playerLeftMsg = Buffer.alloc(1);
+          playerLeftMsg[0] = MessageType.PlayerLeft;
+          for (const player of room.players) {
+            sendMessage(player.socket, playerLeftMsg);
+          }
+          console.log(`Notified remaining players in room ${socket.roomCode}`);
         }
       }
     }
