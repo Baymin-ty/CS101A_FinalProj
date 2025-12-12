@@ -125,15 +125,15 @@ private:
   std::string m_serverIP = "183.131.51.191";
 
   // 地图尺寸选项
-  std::vector<int> m_widthOptions = {21, 31, 41, 51, 61, 71};
-  std::vector<int> m_heightOptions = {15, 21, 31, 41, 51};
+  std::vector<int> m_widthOptions = {21, 31, 41, 51, 61, 71, 81, 101, 121, 151};
+  std::vector<int> m_heightOptions = {15, 21, 31, 41, 51, 61, 71, 81, 101};
   int m_widthIndex = 2;  // 默认 41
   int m_heightIndex = 2; // 默认 31
   int m_mazeWidth = 41;
   int m_mazeHeight = 31;
 
   // 敌人数量选项
-  std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30};
+  std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30, 50, 80, 100};
   int m_enemyIndex = 3; // 默认 10
 
   // 多人模式：R键状态跟踪（事件驱动）
