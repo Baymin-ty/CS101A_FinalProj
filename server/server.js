@@ -182,30 +182,16 @@ function handleMessage(socket, data) {
       response.write(roomCode, 2);
       sendMessage(socket, response);
 
-      // 如果房主已经发送了迷宫数据，直接发送给新玩家并开始游戏
-      if (room.mazeData) {
-        room.started = true;
-
-        // 发送迷宫数据给新玩家
-        sendMessage(socket, room.mazeData);
-        console.log(`Sent existing maze data to new player in room ${roomCode}`);
-
-        // 发送游戏开始消息给两个玩家
-        const gameStartMsg = Buffer.alloc(1);
-        gameStartMsg[0] = MessageType.GameStart;
-        for (const player of room.players) {
-          sendMessage(player.socket, gameStartMsg);
-        }
-        console.log(`Game started in room: ${roomCode}`);
-      } else {
-        // 请求房主发送迷宫数据
-        const host = room.players.find(p => p.isHost);
-        if (host) {
-          const requestMsg = Buffer.alloc(1);
-          requestMsg[0] = MessageType.RequestMaze;
-          sendMessage(host.socket, requestMsg);
-          console.log(`Requested maze data from host in room ${roomCode}`);
-        }
+      // 总是请求房主发送最新的迷宫数据（确保地图一致性）
+      const host = room.players.find(p => p.isHost);
+      if (host) {
+        // 清除旧的迷宫数据，强制房主重新发送
+        room.mazeData = null;
+        room.started = false;
+        const requestMsg = Buffer.alloc(1);
+        requestMsg[0] = MessageType.RequestMaze;
+        sendMessage(host.socket, requestMsg);
+        console.log(`Requested fresh maze data from host in room ${roomCode}`);
       }
       break;
     }

@@ -1044,6 +1044,7 @@ void Game::setupNetworkCallbacks()
         m_mazeGenerator.setEnemyCount(npcCount);
         auto mazeData = m_mazeGenerator.generate();
         m_maze.loadFromString(mazeData);
+        m_mpState.generatedMazeData = mazeData; // 保存地图数据以便后续同步
         NetworkManager::getInstance().sendMazeData(mazeData);
       }
     } });
