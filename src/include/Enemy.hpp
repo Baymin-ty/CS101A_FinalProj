@@ -41,7 +41,10 @@ public:
 
   // 激活状态（多人模式需要手动激活，单人模式自动激活）
   bool isActivated() const { return m_activated; }
-  void activate(int team) { m_activated = true; m_team = team; }
+  void activate(int team);
+  
+  // 加载激活状态贴图（Color_C）
+  bool loadActivatedTextures();
   
   // 检查玩家是否在激活范围内（用于显示提示）
   bool isPlayerInRange(sf::Vector2f playerPos) const;
@@ -114,7 +117,7 @@ private:
   // 配置
   const float m_moveSpeed = 120.f;
   const float m_rotationSpeed = 3.f;
-  const float m_scale = 0.25f;
+  const float m_scale = 0.175f; // 原0.25的70%
   const float m_gunLength = 25.f;
   const float m_shootCooldown = 1.0f;
   const float m_directionChangeInterval = 2.0f;

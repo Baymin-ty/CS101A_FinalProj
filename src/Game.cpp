@@ -179,8 +179,8 @@ void Game::spawnEnemies()
   for (const auto &pos : spawnPoints)
   {
     auto enemy = std::make_unique<Enemy>();
-    if (enemy->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
-                            "tank_assets/PNG/Weapon_Color_B/Gun_01.png"))
+    if (enemy->loadTextures("tank_assets/PNG/Hulls_Color_D/Hull_01.png",
+                            "tank_assets/PNG/Weapon_Color_D/Gun_01.png"))
     {
       enemy->setPosition(pos);
       enemy->setBounds(m_maze.getSize());
@@ -246,8 +246,10 @@ void Game::restartMultiplayer()
   m_gameWon = false;
   m_bullets.clear();
 
-  // 初始化相机位置
+  // 初始化相机位置和缩放
   m_gameView.setCenter(startPos);
+  m_gameView.setSize({LOGICAL_WIDTH * VIEW_ZOOM, LOGICAL_HEIGHT * VIEW_ZOOM});
+  m_currentCameraPos = startPos;
 
   m_gameState = GameState::Multiplayer;
 }
@@ -1116,8 +1118,10 @@ void Game::setupNetworkCallbacks()
     m_bullets.clear();
     m_mpState.nearbyNpcIndex = -1;
     
-    // 初始化相机位置
+    // 初始化相机位置和缩放
     m_gameView.setCenter(spawn1Pos);
+    m_gameView.setSize({LOGICAL_WIDTH * VIEW_ZOOM, LOGICAL_HEIGHT * VIEW_ZOOM});
+    m_currentCameraPos = spawn1Pos;
     
     m_gameState = GameState::Multiplayer; });
 

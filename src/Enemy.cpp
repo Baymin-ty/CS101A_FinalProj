@@ -33,6 +33,46 @@ bool Enemy::loadTextures(const std::string &hullPath, const std::string &turretP
   return true;
 }
 
+bool Enemy::loadActivatedTextures()
+{
+  // 加载激活状态的贴图（Color_C）
+  if (!m_hullTexture.loadFromFile("tank_assets/PNG/Hulls_Color_C/Hull_01.png"))
+    return false;
+  if (!m_turretTexture.loadFromFile("tank_assets/PNG/Weapon_Color_C/Gun_01.png"))
+    return false;
+
+  // 保存当前位置和旋转
+  sf::Vector2f pos = m_hull ? m_hull->getPosition() : sf::Vector2f{0.f, 0.f};
+  float hullRot = m_hull ? m_hull->getRotation().asDegrees() : 0.f;
+  float turretRot = m_turret ? m_turret->getRotation().asDegrees() : 0.f;
+
+  // 重新创建精灵
+  m_hull = std::make_unique<sf::Sprite>(m_hullTexture);
+  m_hull->setOrigin(sf::Vector2f(m_hullTexture.getSize()) / 2.f);
+  m_hull->setScale({m_scale, m_scale});
+  m_hull->setPosition(pos);
+  m_hull->setRotation(sf::degrees(hullRot));
+
+  m_turret = std::make_unique<sf::Sprite>(m_turretTexture);
+  m_turret->setOrigin(sf::Vector2f(m_turretTexture.getSize()) / 2.f);
+  m_turret->setScale({m_scale, m_scale});
+  m_turret->setPosition(pos);
+  m_turret->setRotation(sf::degrees(turretRot));
+
+  return true;
+}
+
+void Enemy::activate(int team)
+{
+  if (!m_activated)
+  {
+    m_activated = true;
+    m_team = team;
+    // 切换到激活状态贴图
+    loadActivatedTextures();
+  }
+}
+
 void Enemy::setPosition(sf::Vector2f position)
 {
   if (m_hull)
