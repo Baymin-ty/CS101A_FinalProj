@@ -363,8 +363,8 @@ void MazeGenerator::placeMultiplayerSpawns()
   std::shuffle(spawnCandidates.begin(), spawnCandidates.end(), m_rng);
 
   // 找两个有一定距离的出生点
-  int minSpawnDist = std::max(3, std::min(m_width, m_height) / 8); // 最小距离
-  int maxSpawnDist = std::max(8, std::min(m_width, m_height) / 4); // 最大距离
+  int minSpawnDist = std::max(6, std::min(m_width, m_height) / 4); // 最小距离（增大）
+  int maxSpawnDist = std::max(15, std::min(m_width, m_height) / 2); // 最大距离
   
   // 收集符合条件的出生点对
   std::vector<std::pair<int, int>> validSpawnPairs; // 存储索引对

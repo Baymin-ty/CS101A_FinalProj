@@ -1009,7 +1009,7 @@ void Game::setupNetworkCallbacks()
     } });
 
   // 对方玩家离开房间，返回等待状态
-  net.setOnPlayerLeft([this]()
+  net.setOnPlayerLeft([this](bool becameHost)
                       {
     if (m_gameState == GameState::Multiplayer) {
       // 清理游戏状态
@@ -1024,9 +1024,18 @@ void Game::setupNetworkCallbacks()
       m_gameOver = false;
       m_gameWon = false;
       
+      // 更新房主状态
+      if (becameHost) {
+        m_mpState.isHost = true;
+      }
+      
       // 返回等待玩家状态
       m_gameState = GameState::WaitingForPlayer;
-      m_mpState.connectionStatus = "Other player left. Waiting for new player...";
+      if (becameHost) {
+        m_mpState.connectionStatus = "Other player left. You are now the host. Waiting...";
+      } else {
+        m_mpState.connectionStatus = "Other player left. Waiting for new player...";
+      }
       
       // 房主需要重新生成地图
       if (m_mpState.isHost) {

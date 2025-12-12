@@ -559,7 +559,8 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     // 对方玩家离开房间
     if (m_onPlayerLeft)
     {
-      m_onPlayerLeft();
+      bool becameHost = (data.size() >= 2) ? (data[1] != 0) : false;
+      m_onPlayerLeft(becameHost);
     }
     break;
   }

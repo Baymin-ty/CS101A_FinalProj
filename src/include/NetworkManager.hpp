@@ -83,7 +83,7 @@ using OnNpcActivateCallback = std::function<void(int npcId, int team)>;
 using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
 using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
-using OnPlayerLeftCallback = std::function<void()>;
+using OnPlayerLeftCallback = std::function<void(bool becameHost)>;
 
 class NetworkManager
 {

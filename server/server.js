@@ -367,10 +367,11 @@ const server = net.createServer((socket) => {
             console.log(`New host assigned in room ${socket.roomCode}`);
           }
 
-          // 通知剩余玩家对方已离开
-          const playerLeftMsg = Buffer.alloc(1);
-          playerLeftMsg[0] = MessageType.PlayerLeft;
+          // 通知剩余玩家对方已离开，并告知是否成为新房主
           for (const player of room.players) {
+            const playerLeftMsg = Buffer.alloc(2);
+            playerLeftMsg[0] = MessageType.PlayerLeft;
+            playerLeftMsg[1] = player.isHost ? 1 : 0; // 告知客户端是否是新房主
             sendMessage(player.socket, playerLeftMsg);
           }
           console.log(`Notified remaining players in room ${socket.roomCode}`);
