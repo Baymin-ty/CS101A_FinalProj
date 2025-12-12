@@ -24,8 +24,10 @@ const MessageType = {
   NpcUpdate: 19,
   NpcShoot: 20,
   NpcDamage: 21,
+  // 音乐同步
+  ClimaxStart: 22,
   // 玩家离开
-  PlayerLeft: 22
+  PlayerLeft: 23
 };
 
 // 房间管理
@@ -294,7 +296,8 @@ function handleMessage(socket, data) {
     case MessageType.NpcActivate:
     case MessageType.NpcUpdate:
     case MessageType.NpcShoot:
-    case MessageType.NpcDamage: {
+    case MessageType.NpcDamage:
+    case MessageType.ClimaxStart: {
       const roomCode = socket.roomCode;
       if (!roomCode) break;
 
