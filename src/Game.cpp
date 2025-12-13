@@ -1258,7 +1258,7 @@ void Game::renderModeSelect()
 
     // 模式描述
     sf::Text desc(m_font);
-    desc.setString("Defeat your opponent to win!");
+    desc.setString("Defeat your opponent or reach the exit first!");
     desc.setCharacterSize(20);
     desc.setFillColor(sf::Color(180, 100, 100));
     sf::FloatRect descBounds = desc.getLocalBounds();
@@ -2422,51 +2422,86 @@ void Game::renderCreatingRoom()
 
   // 标题
   sf::Text title(m_font);
-  title.setString("SELECT GAME MODE");
-  title.setCharacterSize(48);
+  title.setString("MULTIPLAYER");
+  title.setCharacterSize(56);
   title.setFillColor(sf::Color::White);
   title.setStyle(sf::Text::Bold);
   sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({centerX - titleBounds.size.x / 2.f, 150.f});
+  title.setPosition({centerX - titleBounds.size.x / 2.f, 100.f});
   m_window.draw(title);
 
-  // 选项
-  std::vector<std::string> options = {"Escape Mode", "Battle Mode"};
-  float startY = 300.f;
+  // 副标题
+  sf::Text subtitle(m_font);
+  subtitle.setString("Select Game Mode");
+  subtitle.setCharacterSize(28);
+  subtitle.setFillColor(sf::Color(180, 180, 180));
+  sf::FloatRect subtitleBounds = subtitle.getLocalBounds();
+  subtitle.setPosition({centerX - subtitleBounds.size.x / 2.f, 170.f});
+  m_window.draw(subtitle);
+
+  float startY = 280.f;
   float spacing = 80.f;
 
-  for (size_t i = 0; i < options.size(); ++i)
+  // Escape Mode
   {
     sf::Text optionText(m_font);
-    optionText.setString(options[i]);
+    std::string modeStr = "Escape Mode";
     optionText.setCharacterSize(36);
 
-    bool isSelected = (static_cast<int>(m_gameModeOption) == static_cast<int>(i));
-    if (isSelected)
+    if (m_gameModeOption == GameModeOption::EscapeMode)
     {
       optionText.setFillColor(sf::Color::Yellow);
-      optionText.setStyle(sf::Text::Bold);
+      optionText.setString("> " + modeStr + " <");
     }
     else
     {
       optionText.setFillColor(sf::Color(180, 180, 180));
+      optionText.setString(modeStr);
     }
 
-    sf::FloatRect optBounds = optionText.getLocalBounds();
-    optionText.setPosition({centerX - optBounds.size.x / 2.f, startY + i * spacing});
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({centerX - bounds.size.x / 2.f, startY});
     m_window.draw(optionText);
 
-    // 描述文字
-    sf::Text descText(m_font);
-    if (i == 0)
-      descText.setString("Both players reach the exit to win");
+    // 模式描述
+    sf::Text desc(m_font);
+    desc.setString("Cooperate with your teammate to escape!");
+    desc.setCharacterSize(20);
+    desc.setFillColor(sf::Color(100, 180, 100));
+    sf::FloatRect descBounds = desc.getLocalBounds();
+    desc.setPosition({centerX - descBounds.size.x / 2.f, startY + 40.f});
+    m_window.draw(desc);
+  }
+
+  // Battle Mode
+  {
+    sf::Text optionText(m_font);
+    std::string modeStr = "Battle Mode";
+    optionText.setCharacterSize(36);
+
+    if (m_gameModeOption == GameModeOption::BattleMode)
+    {
+      optionText.setFillColor(sf::Color::Yellow);
+      optionText.setString("> " + modeStr + " <");
+    }
     else
-      descText.setString("Defeat the other player to win");
-    descText.setCharacterSize(20);
-    descText.setFillColor(sf::Color(120, 120, 120));
-    sf::FloatRect descBounds = descText.getLocalBounds();
-    descText.setPosition({centerX - descBounds.size.x / 2.f, startY + i * spacing + 45.f});
-    m_window.draw(descText);
+    {
+      optionText.setFillColor(sf::Color(180, 180, 180));
+      optionText.setString(modeStr);
+    }
+
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({centerX - bounds.size.x / 2.f, startY + spacing});
+    m_window.draw(optionText);
+
+    // 模式描述
+    sf::Text desc(m_font);
+    desc.setString("Defeat your opponent or reach the exit first!");
+    desc.setCharacterSize(20);
+    desc.setFillColor(sf::Color(180, 100, 100));
+    sf::FloatRect descBounds = desc.getLocalBounds();
+    desc.setPosition({centerX - descBounds.size.x / 2.f, startY + spacing + 40.f});
+    m_window.draw(desc);
   }
 
   // 地图信息
@@ -2476,16 +2511,16 @@ void Game::renderCreatingRoom()
   mapInfo.setCharacterSize(24);
   mapInfo.setFillColor(sf::Color(100, 200, 100));
   sf::FloatRect mapBounds = mapInfo.getLocalBounds();
-  mapInfo.setPosition({centerX - mapBounds.size.x / 2.f, 550.f});
+  mapInfo.setPosition({centerX - mapBounds.size.x / 2.f, 520.f});
   m_window.draw(mapInfo);
 
   // 提示
   sf::Text hint(m_font);
-  hint.setString("Press ENTER to create room  |  ESC to go back");
-  hint.setCharacterSize(20);
-  hint.setFillColor(sf::Color(150, 150, 150));
+  hint.setString("W/S: Navigate | Enter: Create Room | ESC: Back");
+  hint.setCharacterSize(18);
+  hint.setFillColor(sf::Color(120, 120, 120));
   sf::FloatRect hintBounds = hint.getLocalBounds();
-  hint.setPosition({centerX - hintBounds.size.x / 2.f, 650.f});
+  hint.setPosition({centerX - hintBounds.size.x / 2.f, LOGICAL_HEIGHT - 60.f});
   m_window.draw(hint);
 
   m_window.display();
