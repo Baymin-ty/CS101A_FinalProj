@@ -48,6 +48,17 @@ enum class NetMessageType : uint8_t
   
   // 玩家离开
   PlayerLeft,    // 对方玩家离开房间
+  
+  // Escape 模式救援
+  RescueStart,   // 开始救援
+  RescueProgress,// 救援进度
+  RescueComplete,// 救援完成
+  RescueCancel,  // 取消救援
+  
+  // 房间大厅
+  PlayerReady,    // 玩家准备就绪
+  HostStartGame,  // 房主开始游戏
+  RoomInfo,       // 房间信息同步
 };
 
 // 玩家状态数据
@@ -58,6 +69,7 @@ struct PlayerState
   float turretAngle = 0;
   float health = 100;
   bool reachedExit = false;
+  bool isDead = false;  // 是否已死亡（可被救援）
 };
 
 // NPC状态数据
@@ -85,13 +97,20 @@ using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>
 using OnGameResultCallback = std::function<void(bool isWinner)>;
 using OnRestartRequestCallback = std::function<void()>;
 using OnErrorCallback = std::function<void(const std::string& error)>;
-using OnNpcActivateCallback = std::function<void(int npcId, int team)>;
+using OnNpcActivateCallback = std::function<void(int npcId, int team, int activatorId)>;
 using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
 using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
 using OnPlayerLeftCallback = std::function<void(bool becameHost)>;
 using OnClimaxStartCallback = std::function<void()>;
 using OnWallPlaceCallback = std::function<void(float x, float y)>;
+using OnRescueStartCallback = std::function<void()>;
+using OnRescueProgressCallback = std::function<void(float progress)>;
+using OnRescueCompleteCallback = std::function<void()>;
+using OnRescueCancelCallback = std::function<void()>;
+using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
+using OnPlayerReadyCallback = std::function<void(bool isReady)>;
+using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady)>;
 
 class NetworkManager
 {
@@ -112,7 +131,7 @@ public:
   void joinRoom(const std::string& roomCode);
 
   // 发送迷宫数据（房主调用）
-  void sendMazeData(const std::vector<std::string>& mazeData);
+  void sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode = false);
 
   // 发送游戏数据
   void sendPosition(const PlayerState& state);
@@ -122,7 +141,7 @@ public:
   void sendRestartRequest();           // 发送重新开始请求
   
   // NPC同步
-  void sendNpcActivate(int npcId, int team);  // 发送NPC激活
+  void sendNpcActivate(int npcId, int team, int activatorId = -1);  // 发送NPC激活
   void sendNpcUpdate(const NpcState& state);  // 发送NPC状态更新
   void sendNpcShoot(int npcId, float x, float y, float angle);  // 发送NPC射击
   void sendNpcDamage(int npcId, float damage);  // 发送NPC受伤
@@ -130,6 +149,16 @@ public:
   
   // 墙壁放置同步
   void sendWallPlace(float x, float y);  // 发送墙壁放置
+  
+  // 救援同步
+  void sendRescueStart();    // 开始救援
+  void sendRescueProgress(float progress);  // 救援进度
+  void sendRescueComplete(); // 救援完成
+  void sendRescueCancel();   // 取消救援
+  
+  // 房间大厅
+  void sendPlayerReady(bool isReady);  // 发送准备状态
+  void sendHostStartGame();            // 房主发起开始游戏
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -154,6 +183,13 @@ public:
   void setOnPlayerLeft(OnPlayerLeftCallback cb) { m_onPlayerLeft = cb; }
   void setOnClimaxStart(OnClimaxStartCallback cb) { m_onClimaxStart = cb; }
   void setOnWallPlace(OnWallPlaceCallback cb) { m_onWallPlace = cb; }
+  void setOnRescueStart(OnRescueStartCallback cb) { m_onRescueStart = cb; }
+  void setOnRescueProgress(OnRescueProgressCallback cb) { m_onRescueProgress = cb; }
+  void setOnRescueComplete(OnRescueCompleteCallback cb) { m_onRescueComplete = cb; }
+  void setOnRescueCancel(OnRescueCancelCallback cb) { m_onRescueCancel = cb; }
+  void setOnGameModeReceived(OnGameModeReceivedCallback cb) { m_onGameModeReceived = cb; }
+  void setOnPlayerReady(OnPlayerReadyCallback cb) { m_onPlayerReady = cb; }
+  void setOnRoomInfo(OnRoomInfoCallback cb) { m_onRoomInfo = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -192,4 +228,11 @@ private:
   OnPlayerLeftCallback m_onPlayerLeft;
   OnClimaxStartCallback m_onClimaxStart;
   OnWallPlaceCallback m_onWallPlace;
+  OnRescueStartCallback m_onRescueStart;
+  OnRescueProgressCallback m_onRescueProgress;
+  OnRescueCompleteCallback m_onRescueComplete;
+  OnRescueCancelCallback m_onRescueCancel;
+  OnGameModeReceivedCallback m_onGameModeReceived;
+  OnPlayerReadyCallback m_onPlayerReady;
+  OnRoomInfoCallback m_onRoomInfo;
 };

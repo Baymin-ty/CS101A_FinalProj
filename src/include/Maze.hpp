@@ -84,7 +84,7 @@ public:
   void loadFromString(const std::vector<std::string> &map);
 
   // 生成随机迷宫（使用 MazeGenerator）
-  void generateRandomMaze(int width, int height, unsigned int seed = 0, int enemyCount = 8, bool multiplayerMode = false);
+  void generateRandomMaze(int width, int height, unsigned int seed = 0, int enemyCount = 8, bool multiplayerMode = false, bool escapeMode = false);
 
   // 获取迷宫数据（用于网络传输）
   std::vector<std::string> getMazeData() const { return m_mazeData; }

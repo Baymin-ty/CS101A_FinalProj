@@ -24,10 +24,21 @@ const MessageType = {
   NpcUpdate: 19,
   NpcShoot: 20,
   NpcDamage: 21,
+  // 墙壁放置
+  WallPlace: 22,
   // 音乐同步
-  ClimaxStart: 22,
+  ClimaxStart: 23,
   // 玩家离开
-  PlayerLeft: 23
+  PlayerLeft: 24,
+  // 救援同步
+  RescueStart: 25,
+  RescueProgress: 26,
+  RescueComplete: 27,
+  RescueCancel: 28,
+  // 房间大厅
+  PlayerReady: 29,
+  HostStartGame: 30,
+  RoomInfo: 31
 };
 
 // 房间管理
@@ -37,6 +48,42 @@ const rooms = new Map();
 function generateRoomCode() {
   const code = Math.floor(1000 + Math.random() * 9000).toString();
   return code;
+}
+
+// 获取客户端IP地址
+function getClientIP(socket) {
+  const addr = socket.remoteAddress || '';
+  // 去掉 IPv6 前缀
+  return addr.replace(/^::ffff:/, '');
+}
+
+// 发送房间信息给所有玩家
+function sendRoomInfo(room) {
+  const host = room.players.find(p => p.isHost);
+  const guest = room.players.find(p => !p.isHost);
+
+  const hostIP = host ? getClientIP(host.socket) : '';
+  const guestIP = guest ? getClientIP(guest.socket) : '';
+  const guestReady = guest ? guest.ready : false;
+
+  // 构建消息: RoomInfo + hostIPLen + hostIP + guestIPLen + guestIP + guestReady
+  const hostIPBuf = Buffer.from(hostIP);
+  const guestIPBuf = Buffer.from(guestIP);
+  const response = Buffer.alloc(1 + 1 + hostIPBuf.length + 1 + guestIPBuf.length + 1);
+
+  let offset = 0;
+  response[offset++] = MessageType.RoomInfo;
+  response[offset++] = hostIPBuf.length;
+  hostIPBuf.copy(response, offset);
+  offset += hostIPBuf.length;
+  response[offset++] = guestIPBuf.length;
+  guestIPBuf.copy(response, offset);
+  offset += guestIPBuf.length;
+  response[offset++] = guestReady ? 1 : 0;
+
+  for (const player of room.players) {
+    sendMessage(player.socket, response);
+  }
 }
 
 // 发送消息给客户端
@@ -96,8 +143,9 @@ function handleMessage(socket, data) {
         mazeWidth: mazeWidth,
         mazeHeight: mazeHeight,
         mazeData: null,  // 存储迷宫数据
-        players: [{ socket: socket, reachedExit: false, isHost: true }],
-        started: false
+        players: [{ socket: socket, reachedExit: false, isHost: true, ready: true }],
+        started: false,
+        isEscapeMode: false  // 游戏模式（从迷宫数据中读取）
       };
 
       rooms.set(roomCode, room);
@@ -112,6 +160,9 @@ function handleMessage(socket, data) {
       response[1] = roomCode.length;
       response.write(roomCode, 2);
       sendMessage(socket, response);
+
+      // 发送房间信息
+      sendRoomInfo(room);
       break;
     }
 
@@ -126,28 +177,21 @@ function handleMessage(socket, data) {
       // 只有房主可以发送迷宫数据
       if (!socket.isHost) break;
 
-      // 存储迷宫数据
+      // 存储迷宫数据（包含游戏模式）
       room.mazeData = data;
-      console.log(`Received maze data for room ${roomCode}, size: ${data.length} bytes`);
+      // 解析游戏模式（第2个字节）
+      if (data.length >= 2) {
+        room.isEscapeMode = (data[1] !== 0);
+      }
+      console.log(`Received maze data for room ${roomCode}, size: ${data.length} bytes, isEscapeMode: ${room.isEscapeMode}`);
 
-      // 如果有第二个玩家在等待，发送迷宫数据给他并开始游戏
-      if (room.players.length === 2 && !room.started) {
-        room.started = true;
-
-        // 发送迷宫数据给第二个玩家
+      // 如果有第二个玩家在房间，发送迷宫数据给他（但不开始游戏）
+      if (room.players.length === 2) {
         const guest = room.players.find(p => !p.isHost);
         if (guest) {
           sendMessage(guest.socket, data);
           console.log(`Sent maze data to guest in room ${roomCode}`);
         }
-
-        // 发送游戏开始消息给两个玩家
-        const gameStartMsg = Buffer.alloc(1);
-        gameStartMsg[0] = MessageType.GameStart;
-        for (const player of room.players) {
-          sendMessage(player.socket, gameStartMsg);
-        }
-        console.log(`Game started in room: ${roomCode}`);
       }
       break;
     }
@@ -178,7 +222,7 @@ function handleMessage(socket, data) {
         break;
       }
 
-      room.players.push({ socket: socket, reachedExit: false, isHost: false });
+      room.players.push({ socket: socket, reachedExit: false, isHost: false, ready: false });
       socket.roomCode = roomCode;
       socket.isHost = false;
 
@@ -191,17 +235,72 @@ function handleMessage(socket, data) {
       response.write(roomCode, 2);
       sendMessage(socket, response);
 
-      // 总是请求房主发送最新的迷宫数据（确保地图一致性）
-      const host = room.players.find(p => p.isHost);
-      if (host) {
-        // 清除旧的迷宫数据，强制房主重新发送
-        room.mazeData = null;
-        room.started = false;
-        const requestMsg = Buffer.alloc(1);
-        requestMsg[0] = MessageType.RequestMaze;
-        sendMessage(host.socket, requestMsg);
-        console.log(`Requested fresh maze data from host in room ${roomCode}`);
+      // 发送迷宫数据给新玩家（如果已有）
+      if (room.mazeData) {
+        sendMessage(socket, room.mazeData);
+        console.log(`Sent existing maze data to guest in room ${roomCode}`);
       }
+
+      // 发送房间信息给所有玩家
+      sendRoomInfo(room);
+      break;
+    }
+
+    case MessageType.PlayerReady: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room) break;
+
+      const player = room.players.find(p => p.socket === socket);
+      if (player) {
+        player.ready = (data[1] !== 0);
+        console.log(`Player ready status in room ${roomCode}: ${player.ready}`);
+
+        // 广播准备状态给其他玩家
+        broadcastToRoom(room, socket, data);
+
+        // 发送更新后的房间信息
+        sendRoomInfo(room);
+      }
+      break;
+    }
+
+    case MessageType.HostStartGame: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room) break;
+
+      // 只有房主可以开始游戏
+      if (!socket.isHost) {
+        console.log(`Non-host tried to start game in room ${roomCode}`);
+        break;
+      }
+
+      // 检查是否满足开始条件：有2个玩家且对方已准备
+      const guest = room.players.find(p => !p.isHost);
+      if (!guest || !guest.ready) {
+        console.log(`Cannot start game in room ${roomCode}: guest not ready`);
+        break;
+      }
+
+      if (room.players.length < 2) {
+        console.log(`Cannot start game in room ${roomCode}: not enough players`);
+        break;
+      }
+
+      room.started = true;
+
+      // 发送游戏开始消息给两个玩家
+      const gameStartMsg = Buffer.alloc(1);
+      gameStartMsg[0] = MessageType.GameStart;
+      for (const player of room.players) {
+        sendMessage(player.socket, gameStartMsg);
+      }
+      console.log(`Game started in room: ${roomCode}`);
       break;
     }
 
@@ -284,11 +383,34 @@ function handleMessage(socket, data) {
       room.started = false;
       for (const player of room.players) {
         player.reachedExit = false;
+        // 非房主需要重新准备
+        if (!player.isHost) {
+          player.ready = false;
+        }
       }
 
       // 转发重新开始请求给其他玩家
       broadcastToRoom(room, socket, data);
+
+      // 发送更新后的房间信息
+      sendRoomInfo(room);
       console.log(`Restart request in room ${roomCode}`);
+      break;
+    }
+
+    // 救援同步消息
+    case MessageType.RescueStart:
+    case MessageType.RescueProgress:
+    case MessageType.RescueComplete:
+    case MessageType.RescueCancel: {
+      const roomCode = socket.roomCode;
+      if (!roomCode) break;
+
+      const room = rooms.get(roomCode);
+      if (!room || !room.started) break;
+
+      // 转发给其他玩家
+      broadcastToRoom(room, socket, data);
       break;
     }
 
@@ -297,7 +419,8 @@ function handleMessage(socket, data) {
     case MessageType.NpcUpdate:
     case MessageType.NpcShoot:
     case MessageType.NpcDamage:
-    case MessageType.ClimaxStart: {
+    case MessageType.ClimaxStart:
+    case MessageType.WallPlace: {
       const roomCode = socket.roomCode;
       if (!roomCode) break;
 
@@ -335,16 +458,21 @@ const server = net.createServer((socket) => {
           rooms.delete(socket.roomCode);
           console.log(`Room ${socket.roomCode} deleted`);
         } else {
-          // 重置房间状态，让剩余玩家回到等待状态
+          // 重置房间状态，让剩余玩家回到房间大厅
           room.started = false;
           for (const player of room.players) {
             player.reachedExit = false;
+            // 新房主自动准备就绪
+            if (wasHost) {
+              player.ready = true;
+            }
           }
 
           // 如果离开的是房主，让剩余玩家成为新房主
           if (wasHost && room.players.length > 0) {
             room.players[0].isHost = true;
             room.players[0].socket.isHost = true;
+            room.players[0].ready = true;  // 房主默认准备
             console.log(`New host assigned in room ${socket.roomCode}`);
           }
 
@@ -359,6 +487,9 @@ const server = net.createServer((socket) => {
               console.error('Error sending PlayerLeft message:', e.message);
             }
           }
+
+          // 发送更新后的房间信息
+          sendRoomInfo(room);
           console.log(`Notified remaining players in room ${socket.roomCode}`);
         }
       }

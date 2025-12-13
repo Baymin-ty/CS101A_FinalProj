@@ -303,32 +303,72 @@ void MazeGenerator::placeDestructibleWalls()
     }
   }
 
-  // 单机模式：所有可破坏墙都是普通的（无特殊属性）
+  // 单机模式：根据是否 Escape 模式决定墙体类型
   if (!m_multiplayerMode)
   {
-    for (const auto &[x, y] : destructibleCandidates)
+    if (m_escapeMode)
     {
-      m_grid[y][x] = '*'; // 普通可破坏墙
+      // 单人 Escape 模式：30%治疗，70%普通
+      for (const auto &[x, y] : destructibleCandidates)
+      {
+        float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+        if (roll < 0.30f)
+        {
+          m_grid[y][x] = 'H'; // Heal (蓝色)
+        }
+        else
+        {
+          m_grid[y][x] = '*'; // 普通 (棕色)
+        }
+      }
+    }
+    else
+    {
+      // 单人 Battle 模式：所有都是普通墙
+      for (const auto &[x, y] : destructibleCandidates)
+      {
+        m_grid[y][x] = '*'; // 普通可破坏墙
+      }
     }
     return;
   }
 
   // 联机模式：生成特殊方块
-  // 剩余墙体分配属性：40%金色，20%治疗，40%普通
-  for (const auto &[x, y] : destructibleCandidates)
+  if (m_escapeMode)
   {
-    float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
-    if (roll < 0.40f)
+    // Escape 模式：只有蓝色墙（治疗）和棕色墙（普通），无金色墙
+    // 30%治疗，70%普通
+    for (const auto &[x, y] : destructibleCandidates)
     {
-      m_grid[y][x] = 'G'; // Gold
+      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+      if (roll < 0.30f)
+      {
+        m_grid[y][x] = 'H'; // Heal (蓝色)
+      }
+      else
+      {
+        m_grid[y][x] = '*'; // 普通 (棕色)
+      }
     }
-    else if (roll < 0.60f)
+  }
+  else
+  {
+    // Battle 模式：40%金色，20%治疗，40%普通
+    for (const auto &[x, y] : destructibleCandidates)
     {
-      m_grid[y][x] = 'H'; // Heal
-    }
-    else
-    {
-      m_grid[y][x] = '*'; // 普通
+      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+      if (roll < 0.40f)
+      {
+        m_grid[y][x] = 'G'; // Gold
+      }
+      else if (roll < 0.60f)
+      {
+        m_grid[y][x] = 'H'; // Heal
+      }
+      else
+      {
+        m_grid[y][x] = '*'; // 普通
+      }
     }
   }
 }

@@ -20,7 +20,9 @@ enum class GameState
   Playing,
   Paused,
   Connecting,
+  CreatingRoom,    // 创建房间时选择游戏模式
   WaitingForPlayer,
+  RoomLobby,       // 房间大厅（显示房间信息，等待开始）
   Multiplayer,
   GameOver,
   Victory
@@ -68,6 +70,8 @@ private:
   void processMainMenuEvents(const sf::Event &event);
   void processModeSelectEvents(const sf::Event &event);
   void processConnectingEvents(const sf::Event &event);
+  void processCreatingRoomEvents(const sf::Event &event);  // 创建房间时选择模式
+  void processRoomLobbyEvents(const sf::Event &event);  // 房间大厅事件处理
   void update(float dt);
   void updateMultiplayer(float dt);
   void render();
@@ -77,7 +81,9 @@ private:
   void renderPaused();
   void renderGameOver();
   void renderConnecting();
+  void renderCreatingRoom();   // 创建房间选择模式渲染
   void renderWaitingForPlayer();
+  void renderRoomLobby();    // 房间大厅渲染
   void renderMultiplayer();
   void checkCollisions();
   void checkMultiplayerCollisions();

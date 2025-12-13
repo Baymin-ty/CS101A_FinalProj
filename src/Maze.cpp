@@ -118,7 +118,7 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   calculateRoundedCorners();
 }
 
-void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount, bool multiplayerMode)
+void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enemyCount, bool multiplayerMode, bool escapeMode)
 {
   MazeGenerator generator(width, height);
   if (seed != 0)
@@ -129,6 +129,8 @@ void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enem
   generator.setEnemyCount(enemyCount);
   // 设置联机模式（联机模式下生成特殊方块）
   generator.setMultiplayerMode(multiplayerMode);
+  // 设置 Escape 模式（只生成蓝色和棕色墙）
+  generator.setEscapeMode(escapeMode);
   std::vector<std::string> mazeData = generator.generate();
   loadFromString(mazeData);
 }

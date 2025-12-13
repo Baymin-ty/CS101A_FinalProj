@@ -62,12 +62,14 @@ bool Enemy::loadActivatedTextures()
   return true;
 }
 
-void Enemy::activate(int team)
+void Enemy::activate(int team, int activatorId)
 {
   if (!m_activated)
   {
     m_activated = true;
     m_team = team;
+    m_activatorId = activatorId;  // 记录激活者 (-1=自动激活, 0=本地玩家, 1=另一玩家)
+    m_primaryTargetDowned = false;
     // 切换到激活状态贴图
     loadActivatedTextures();
   }

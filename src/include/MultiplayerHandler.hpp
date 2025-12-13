@@ -25,6 +25,27 @@ struct MultiplayerState
   int nearbyNpcIndex = -1;
   bool rKeyJustPressed = false;
   std::vector<std::string> generatedMazeData;
+  
+  // Escape 模式相关
+  bool isEscapeMode = false;  // 是否是 Escape 模式（否则是 Battle 模式）
+  bool localPlayerDead = false;   // 本地玩家是否已死亡（可被救援）
+  bool otherPlayerDead = false;   // 对方玩家是否已死亡
+  bool isRescuing = false;        // 是否正在救援对方
+  bool beingRescued = false;      // 是否正在被对方救援
+  float rescueProgress = 0.f;     // 救援进度 (0-3s)
+  float rescueSyncTimer = 0.f;    // 救援进度同步计时器
+  bool fKeyHeld = false;          // F键是否按下
+  bool canRescue = false;         // 是否在救援范围内
+  
+  // 房间大厅相关
+  bool localPlayerReady = false;  // 本地玩家是否准备就绪
+  bool otherPlayerReady = false;  // 对方玩家是否准备就绪
+  bool otherPlayerInRoom = false; // 对方是否在房间中
+  std::string localPlayerIP;      // 本地玩家IP
+  std::string otherPlayerIP;      // 对方玩家IP
+  int npcCount = 10;              // NPC数量
+  int mazeWidth = 41;             // 迷宫宽度
+  int mazeHeight = 31;            // 迷宫高度
 };
 
 // 多人游戏渲染和更新所需的上下文
@@ -43,6 +64,7 @@ struct MultiplayerContext
   unsigned int screenHeight;
   float tankScale;
   bool placementMode;  // 墙壁放置模式
+  bool isEscapeMode;   // 是否是 Escape 模式
 };
 
 // 多人模式处理器

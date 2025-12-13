@@ -24,6 +24,9 @@ public:
   // 设置联机模式（联机模式下生成特殊方块）
   void setMultiplayerMode(bool multiplayer) { m_multiplayerMode = multiplayer; }
 
+  // 设置 Escape 模式（只生成蓝色和棕色墙）
+  void setEscapeMode(bool escape) { m_escapeMode = escape; }
+
   // 获取两个出生点（用于多人模式）
   std::pair<int, int> getSpawn1() const { return {m_spawn1X, m_spawn1Y}; }
   std::pair<int, int> getSpawn2() const { return {m_spawn2X, m_spawn2Y}; }
@@ -47,6 +50,7 @@ private:
   int m_enemyCount = 5;
   float m_destructibleRatio = 0.15f;
   bool m_multiplayerMode = false;  // 是否联机模式
+  bool m_escapeMode = false;        // 是否 Escape 模式（只生成蓝色和棕色墙）
 
   // 起点和终点坐标
   int m_startX = 1, m_startY = 1;

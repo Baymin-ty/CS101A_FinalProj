@@ -5,6 +5,7 @@
 #include "include/AudioManager.hpp"
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 void MultiplayerHandler::update(
   MultiplayerContext& ctx,
@@ -15,47 +16,185 @@ void MultiplayerHandler::update(
 {
   if (!ctx.player) return;
 
+  auto& net = NetworkManager::getInstance();
+  
+  // 检查本地玩家死亡状态
+  if (ctx.player->isDead() && !state.localPlayerDead) {
+    state.localPlayerDead = true;
+    // 在 Escape 模式下，死亡不直接结束游戏，等待队友救援
+    if (!state.isEscapeMode) {
+      // Battle 模式：直接失败
+      state.multiplayerWin = false;
+      std::cout << "[DEBUG] Battle mode: Local player died, sending lose" << std::endl;
+      net.sendGameResult(false);
+      onDefeat();
+      return;
+    } else {
+      std::cout << "[DEBUG] Escape mode: Local player downed, waiting for rescue" << std::endl;
+    }
+  }
+  
+  // Escape 模式：检查是否两个玩家都死亡（只由房主判定，避免竞争条件）
+  if (state.isEscapeMode && state.isHost && state.localPlayerDead && state.otherPlayerDead) {
+    state.multiplayerWin = false;
+    std::cout << "[DEBUG] Escape mode: Both dead, sending lose" << std::endl;
+    net.sendGameResult(false);  // 通知对方：游戏失败
+    onDefeat();
+    return;
+  }
+
   // 获取鼠标在世界坐标中的位置
   sf::Vector2i mousePixelPos = sf::Mouse::getPosition(ctx.window);
   sf::Vector2f mouseWorldPos = ctx.window.mapPixelToCoords(mousePixelPos, ctx.gameView);
 
-  // 保存旧位置
-  sf::Vector2f oldPos = ctx.player->getPosition();
-  sf::Vector2f movement = ctx.player->getMovement(dt);
+  // 如果本地玩家没死，正常更新
+  if (!state.localPlayerDead) {
+    // 保存旧位置
+    sf::Vector2f oldPos = ctx.player->getPosition();
+    sf::Vector2f movement = ctx.player->getMovement(dt);
 
-  // 更新本地玩家
-  ctx.player->update(dt, mouseWorldPos);
+    // 更新本地玩家
+    ctx.player->update(dt, mouseWorldPos);
 
-  // 碰撞检测
-  sf::Vector2f newPos = ctx.player->getPosition();
-  float radius = ctx.player->getCollisionRadius();
+    // 碰撞检测
+    sf::Vector2f newPos = ctx.player->getPosition();
+    float radius = ctx.player->getCollisionRadius();
 
-  if (ctx.maze.checkCollision(newPos, radius)) {
-    sf::Vector2f posX = {oldPos.x + movement.x, oldPos.y};
-    sf::Vector2f posY = {oldPos.x, oldPos.y + movement.y};
+    if (ctx.maze.checkCollision(newPos, radius)) {
+      sf::Vector2f posX = {oldPos.x + movement.x, oldPos.y};
+      sf::Vector2f posY = {oldPos.x, oldPos.y + movement.y};
 
-    bool canMoveX = !ctx.maze.checkCollision(posX, radius);
-    bool canMoveY = !ctx.maze.checkCollision(posY, radius);
+      bool canMoveX = !ctx.maze.checkCollision(posX, radius);
+      bool canMoveY = !ctx.maze.checkCollision(posY, radius);
 
-    if (canMoveX && canMoveY) {
-      if (std::abs(movement.x) > std::abs(movement.y))
+      if (canMoveX && canMoveY) {
+        if (std::abs(movement.x) > std::abs(movement.y))
+          ctx.player->setPosition(posX);
+        else
+          ctx.player->setPosition(posY);
+      } else if (canMoveX) {
         ctx.player->setPosition(posX);
-      else
+      } else if (canMoveY) {
         ctx.player->setPosition(posY);
-    } else if (canMoveX) {
-      ctx.player->setPosition(posX);
-    } else if (canMoveY) {
-      ctx.player->setPosition(posY);
+      } else {
+        ctx.player->setPosition(oldPos);
+      }
+    }
+    
+    // 处理射击（只有活着的玩家可以射击）
+    if (ctx.player->hasFiredBullet()) {
+      sf::Vector2f bulletPos = ctx.player->getBulletSpawnPosition();
+      float bulletAngle = ctx.player->getTurretRotation();
+      auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true);
+      bullet->setTeam(ctx.player->getTeam());  // 设置子弹阵营
+      ctx.bullets.push_back(std::move(bullet));
+      net.sendShoot(bulletPos.x, bulletPos.y, bulletAngle);
+      
+      // 播放射击音效
+      AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
+    }
+  }
+  
+  // Escape 模式：处理救援逻辑
+  if (state.isEscapeMode && !state.localPlayerDead && state.otherPlayerDead && ctx.otherPlayer) {
+    // 检查是否靠近倒地的队友
+    sf::Vector2f myPos = ctx.player->getPosition();
+    sf::Vector2f otherPos = ctx.otherPlayer->getPosition();
+    float distToTeammate = std::hypot(myPos.x - otherPos.x, myPos.y - otherPos.y);
+    
+    const float RESCUE_DISTANCE = 60.f;
+    const float RESCUE_TIME = 3.0f;  // 3秒救援时间
+    
+    if (distToTeammate < RESCUE_DISTANCE) {
+      state.canRescue = true;
+      
+      if (state.fKeyHeld) {
+        // 正在施救
+        if (!state.isRescuing) {
+          state.isRescuing = true;
+          state.rescueProgress = 0.f;
+          state.rescueSyncTimer = 0.f;
+          net.sendRescueStart();
+          std::cout << "[DEBUG] Started rescue!" << std::endl;
+        }
+        
+        state.rescueProgress += dt;
+        
+        // 每0.1秒同步进度
+        state.rescueSyncTimer += dt;
+        if (state.rescueSyncTimer >= 0.1f) {
+          net.sendRescueProgress(state.rescueProgress / RESCUE_TIME);
+          state.rescueSyncTimer = 0.f;
+        }
+        
+        // 救援完成
+        if (state.rescueProgress >= RESCUE_TIME) {
+          std::cout << "[DEBUG] Rescue complete! Reviving teammate." << std::endl;
+          state.isRescuing = false;
+          state.rescueProgress = 0.f;
+          state.otherPlayerDead = false;
+          net.sendRescueComplete();
+          
+          // 复活队友：恢复50%血量
+          if (ctx.otherPlayer) {
+            ctx.otherPlayer->setHealth(50.f);
+            std::cout << "[DEBUG] Set otherPlayer health to 50" << std::endl;
+          }
+        }
+      } else {
+        // F键松开，取消救援
+        if (state.isRescuing) {
+          state.isRescuing = false;
+          state.rescueProgress = 0.f;
+          net.sendRescueCancel();
+          std::cout << "[DEBUG] Rescue cancelled (F key released)" << std::endl;
+        }
+      }
     } else {
-      ctx.player->setPosition(oldPos);
+      state.canRescue = false;
+      // 离开救援范围，取消救援
+      if (state.isRescuing) {
+        state.isRescuing = false;
+        state.rescueProgress = 0.f;
+        net.sendRescueCancel();
+      }
+    }
+  } else {
+    state.canRescue = false;
+    if (state.isRescuing) {
+      state.isRescuing = false;
+      state.rescueProgress = 0.f;
+      net.sendRescueCancel();
     }
   }
 
-  // 检查玩家是否接近未激活的NPC
-  checkNearbyNpc(ctx, state);
-
-  // 处理NPC激活
-  handleNpcActivation(ctx, state);
+  // 检查玩家是否接近未激活的NPC（Battle 模式才需要手动激活）
+  if (!state.isEscapeMode) {
+    checkNearbyNpc(ctx, state);
+    handleNpcActivation(ctx, state);
+  }
+  
+  // Escape 模式：NPC 自动激活（类似单人模式）
+  // 双方都可以触发激活，只要本地玩家接近 NPC 就发送激活消息
+  if (state.isEscapeMode && !state.localPlayerDead && ctx.player) {
+    for (auto& npc : ctx.enemies) {
+      if (!npc->isActivated() && !npc->isDead()) {
+        // 只检查本地玩家的距离
+        sf::Vector2f toPlayer = ctx.player->getPosition() - npc->getPosition();
+        float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
+        
+        if (dist < 450.f) {
+          // 本地玩家触发激活
+          int activatorId = state.isHost ? 0 : 1;  // 房主=0, 非房主=1
+          
+          // 自动激活，team=0 表示攻击玩家
+          npc->activate(0, activatorId);
+          net.sendNpcActivate(npc->getId(), 0, activatorId);
+          std::cout << "[DEBUG] Escape mode: Local player activated NPC " << npc->getId() << std::endl;
+        }
+      }
+    }
+  }
 
   // 更新NPC AI（仅房主）或插值更新（非房主）
   if (state.isHost) {
@@ -70,7 +209,6 @@ void MultiplayerHandler::update(
   }
 
   // 发送位置到服务器
-  auto& net = NetworkManager::getInstance();
   PlayerState pstate;
   pstate.x = ctx.player->getPosition().x;
   pstate.y = ctx.player->getPosition().y;
@@ -78,18 +216,8 @@ void MultiplayerHandler::update(
   pstate.turretAngle = ctx.player->getTurretRotation();
   pstate.health = ctx.player->getHealth();
   pstate.reachedExit = state.localPlayerReachedExit;
+  pstate.isDead = state.localPlayerDead;
   net.sendPosition(pstate);
-
-  // 处理射击
-  if (ctx.player->hasFiredBullet()) {
-    sf::Vector2f bulletPos = ctx.player->getBulletSpawnPosition();
-    float bulletAngle = ctx.player->getTurretRotation();
-    ctx.bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true));
-    net.sendShoot(bulletPos.x, bulletPos.y, bulletAngle);
-    
-    // 播放射击音效
-    AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
-  }
 
   // 更新迷宫
   ctx.maze.update(dt);
@@ -109,22 +237,52 @@ void MultiplayerHandler::update(
       [](const std::unique_ptr<Bullet>& b) { return !b->isAlive(); }),
     ctx.bullets.end());
 
-  // 检查玩家是否到达终点
+  // 检查玩家是否到达终点（只有活着的玩家才能到达终点）
   sf::Vector2f exitPos = ctx.maze.getExitPosition();
-  float distToExit = std::hypot(ctx.player->getPosition().x - exitPos.x,
-                                 ctx.player->getPosition().y - exitPos.y);
+  if (!state.localPlayerDead) {
+    float distToExit = std::hypot(ctx.player->getPosition().x - exitPos.x,
+                                   ctx.player->getPosition().y - exitPos.y);
 
-  if (distToExit < TILE_SIZE && !state.localPlayerReachedExit) {
-    state.localPlayerReachedExit = true;
+    if (distToExit < TILE_SIZE && !state.localPlayerReachedExit) {
+      state.localPlayerReachedExit = true;
+      
+      if (state.isEscapeMode) {
+        // Escape 模式：两个人都到达才算胜利（只由房主判定）
+        if (state.isHost && state.otherPlayerReachedExit && !state.otherPlayerDead) {
+          state.multiplayerWin = true;
+          std::cout << "[DEBUG] Escape mode: Both reached exit, sending win" << std::endl;
+          net.sendGameResult(true);
+          onVictory();
+          return;
+        }
+        // 非房主或对方还没到达：只标记自己到达了，等待
+      } else {
+        // Battle 模式：先到达者胜利
+        state.multiplayerWin = true;
+        std::cout << "[DEBUG] Battle mode: Reached exit first, sending win" << std::endl;
+        net.sendGameResult(true);
+        onVictory();
+        return;
+      }
+    }
+  }
+  
+  // Escape 模式：检查是否双方都到达终点（只由房主判定）
+  if (state.isEscapeMode && state.isHost &&
+      state.localPlayerReachedExit && state.otherPlayerReachedExit &&
+      !state.localPlayerDead && !state.otherPlayerDead) {
     state.multiplayerWin = true;
+    std::cout << "[DEBUG] Escape mode (second check): Both reached exit, sending win" << std::endl;
     net.sendGameResult(true);
     onVictory();
     return;
   }
 
-  // 检查本地玩家是否死亡
-  if (ctx.player->isDead()) {
+  // Battle 模式：检查本地玩家是否死亡（这个检查可能是重复的，但为了安全保留）
+  if (!state.isEscapeMode && ctx.player->isDead() && !state.localPlayerDead) {
+    state.localPlayerDead = true;
     state.multiplayerWin = false;
+    std::cout << "[DEBUG] Battle mode (second check): Local player died, sending lose" << std::endl;
     net.sendGameResult(false);
     onDefeat();
     return;
@@ -166,8 +324,9 @@ void MultiplayerHandler::handleNpcActivation(
     std::cout << "[DEBUG] R key triggered! NPC index: " << state.nearbyNpcIndex << std::endl;
     if (ctx.player->getCoins() >= 3) {
       ctx.player->spendCoins(3);
-      ctx.enemies[state.nearbyNpcIndex]->activate(localTeam);
-      NetworkManager::getInstance().sendNpcActivate(state.nearbyNpcIndex, localTeam);
+      // Battle 模式：激活者为本地玩家 (activatorId=0)
+      ctx.enemies[state.nearbyNpcIndex]->activate(localTeam, 0);
+      NetworkManager::getInstance().sendNpcActivate(state.nearbyNpcIndex, localTeam, 0);
       std::cout << "[DEBUG] Activated NPC " << state.nearbyNpcIndex << ", coins left: " << ctx.player->getCoins() << std::endl;
       state.nearbyNpcIndex = -1;
     } else {
@@ -197,21 +356,67 @@ void MultiplayerHandler::updateNpcAI(
         // 收集敌对目标
         std::vector<sf::Vector2f> targets;
 
-        if (ctx.player && ctx.player->getTeam() != npcTeam && npcTeam != 0) {
-          targets.push_back(ctx.player->getPosition());
-        }
+        // Escape 模式：NPC (team=0) 攻击所有活着的玩家
+        if (state.isEscapeMode && npcTeam == 0) {
+          // NPC 的激活者 ID: 0=本地玩家, 1=其他玩家
+          int activatorId = npc->getActivatorId();
+          
+          // 确定主目标和副目标
+          Tank* primaryTarget = nullptr;
+          Tank* secondaryTarget = nullptr;
+          bool primaryDowned = false;
+          bool secondaryDowned = false;
+          
+          if (activatorId == 0) {
+            // 本地玩家激活的 -> 优先攻击本地玩家
+            primaryTarget = ctx.player;
+            primaryDowned = state.localPlayerDead;
+            secondaryTarget = ctx.otherPlayer;
+            secondaryDowned = state.otherPlayerDead;
+          } else {
+            // 其他玩家激活的 (activatorId == 1) -> 优先攻击其他玩家
+            primaryTarget = ctx.otherPlayer;
+            primaryDowned = state.otherPlayerDead;
+            secondaryTarget = ctx.player;
+            secondaryDowned = state.localPlayerDead;
+          }
+          
+          // 更新主目标倒地状态
+          if (primaryDowned && !npc->isPrimaryTargetDowned()) {
+            // 主目标刚刚倒地，切换到副目标
+            npc->setPrimaryTargetDowned(true);
+          }
+          
+          // 选择攻击目标
+          if (npc->isPrimaryTargetDowned()) {
+            // 主目标已倒地，攻击副目标（如果活着）
+            if (secondaryTarget && !secondaryDowned) {
+              targets.push_back(secondaryTarget->getPosition());
+            }
+          } else {
+            // 主目标还活着，攻击主目标
+            if (primaryTarget) {
+              targets.push_back(primaryTarget->getPosition());
+            }
+          }
+        } else {
+          // Battle 模式或其他情况：原有逻辑
+          if (ctx.player && ctx.player->getTeam() != npcTeam && npcTeam != 0) {
+            targets.push_back(ctx.player->getPosition());
+          }
 
-        if (ctx.otherPlayer && ctx.otherPlayer->getTeam() != npcTeam && npcTeam != 0) {
-          targets.push_back(ctx.otherPlayer->getPosition());
-        }
+          if (ctx.otherPlayer && ctx.otherPlayer->getTeam() != npcTeam && npcTeam != 0) {
+            targets.push_back(ctx.otherPlayer->getPosition());
+          }
 
-        for (const auto& otherNpc : ctx.enemies) {
-          if (otherNpc.get() != npc.get() &&
-              otherNpc->isActivated() &&
-              !otherNpc->isDead() &&
-              otherNpc->getTeam() != npcTeam &&
-              otherNpc->getTeam() != 0) {
-            targets.push_back(otherNpc->getPosition());
+          for (const auto& otherNpc : ctx.enemies) {
+            if (otherNpc.get() != npc.get() &&
+                otherNpc->isActivated() &&
+                !otherNpc->isDead() &&
+                otherNpc->getTeam() != npcTeam &&
+                otherNpc->getTeam() != 0) {
+              targets.push_back(otherNpc->getPosition());
+            }
           }
         }
 
@@ -402,7 +607,31 @@ void MultiplayerHandler::renderMultiplayer(
   // 渲染另一个玩家
   if (ctx.otherPlayer) {
     ctx.otherPlayer->render(ctx.window);
-    if (state.otherPlayerReachedExit) {
+    
+    // Escape 模式下显示倒地玩家的特殊标记
+    if (state.isEscapeMode && state.otherPlayerDead) {
+      sf::Vector2f pos = ctx.otherPlayer->getPosition();
+      
+      // 画一个红色十字表示需要救援
+      sf::RectangleShape crossH({30.f, 8.f});
+      crossH.setFillColor(sf::Color(255, 50, 50, 200));
+      crossH.setPosition({pos.x - 15.f, pos.y - 4.f - 30.f});
+      ctx.window.draw(crossH);
+      
+      sf::RectangleShape crossV({8.f, 30.f});
+      crossV.setFillColor(sf::Color(255, 50, 50, 200));
+      crossV.setPosition({pos.x - 4.f, pos.y - 15.f - 30.f});
+      ctx.window.draw(crossV);
+      
+      // 显示 "DOWNED" 文字
+      sf::Text downedText(ctx.font);
+      downedText.setString("DOWNED");
+      downedText.setCharacterSize(12);
+      downedText.setFillColor(sf::Color::Red);
+      sf::FloatRect bounds = downedText.getLocalBounds();
+      downedText.setPosition({pos.x - bounds.size.x / 2.f, pos.y + 25.f});
+      ctx.window.draw(downedText);
+    } else if (state.otherPlayerReachedExit) {
       UIHelper::drawTeamMarker(ctx.window,
         {ctx.otherPlayer->getPosition().x, ctx.otherPlayer->getPosition().y - 25.f},
         15.f, sf::Color(0, 255, 0, 150));
@@ -412,10 +641,82 @@ void MultiplayerHandler::renderMultiplayer(
   // 渲染本地玩家
   if (ctx.player) {
     ctx.player->render(ctx.window);
-    if (state.localPlayerReachedExit) {
+    
+    // 如果本地玩家死亡，显示等待救援的 UI
+    if (state.isEscapeMode && state.localPlayerDead) {
+      sf::Vector2f pos = ctx.player->getPosition();
+      
+      // 画一个红色十字
+      sf::RectangleShape crossH({30.f, 8.f});
+      crossH.setFillColor(sf::Color(255, 50, 50, 200));
+      crossH.setPosition({pos.x - 15.f, pos.y - 4.f - 30.f});
+      ctx.window.draw(crossH);
+      
+      sf::RectangleShape crossV({8.f, 30.f});
+      crossV.setFillColor(sf::Color(255, 50, 50, 200));
+      crossV.setPosition({pos.x - 4.f, pos.y - 15.f - 30.f});
+      ctx.window.draw(crossV);
+      
+      // 显示被救援进度（如果正在被救）
+      if (state.beingRescued && state.rescueProgress > 0.f) {
+        float progress = state.rescueProgress / 3.0f;  // 3秒总时间
+        
+        // 进度条背景
+        sf::RectangleShape bgBar({60.f, 8.f});
+        bgBar.setFillColor(sf::Color(50, 50, 50, 200));
+        bgBar.setPosition({pos.x - 30.f, pos.y + 35.f});
+        ctx.window.draw(bgBar);
+        
+        // 进度条
+        sf::RectangleShape progressBar({60.f * progress, 8.f});
+        progressBar.setFillColor(sf::Color(50, 200, 50, 255));
+        progressBar.setPosition({pos.x - 30.f, pos.y + 35.f});
+        ctx.window.draw(progressBar);
+      }
+    } else if (state.localPlayerReachedExit) {
       UIHelper::drawTeamMarker(ctx.window,
         {ctx.player->getPosition().x, ctx.player->getPosition().y - 25.f},
         15.f, sf::Color(0, 255, 0, 150));
+    }
+  }
+  
+  // 渲染救援提示和进度（靠近倒地队友时）
+  if (state.isEscapeMode && state.canRescue && ctx.otherPlayer) {
+    sf::Vector2f otherPos = ctx.otherPlayer->getPosition();
+    
+    if (state.isRescuing) {
+      // 显示救援进度条
+      float progress = state.rescueProgress / 3.0f;  // 3秒总时间
+      
+      // 进度条背景
+      sf::RectangleShape bgBar({80.f, 10.f});
+      bgBar.setFillColor(sf::Color(50, 50, 50, 200));
+      bgBar.setPosition({otherPos.x - 40.f, otherPos.y - 60.f});
+      ctx.window.draw(bgBar);
+      
+      // 进度条
+      sf::RectangleShape progressBar({80.f * progress, 10.f});
+      progressBar.setFillColor(sf::Color(50, 200, 50, 255));
+      progressBar.setPosition({otherPos.x - 40.f, otherPos.y - 60.f});
+      ctx.window.draw(progressBar);
+      
+      // 显示救援中文字
+      sf::Text rescueText(ctx.font);
+      rescueText.setString("Rescuing...");
+      rescueText.setCharacterSize(14);
+      rescueText.setFillColor(sf::Color::Yellow);
+      sf::FloatRect bounds = rescueText.getLocalBounds();
+      rescueText.setPosition({otherPos.x - bounds.size.x / 2.f, otherPos.y - 80.f});
+      ctx.window.draw(rescueText);
+    } else {
+      // 显示按 F 救援提示
+      sf::Text rescueHint(ctx.font);
+      rescueHint.setString("Hold F to rescue");
+      rescueHint.setCharacterSize(14);
+      rescueHint.setFillColor(sf::Color::Yellow);
+      sf::FloatRect bounds = rescueHint.getLocalBounds();
+      rescueHint.setPosition({otherPos.x - bounds.size.x / 2.f, otherPos.y - 60.f});
+      ctx.window.draw(rescueHint);
     }
   }
 
@@ -459,13 +760,19 @@ void MultiplayerHandler::renderNpcs(
     npc->draw(ctx.window);
 
     sf::Vector2f npcPos = npc->getPosition();
-    if (npc->isActivated()) {
-      sf::Color markerColor = (npc->getTeam() == ctx.player->getTeam()) 
-        ? sf::Color(0, 255, 0, 200)   // 己方：绿色
-        : sf::Color(255, 0, 0, 200);  // 敌方：红色
-      UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, markerColor);
-    } else {
-      UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
+    
+    // Escape 模式：NPC 是敌人，不需要显示标记（显而易见）
+    // Battle 模式：显示阵营标记
+    if (!state.isEscapeMode) {
+      if (npc->isActivated()) {
+        sf::Color markerColor = (npc->getTeam() == ctx.player->getTeam()) 
+          ? sf::Color(0, 255, 0, 200)   // 己方：绿色
+          : sf::Color(255, 0, 0, 200);  // 敌方：红色
+        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, markerColor);
+      } else {
+        // 未激活：灰色
+        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
+      }
     }
   }
 }
@@ -483,42 +790,95 @@ void MultiplayerHandler::renderUI(
 
   // Self 标签和血条
   sf::Text selfLabel(ctx.font);
-  selfLabel.setString("Self");
+  if (state.isEscapeMode && state.localPlayerDead) {
+    selfLabel.setString("Self [DOWNED]");
+    selfLabel.setFillColor(sf::Color::Red);
+  } else {
+    selfLabel.setString("Self");
+    selfLabel.setFillColor(sf::Color::White);
+  }
   selfLabel.setCharacterSize(18);
-  selfLabel.setFillColor(sf::Color::White);
   selfLabel.setPosition({barX, barY - 2.f});
   ctx.window.draw(selfLabel);
 
   float selfHealthPercent = ctx.player ? (ctx.player->getHealth() / 100.f) : 0.f;
+  sf::Color selfBarColor = (state.isEscapeMode && state.localPlayerDead) ? sf::Color(100, 100, 100) : sf::Color::Green;
   UIHelper::drawHealthBar(ctx.window, barX + 50.f, barY, barWidth, barHeight,
-                          selfHealthPercent, sf::Color::Green);
+                          selfHealthPercent, selfBarColor);
 
   // Other 标签和血条
   sf::Text otherLabel(ctx.font);
-  otherLabel.setString("Other");
+  if (state.isEscapeMode && state.otherPlayerDead) {
+    otherLabel.setString("Teammate [DOWNED]");
+    otherLabel.setFillColor(sf::Color::Red);
+  } else if (state.isEscapeMode) {
+    otherLabel.setString("Teammate");
+    otherLabel.setFillColor(sf::Color::Cyan);
+  } else {
+    otherLabel.setString("Other");
+    otherLabel.setFillColor(sf::Color::White);
+  }
   otherLabel.setCharacterSize(18);
-  otherLabel.setFillColor(sf::Color::White);
   otherLabel.setPosition({barX, barY + 30.f - 2.f});
   ctx.window.draw(otherLabel);
 
   float otherHealthPercent = ctx.otherPlayer ? (ctx.otherPlayer->getHealth() / 100.f) : 0.f;
+  sf::Color otherBarColor = (state.isEscapeMode && state.otherPlayerDead) ? sf::Color(100, 100, 100) : sf::Color::Cyan;
   UIHelper::drawHealthBar(ctx.window, barX + 50.f, barY + 30.f, barWidth, barHeight,
-                          otherHealthPercent, sf::Color::Cyan);
+                          otherHealthPercent, otherBarColor);
 
-  // 金币显示
-  sf::Text coinsText(ctx.font);
-  coinsText.setString("Coins: " + std::to_string(ctx.player ? ctx.player->getCoins() : 0));
-  coinsText.setCharacterSize(20);
-  coinsText.setFillColor(sf::Color::Yellow);
-  coinsText.setPosition({barX, barY + 60.f});
-  ctx.window.draw(coinsText);
+  // Escape 模式显示到达终点状态
+  if (state.isEscapeMode) {
+    float statusY = barY + 60.f;
+    
+    // 本地玩家到达状态
+    sf::Text selfStatus(ctx.font);
+    if (state.localPlayerReachedExit && !state.localPlayerDead) {
+      selfStatus.setString("You: ESCAPED!");
+      selfStatus.setFillColor(sf::Color::Green);
+    } else if (state.localPlayerDead) {
+      selfStatus.setString("You: DOWNED - Wait for rescue!");
+      selfStatus.setFillColor(sf::Color::Red);
+    } else {
+      selfStatus.setString("You: Reach the exit!");
+      selfStatus.setFillColor(sf::Color(180, 180, 180));
+    }
+    selfStatus.setCharacterSize(16);
+    selfStatus.setPosition({barX, statusY});
+    ctx.window.draw(selfStatus);
+    
+    // 队友到达状态
+    sf::Text otherStatus(ctx.font);
+    if (state.otherPlayerReachedExit && !state.otherPlayerDead) {
+      otherStatus.setString("Teammate: ESCAPED!");
+      otherStatus.setFillColor(sf::Color::Green);
+    } else if (state.otherPlayerDead) {
+      otherStatus.setString("Teammate: DOWNED - Go rescue!");
+      otherStatus.setFillColor(sf::Color::Red);
+    } else {
+      otherStatus.setString("Teammate: Not escaped yet");
+      otherStatus.setFillColor(sf::Color(180, 180, 180));
+    }
+    otherStatus.setCharacterSize(16);
+    otherStatus.setPosition({barX, statusY + 22.f});
+    ctx.window.draw(otherStatus);
+  } else {
+    // Battle 模式：金币显示
+    sf::Text coinsText(ctx.font);
+    coinsText.setString("Coins: " + std::to_string(ctx.player ? ctx.player->getCoins() : 0));
+    coinsText.setCharacterSize(20);
+    coinsText.setFillColor(sf::Color::Yellow);
+    coinsText.setPosition({barX, barY + 60.f});
+    ctx.window.draw(coinsText);
+  }
   
   // 墙壁背包显示
+  float wallsY = state.isEscapeMode ? barY + 110.f : barY + 85.f;
   sf::Text wallsText(ctx.font);
   wallsText.setString("Walls: " + std::to_string(ctx.player ? ctx.player->getWallsInBag() : 0));
   wallsText.setCharacterSize(20);
   wallsText.setFillColor(sf::Color(139, 90, 43));  // 棕色
-  wallsText.setPosition({barX, barY + 85.f});
+  wallsText.setPosition({barX, wallsY});
   ctx.window.draw(wallsText);
   
   // 墙壁放置模式提示
@@ -539,13 +899,17 @@ void MultiplayerHandler::renderUI(
     bagHint.setString("Press B to place walls");
     bagHint.setCharacterSize(18);
     bagHint.setFillColor(sf::Color(150, 150, 150));
-    bagHint.setPosition({barX, barY + 110.f});
+    bagHint.setPosition({barX, wallsY + 25.f});
     ctx.window.draw(bagHint);
   }
 
   // 显示操作提示
   sf::Text controlHint(ctx.font);
-  controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | R: Activate NPC");
+  if (state.isEscapeMode) {
+    controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | F: Rescue teammate");
+  } else {
+    controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | R: Activate NPC");
+  }
   controlHint.setCharacterSize(14);
   controlHint.setFillColor(sf::Color(150, 150, 150));
   controlHint.setPosition({barX, static_cast<float>(ctx.screenHeight) - 30.f});

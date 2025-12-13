@@ -41,7 +41,13 @@ public:
 
   // 激活状态（多人模式需要手动激活，单人模式自动激活）
   bool isActivated() const { return m_activated; }
-  void activate(int team);
+  void activate(int team, int activatorId = -1);  // activatorId: 0=local, 1=other, -1=auto
+  
+  // Escape 模式：获取/设置激活者和目标优先级
+  int getActivatorId() const { return m_activatorId; }
+  void setActivatorId(int id) { m_activatorId = id; }
+  bool isPrimaryTargetDowned() const { return m_primaryTargetDowned; }
+  void setPrimaryTargetDowned(bool downed) { m_primaryTargetDowned = downed; }
   
   // 加载激活状态贴图（Color_C）
   bool loadActivatedTextures();
@@ -109,6 +115,8 @@ private:
   bool m_activated = false; // 是否被激活
   int m_team = 0;           // 阵营：0=中立，1=玩家1，2=玩家2
   int m_id = 0;             // NPC唯一ID
+  int m_activatorId = -1;   // Escape 模式：激活者 ID（0=local, 1=other, -1=自动激活）
+  bool m_primaryTargetDowned = false; // 主目标是否倒地
 
   // 多目标追踪
   std::vector<sf::Vector2f> m_targets;

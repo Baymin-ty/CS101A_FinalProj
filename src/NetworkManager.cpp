@@ -119,6 +119,7 @@ void NetworkManager::sendPosition(const PlayerState& state)
   addFloat(state.turretAngle);
   addFloat(state.health);
   data.push_back(state.reachedExit ? 1 : 0);
+  data.push_back(state.isDead ? 1 : 0);  // 添加死亡状态
 
   sendPacket(data);
 }
@@ -199,7 +200,67 @@ void NetworkManager::sendWallPlace(float x, float y)
   sendPacket(data);
 }
 
-void NetworkManager::sendNpcActivate(int npcId, int team)
+void NetworkManager::sendRescueStart()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::RescueStart));
+  sendPacket(data);
+}
+
+void NetworkManager::sendRescueProgress(float progress)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::RescueProgress));
+  
+  uint8_t* bytes = reinterpret_cast<uint8_t*>(&progress);
+  for (int i = 0; i < 4; i++)
+    data.push_back(bytes[i]);
+    
+  sendPacket(data);
+}
+
+void NetworkManager::sendRescueComplete()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::RescueComplete));
+  sendPacket(data);
+}
+
+void NetworkManager::sendRescueCancel()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::RescueCancel));
+  sendPacket(data);
+}
+
+void NetworkManager::sendPlayerReady(bool isReady)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::PlayerReady));
+  data.push_back(isReady ? 1 : 0);
+  sendPacket(data);
+}
+
+void NetworkManager::sendHostStartGame()
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::HostStartGame));
+  sendPacket(data);
+}
+
+void NetworkManager::sendNpcActivate(int npcId, int team, int activatorId)
 {
   if (!m_connected) return;
 
@@ -207,6 +268,7 @@ void NetworkManager::sendNpcActivate(int npcId, int team)
   data.push_back(static_cast<uint8_t>(NetMessageType::NpcActivate));
   data.push_back(static_cast<uint8_t>(npcId));
   data.push_back(static_cast<uint8_t>(team));
+  data.push_back(static_cast<uint8_t>(activatorId + 128));  // +128 以支持负数
   sendPacket(data);
 }
 
@@ -278,12 +340,15 @@ void NetworkManager::sendNpcDamage(int npcId, float damage)
   sendPacket(data);
 }
 
-void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData)
+void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode)
 {
   if (!m_connected) return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::MazeData));
+  
+  // 游戏模式: 0=Battle, 1=Escape
+  data.push_back(isEscapeMode ? 1 : 0);
   
   // 迷宫行数
   uint16_t rows = static_cast<uint16_t>(mazeData.size());
@@ -433,9 +498,14 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   case NetMessageType::MazeData:
   {
     // 解析迷宫数据
-    if (data.size() >= 3)
+    if (data.size() >= 4)
     {
       size_t offset = 1;
+      
+      // 读取游戏模式
+      bool isEscapeMode = (data[offset] != 0);
+      offset += 1;
+      
       uint16_t rows = data[offset] | (data[offset + 1] << 8);
       offset += 2;
       
@@ -450,6 +520,12 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
           mazeData.push_back(row);
           offset += len;
         }
+      }
+      
+      // 先设置游戏模式，再回调 MazeData
+      if (m_onGameModeReceived)
+      {
+        m_onGameModeReceived(isEscapeMode);
       }
       
       if (m_onMazeData)
@@ -479,6 +555,7 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       state.turretAngle = readFloat(13);
       state.health = readFloat(17);
       state.reachedExit = data[21] != 0;
+      state.isDead = (data.size() >= 23) ? (data[22] != 0) : false;  // 读取死亡状态
       if (m_onPlayerUpdate)
       {
         m_onPlayerUpdate(state);
@@ -508,14 +585,16 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   }
   case NetMessageType::GameResult:
   {
-    // 游戏结果 - 对方发来的结果（对方赢意味着本地输）
+    // 游戏结果 - 对方发来的是对方自己的结果（true=对方赢了, false=对方输了）
     if (data.size() >= 2)
     {
-      bool otherPlayerWon = data[1] != 0;
+      bool otherPlayerResult = data[1] != 0;
       if (m_onGameResult)
       {
-        // 对方赢 = 我输，对方输 = 我赢
-        m_onGameResult(!otherPlayerWon);
+        // 直接传递对方的结果，由回调决定如何处理
+        // Battle模式：对方输=我赢，所以回调中会取反
+        // Escape模式：队友关系，结果相同
+        m_onGameResult(otherPlayerResult);
       }
     }
     break;
@@ -532,11 +611,12 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   case NetMessageType::NpcActivate:
   {
     // NPC激活消息
-    if (data.size() >= 3 && m_onNpcActivate)
+    if (data.size() >= 4 && m_onNpcActivate)
     {
       int npcId = data[1];
       int team = data[2];
-      m_onNpcActivate(npcId, team);
+      int activatorId = static_cast<int>(data[3]) - 128;  // 还原负数
+      m_onNpcActivate(npcId, team, activatorId);
     }
     break;
   }
@@ -610,6 +690,71 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       std::memcpy(&x, &data[1], sizeof(float));
       std::memcpy(&y, &data[5], sizeof(float));
       m_onWallPlace(x, y);
+    }
+    break;
+  }
+  case NetMessageType::RescueStart:
+  {
+    if (m_onRescueStart)
+    {
+      m_onRescueStart();
+    }
+    break;
+  }
+  case NetMessageType::RescueProgress:
+  {
+    if (data.size() >= 5 && m_onRescueProgress)
+    {
+      float progress;
+      std::memcpy(&progress, &data[1], sizeof(float));
+      m_onRescueProgress(progress);
+    }
+    break;
+  }
+  case NetMessageType::RescueComplete:
+  {
+    if (m_onRescueComplete)
+    {
+      m_onRescueComplete();
+    }
+    break;
+  }
+  case NetMessageType::RescueCancel:
+  {
+    if (m_onRescueCancel)
+    {
+      m_onRescueCancel();
+    }
+    break;
+  }
+  case NetMessageType::PlayerReady:
+  {
+    if (data.size() >= 2 && m_onPlayerReady)
+    {
+      bool isReady = (data[1] != 0);
+      m_onPlayerReady(isReady);
+    }
+    break;
+  }
+  case NetMessageType::RoomInfo:
+  {
+    // 房间信息：hostIP长度(1) + hostIP + guestIP长度(1) + guestIP + guestReady(1)
+    if (data.size() >= 3 && m_onRoomInfo)
+    {
+      size_t offset = 1;
+      uint8_t hostIPLen = data[offset++];
+      std::string hostIP(data.begin() + offset, data.begin() + offset + hostIPLen);
+      offset += hostIPLen;
+      
+      uint8_t guestIPLen = data[offset++];
+      std::string guestIP;
+      if (guestIPLen > 0) {
+        guestIP = std::string(data.begin() + offset, data.begin() + offset + guestIPLen);
+        offset += guestIPLen;
+      }
+      
+      bool guestReady = (data.size() > offset) ? (data[offset] != 0) : false;
+      m_onRoomInfo(hostIP, guestIP, guestReady);
     }
     break;
   }
