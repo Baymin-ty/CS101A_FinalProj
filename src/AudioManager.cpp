@@ -29,7 +29,14 @@ bool AudioManager::init(const std::string& assetPath)
     std::cerr << "[Audio] Failed to load start.mp3" << std::endl;
     return false;
   }
-  m_bgmStart.setLooping(true);
+  m_bgmStart.setLooping(false);  // start只播放一次
+  
+  if (!m_bgmMiddle.openFromFile(assetPath + "middle.mp3"))
+  {
+    std::cerr << "[Audio] Failed to load middle.mp3" << std::endl;
+    return false;
+  }
+  m_bgmMiddle.setLooping(true);  // middle循环播放
   
   if (!m_bgmClimax.openFromFile(assetPath + "climax.mp3"))
   {
@@ -122,6 +129,9 @@ void AudioManager::playBGM(BGMType type)
       break;
     case BGMType::Start:
       m_currentBGMPlayer = &m_bgmStart;
+      break;
+    case BGMType::Middle:
+      m_currentBGMPlayer = &m_bgmMiddle;
       break;
     case BGMType::Climax:
       m_currentBGMPlayer = &m_bgmClimax;
@@ -245,6 +255,15 @@ void AudioManager::setSFXVolume(float volume)
 
 void AudioManager::update()
 {
+  // 检查 start BGM 是否播放完毕，自动切换到 middle
+  if (m_currentBGM == BGMType::Start && m_currentBGMPlayer != nullptr)
+  {
+    if (m_currentBGMPlayer->getStatus() == sf::Sound::Status::Stopped)
+    {
+      playBGM(BGMType::Middle);
+    }
+  }
+  
   // 清理已播放完的音效
   m_activeSounds.erase(
     std::remove_if(m_activeSounds.begin(), m_activeSounds.end(),

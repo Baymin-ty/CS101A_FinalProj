@@ -10,7 +10,8 @@
 enum class BGMType
 {
   Menu,    // 主菜单
-  Start,   // 游戏开始
+  Start,   // 游戏开始（只播放一次）
+  Middle,  // 游戏中段（循环播放）
   Climax   // 高潮（看到终点）
 };
 
@@ -81,6 +82,7 @@ private:
   // 背景音乐
   sf::Music m_bgmMenu;
   sf::Music m_bgmStart;
+  sf::Music m_bgmMiddle;
   sf::Music m_bgmClimax;
   sf::Music* m_currentBGMPlayer = nullptr;
   BGMType m_currentBGM = BGMType::Menu;
