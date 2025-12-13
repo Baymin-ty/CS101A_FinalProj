@@ -83,12 +83,19 @@ bool AudioManager::init(const std::string& assetPath)
   }
   m_sfxBuffers[SFXType::Bingo] = buffer;
   
-  if (!buffer.loadFromFile(assetPath + "TankWaling.mp3"))
+  if (!buffer.loadFromFile(assetPath + "chosen.mp3"))
   {
-    std::cerr << "[Audio] Failed to load TankWaling.mp3" << std::endl;
+    std::cerr << "[Audio] Failed to load chosen.mp3" << std::endl;
     return false;
   }
-  m_sfxBuffers[SFXType::TankWalking] = buffer;
+  m_sfxBuffers[SFXType::MenuSelect] = buffer;
+  
+  if (!buffer.loadFromFile(assetPath + "confirm.mp3"))
+  {
+    std::cerr << "[Audio] Failed to load confirm.mp3" << std::endl;
+    return false;
+  }
+  m_sfxBuffers[SFXType::MenuConfirm] = buffer;
   
   m_initialized = true;
   std::cout << "[Audio] Audio system initialized successfully" << std::endl;
@@ -246,6 +253,23 @@ void AudioManager::update()
       }),
     m_activeSounds.end()
   );
+}
+
+void AudioManager::stopAllSFX()
+{
+  // 停止并清空所有活跃音效
+  for (auto& sound : m_activeSounds)
+  {
+    sound->stop();
+  }
+  m_activeSounds.clear();
+  
+  // 停止所有循环音效
+  for (auto& [type, sound] : m_loopSounds)
+  {
+    sound->stop();
+  }
+  m_loopSounds.clear();
 }
 
 void AudioManager::pauseAll()

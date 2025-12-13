@@ -23,7 +23,8 @@ enum class SFXType
   Explode,             // 爆炸（坦克死亡/红色墙爆炸）
   CollectCoins,        // 收集金币（黄色墙被打掉）
   Bingo,               // 蓝色治疗墙被打掉
-  TankWalking          // 坦克移动
+  MenuSelect,          // 菜单选项切换
+  MenuConfirm          // 菜单确认
 };
 
 class AudioManager
@@ -60,6 +61,9 @@ public:
   
   // 更新（清理已播放完的音效）
   void update();
+  
+  // 停止所有音效（重启游戏时调用）
+  void stopAllSFX();
   
   // 暂停/恢复所有音频
   void pauseAll();

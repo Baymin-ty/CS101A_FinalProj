@@ -124,6 +124,9 @@ void Game::generateRandomMaze()
 
 void Game::startGame()
 {
+  // 停止所有残留音效
+  AudioManager::getInstance().stopAllSFX();
+
   // 生成随机地图
   generateRandomMaze();
 
@@ -136,6 +139,9 @@ void Game::startGame()
 
   // 设置玩家到起点
   m_player->setPosition(m_maze.getStartPosition());
+
+  // 清空子弹
+  m_bullets.clear();
 
   // 在指定位置生成敌人
   spawnEnemies();
@@ -317,6 +323,7 @@ void Game::processMenuEvents(const sf::Event &event)
       int current = static_cast<int>(m_selectedOption);
       current = (current - 1 + optionCount) % optionCount;
       m_selectedOption = static_cast<MenuOption>(current);
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
     case sf::Keyboard::Key::Down:
@@ -325,6 +332,7 @@ void Game::processMenuEvents(const sf::Event &event)
       int current = static_cast<int>(m_selectedOption);
       current = (current + 1) % optionCount;
       m_selectedOption = static_cast<MenuOption>(current);
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
     case sf::Keyboard::Key::Enter:
@@ -332,23 +340,22 @@ void Game::processMenuEvents(const sf::Event &event)
       switch (m_selectedOption)
       {
       case MenuOption::StartGame:
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
         startGame();
         break;
       case MenuOption::Multiplayer:
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
         m_gameState = GameState::Connecting;
         m_inputText = m_serverIP;
         m_inputMode = InputMode::ServerIP;
         break;
       case MenuOption::MapWidth:
-        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
-        break;
       case MenuOption::MapHeight:
-        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
-        break;
       case MenuOption::EnemyCount:
-        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        // 这些选项用左右键调整，Enter不做任何事
         break;
       case MenuOption::Exit:
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
         m_window.close();
         break;
       default:
@@ -361,12 +368,15 @@ void Game::processMenuEvents(const sf::Event &event)
       {
       case MenuOption::MapWidth:
         m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MenuOption::MapHeight:
         m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MenuOption::EnemyCount:
         m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
@@ -378,12 +388,15 @@ void Game::processMenuEvents(const sf::Event &event)
       {
       case MenuOption::MapWidth:
         m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MenuOption::MapHeight:
         m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MenuOption::EnemyCount:
         m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
