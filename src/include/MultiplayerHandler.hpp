@@ -42,6 +42,7 @@ struct MultiplayerContext
   unsigned int screenWidth;
   unsigned int screenHeight;
   float tankScale;
+  bool placementMode;  // 墙壁放置模式
 };
 
 // 多人模式处理器

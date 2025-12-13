@@ -320,6 +320,73 @@ void MultiplayerHandler::renderMultiplayer(
   // 渲染迷宫
   ctx.maze.render(ctx.window);
 
+  // 如果处于放置模式，绘制预览
+  if (ctx.placementMode && ctx.player && ctx.player->getWallsInBag() > 0)
+  {
+    // 获取鼠标在世界坐标中的位置
+    sf::Vector2i mousePixelPos = sf::Mouse::getPosition(ctx.window);
+    sf::Vector2f mouseWorldPos = ctx.window.mapPixelToCoords(mousePixelPos, ctx.gameView);
+    
+    // 获取对应的格子位置
+    GridPos grid = ctx.maze.worldToGrid(mouseWorldPos);
+    sf::Vector2f gridCenter = ctx.maze.gridToWorld(grid);
+    
+    // 检查是否有坦克在该位置
+    bool hasTankAtPos = false;
+    float checkRadius = ctx.maze.getTileSize() * 0.7f;
+    
+    // 检查玩家
+    if (ctx.player)
+    {
+      float dist = std::hypot(ctx.player->getPosition().x - gridCenter.x, ctx.player->getPosition().y - gridCenter.y);
+      if (dist < checkRadius)
+        hasTankAtPos = true;
+    }
+    // 检查另一个玩家
+    if (!hasTankAtPos && ctx.otherPlayer)
+    {
+      float dist = std::hypot(ctx.otherPlayer->getPosition().x - gridCenter.x, ctx.otherPlayer->getPosition().y - gridCenter.y);
+      if (dist < checkRadius)
+        hasTankAtPos = true;
+    }
+    // 检查NPC
+    if (!hasTankAtPos)
+    {
+      for (const auto& enemy : ctx.enemies)
+      {
+        if (!enemy->isDead())
+        {
+          float dist = std::hypot(enemy->getPosition().x - gridCenter.x, enemy->getPosition().y - gridCenter.y);
+          if (dist < checkRadius)
+          {
+            hasTankAtPos = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // 绘制预览方块
+    float tileSize = ctx.maze.getTileSize();
+    sf::RectangleShape preview({tileSize - 4.f, tileSize - 4.f});
+    preview.setPosition({gridCenter.x - (tileSize - 4.f) / 2.f, gridCenter.y - (tileSize - 4.f) / 2.f});
+    
+    if (!hasTankAtPos && ctx.maze.canPlaceWall(mouseWorldPos))
+    {
+      // 可放置：绿色半透明
+      preview.setFillColor(sf::Color(100, 200, 100, 150));
+      preview.setOutlineColor(sf::Color(50, 150, 50, 200));
+    }
+    else
+    {
+      // 不可放置：红色半透明
+      preview.setFillColor(sf::Color(200, 100, 100, 150));
+      preview.setOutlineColor(sf::Color(150, 50, 50, 200));
+    }
+    preview.setOutlineThickness(2.f);
+    ctx.window.draw(preview);
+  }
+
   // 渲染终点
   sf::Vector2f exitPos = ctx.maze.getExitPosition();
   sf::RectangleShape exitMarker({TILE_SIZE * 0.8f, TILE_SIZE * 0.8f});
@@ -453,6 +520,28 @@ void MultiplayerHandler::renderUI(
   wallsText.setFillColor(sf::Color(139, 90, 43));  // 棕色
   wallsText.setPosition({barX, barY + 85.f});
   ctx.window.draw(wallsText);
+  
+  // 墙壁放置模式提示
+  if (ctx.placementMode)
+  {
+    sf::Text placeHint(ctx.font);
+    placeHint.setString("[PLACEMENT MODE] Click to place wall, B to cancel");
+    placeHint.setCharacterSize(20);
+    placeHint.setFillColor(sf::Color::Yellow);
+    sf::FloatRect hintBounds = placeHint.getLocalBounds();
+    placeHint.setPosition({(static_cast<float>(ctx.screenWidth) - hintBounds.size.x) / 2.f, 20.f});
+    ctx.window.draw(placeHint);
+  }
+  else if (ctx.player && ctx.player->getWallsInBag() > 0)
+  {
+    // 提示可以按B进入放置模式
+    sf::Text bagHint(ctx.font);
+    bagHint.setString("Press B to place walls");
+    bagHint.setCharacterSize(18);
+    bagHint.setFillColor(sf::Color(150, 150, 150));
+    bagHint.setPosition({barX, barY + 110.f});
+    ctx.window.draw(bagHint);
+  }
 
   // 显示操作提示
   sf::Text controlHint(ctx.font);

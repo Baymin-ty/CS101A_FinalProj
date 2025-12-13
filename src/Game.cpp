@@ -1889,7 +1889,8 @@ MultiplayerContext Game::getMultiplayerContext()
       m_maze,
       LOGICAL_WIDTH,  // 使用逻辑分辨率
       LOGICAL_HEIGHT, // 使用逻辑分辨率
-      m_tankScale};
+      m_tankScale,
+      m_placementMode};
 }
 
 void Game::updateMultiplayer(float dt)

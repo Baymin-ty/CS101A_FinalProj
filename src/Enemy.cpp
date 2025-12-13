@@ -285,8 +285,11 @@ void Enemy::update(float dt, const Maze &maze)
   // 选择最佳目标和射击策略
   m_hasValidTarget = false;
   sf::Vector2f bestTarget = m_targetPos;
-  int bestLOS = 2; // 默认假设最差情况（不可拆墙阻挡）
+  int bestBulletPath = 2; // 默认假设最差情况（不可拆墙阻挡）
   float bestDist = 999999.f;
+
+  // 获取枪口位置（子弹实际发射位置）
+  sf::Vector2f gunPos = getGunPosition();
 
   // 如果有多个目标，选择最容易攻击的
   std::vector<sf::Vector2f> allTargets = m_targets;
@@ -299,53 +302,76 @@ void Enemy::update(float dt, const Maze &maze)
   {
     sf::Vector2f toTarget = target - m_hull->getPosition();
     float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
-    int los = maze.checkLineOfSight(m_hull->getPosition(), target);
+    
+    // 先让炮塔朝向目标，计算枪口位置
+    float angle = Utils::getAngle(m_hull->getPosition(), target);
+    float angleRad = (angle - 90.f) * Utils::PI / 180.f;
+    sf::Vector2f testGunPos = m_hull->getPosition() + sf::Vector2f{std::cos(angleRad) * m_gunLength, std::sin(angleRad) * m_gunLength};
+    
+    // 使用精确的子弹路径检测
+    int bulletPath = maze.checkBulletPath(testGunPos, target);
 
     // 优先选择：无阻挡 > 可拆墙 > 不可拆墙，距离作为次要因素
-    if (los < bestLOS || (los == bestLOS && dist < bestDist))
+    if (bulletPath < bestBulletPath || (bulletPath == bestBulletPath && dist < bestDist))
     {
-      bestLOS = los;
+      bestBulletPath = bulletPath;
       bestDist = dist;
       bestTarget = target;
     }
   }
 
-  m_lastLineOfSightResult = bestLOS;
+  m_lastLineOfSightResult = bestBulletPath;
 
-  // 根据视线检测结果决定射击目标
-  if (bestLOS == 0)
+  // 根据子弹路径检测结果决定射击目标
+  if (bestBulletPath == 0)
   {
     // 无阻挡，直接瞄准目标
     m_shootTarget = bestTarget;
     m_hasValidTarget = true;
   }
-  else if (bestLOS == 1)
+  else if (bestBulletPath == 1)
   {
-    // 有可拆墙阻挡，瞄准可拆墙
-    m_shootTarget = maze.getFirstBlockedPosition(m_hull->getPosition(), bestTarget);
-    m_hasValidTarget = true;
+    // 子弹会先命中可破坏墙
+    // 但是如果有普通路径可以绕过去，且绕路不会太长，就不要打墙
+    // 只有当没有普通路径，或者智能路径明显更短时才打墙
+    if (m_hasDestructibleWallOnPath)
+    {
+      // 当前正在使用智能路径（穿墙路径更优），射击阻挡的墙
+      m_shootTarget = maze.getFirstBlockedPosition(gunPos, bestTarget);
+      m_hasValidTarget = true;
+    }
+    else
+    {
+      // 当前使用普通路径（绕路更优），不要射击墙，继续移动
+      m_hasValidTarget = false;
+    }
   }
   else
   {
-    // 不可拆墙阻挡
+    // 子弹会先命中不可破坏墙，不能射击这个方向
     // 检查是否有智能路径上的可破坏墙可以攻击
     if (m_hasDestructibleWallOnPath)
     {
-      // 检查是否能看到智能路径上的可破坏墙
-      int losToWall = maze.checkLineOfSight(m_hull->getPosition(), m_destructibleWallTarget);
-      if (losToWall != 2) // 不是被不可破坏墙完全挡住
+      // 计算朝向智能路径目标墙的枪口位置
+      float wallAngle = Utils::getAngle(m_hull->getPosition(), m_destructibleWallTarget);
+      float wallAngleRad = (wallAngle - 90.f) * Utils::PI / 180.f;
+      sf::Vector2f wallGunPos = m_hull->getPosition() + sf::Vector2f{std::cos(wallAngleRad) * m_gunLength, std::sin(wallAngleRad) * m_gunLength};
+      
+      // 检查子弹是否能打到智能路径上的可破坏墙
+      int bulletToWall = maze.checkBulletPath(wallGunPos, m_destructibleWallTarget);
+      if (bulletToWall != 2) // 不会被不可破坏墙挡住
       {
         // 可以攻击智能路径上的可破坏墙
-        if (losToWall == 0)
+        if (bulletToWall == 0)
         {
-          // 可以直接看到目标墙
+          // 可以直接打到目标墙
           m_shootTarget = m_destructibleWallTarget;
           m_hasValidTarget = true;
         }
         else
         {
-          // 中间还有其他可破坏墙，攻击第一个
-          m_shootTarget = maze.getFirstBlockedPosition(m_hull->getPosition(), m_destructibleWallTarget);
+          // 会先打到其他可破坏墙
+          m_shootTarget = maze.getFirstBlockedPosition(wallGunPos, m_destructibleWallTarget);
           m_hasValidTarget = true;
         }
       }

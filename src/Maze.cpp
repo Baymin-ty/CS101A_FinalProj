@@ -546,7 +546,7 @@ bool Maze::isDestructibleWall(int row, int col) const
 Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vector2f target, float destructibleCost) const
 {
   PathResult result;
-  
+
   GridPos startGrid = worldToGrid(start);
   GridPos targetGrid = worldToGrid(target);
 
@@ -555,7 +555,7 @@ Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vecto
   {
     return result;
   }
-  
+
   // 终点如果是不可破坏墙则无法到达
   if (targetGrid.y >= 0 && targetGrid.y < m_rows && targetGrid.x >= 0 && targetGrid.x < m_cols)
   {
@@ -600,7 +600,7 @@ Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vecto
       // 重建路径并查找第一个可破坏墙
       std::vector<sf::Vector2f> path;
       GridPos curr = targetGrid;
-      
+
       // 先收集所有路径点（从终点到起点）
       std::vector<GridPos> gridPath;
       while (curr != startGrid)
@@ -608,15 +608,15 @@ Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vecto
         gridPath.push_back(curr);
         curr = cameFrom[curr];
       }
-      
+
       // 反转得到从起点到终点的顺序
       std::reverse(gridPath.begin(), gridPath.end());
-      
+
       // 转换为世界坐标并查找第一个可破坏墙
-      for (const auto& gridPos : gridPath)
+      for (const auto &gridPos : gridPath)
       {
         path.push_back(gridToWorld(gridPos));
-        
+
         // 检查是否是可破坏墙（且还没找到第一个）
         if (!result.hasDestructibleWall && isDestructibleWall(gridPos.y, gridPos.x))
         {
@@ -625,7 +625,7 @@ Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vecto
           result.firstDestructibleWallGrid = gridPos;
         }
       }
-      
+
       result.path = path;
       return result;
     }
@@ -644,7 +644,7 @@ Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vecto
         continue;
 
       WallType neighborType = m_walls[neighbor.y][neighbor.x].type;
-      
+
       // 不可破坏墙不能通过
       if (neighborType == WallType::Solid)
         continue;
@@ -720,6 +720,63 @@ int Maze::checkLineOfSight(sf::Vector2f start, sf::Vector2f end) const
       err += dx;
       y0 += sy;
     }
+  }
+
+  return result;
+}
+
+int Maze::checkBulletPath(sf::Vector2f start, sf::Vector2f target) const
+{
+  // 使用射线步进法更精确地检测子弹路径
+  // 每次步进一小段距离，检查是否碰到墙壁
+
+  sf::Vector2f direction = target - start;
+  float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+
+  if (distance < 1.f)
+    return 0; // 起点和终点太近
+
+  // 归一化方向
+  direction /= distance;
+
+  // 步进大小（小于格子大小的一半，确保不会跳过墙壁）
+  const float stepSize = m_tileSize * 0.3f;
+  int steps = static_cast<int>(distance / stepSize) + 1;
+
+  int result = 0; // 默认无阻挡
+
+  for (int i = 1; i <= steps; ++i)
+  {
+    float t = std::min(static_cast<float>(i) * stepSize, distance);
+    sf::Vector2f checkPos = start + direction * t;
+
+    GridPos grid = worldToGrid(checkPos);
+
+    // 边界检查
+    if (grid.y < 0 || grid.y >= m_rows || grid.x < 0 || grid.x >= m_cols)
+      continue;
+
+    WallType type = m_walls[grid.y][grid.x].type;
+
+    if (type == WallType::Solid)
+    {
+      return 2; // 会先命中不可破坏墙
+    }
+    else if (type == WallType::Destructible)
+    {
+      if (result == 0)
+      {
+        result = 1; // 记录会命中可破坏墙，但继续检查后面是否有不可破坏墙
+      }
+      // 一旦碰到可破坏墙，子弹就会停止，所以后面的墙不会被击中
+      return result;
+    }
+
+    // 检查是否已经到达目标附近
+    float remainDist = std::sqrt((target.x - checkPos.x) * (target.x - checkPos.x) +
+                                 (target.y - checkPos.y) * (target.y - checkPos.y));
+    if (remainDist < stepSize)
+      break;
   }
 
   return result;

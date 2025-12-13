@@ -154,6 +154,11 @@ public:
   // 返回值：0 = 无阻挡, 1 = 有可拆墙阻挡, 2 = 有不可拆墙阻挡
   int checkLineOfSight(sf::Vector2f start, sf::Vector2f end) const;
   
+  // 精确射击检测：检查子弹从 start 射向 target 是否能命中
+  // 返回值：0 = 可以命中, 1 = 会先命中可破坏墙, 2 = 会先命中不可破坏墙
+  // 这个函数使用更细的步进来模拟子弹轨迹
+  int checkBulletPath(sf::Vector2f start, sf::Vector2f target) const;
+  
   // 获取视线方向上第一个被阻挡的位置（用于判断是否应该攻击可拆墙）
   sf::Vector2f getFirstBlockedPosition(sf::Vector2f start, sf::Vector2f end) const;
   
