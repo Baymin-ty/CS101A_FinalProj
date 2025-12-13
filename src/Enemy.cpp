@@ -156,20 +156,29 @@ void Enemy::update(float dt, const Maze &maze)
     m_moveDirection = toTarget / distToTarget; // 归一化
   }
 
-  // 如果接近玩家，保持距离
+  // 计算到玩家的距离
   sf::Vector2f toPlayer = m_targetPos - oldPos;
   float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
-
-  if (distToPlayer < 80.f)
+  
+  // 先进行视线检测，确定是否有直接视线到玩家
+  // 使用 m_lastLineOfSightResult 作为缓存（每次路径更新时刷新）
+  int losToPlayer = m_lastLineOfSightResult;
+  
+  // 只有在有直接视线（无墙阻挡）的情况下才保持距离
+  if (losToPlayer == 0)
   {
-    // 太近了，后退
-    m_moveDirection = -toPlayer / distToPlayer;
+    if (distToPlayer < 80.f)
+    {
+      // 太近了，后退
+      m_moveDirection = -toPlayer / distToPlayer;
+    }
+    else if (distToPlayer < 120.f && distToPlayer > 80.f)
+    {
+      // 在合适距离，横向移动
+      m_moveDirection = {-toPlayer.y / distToPlayer, toPlayer.x / distToPlayer};
+    }
   }
-  else if (distToPlayer < 120.f && distToPlayer > 80.f)
-  {
-    // 在合适距离，横向移动
-    m_moveDirection = {-toPlayer.y / distToPlayer, toPlayer.x / distToPlayer};
-  }
+  // 如果有墙阻挡（losToPlayer != 0），继续沿A*路径移动
 
   // 移动
   sf::Vector2f movement = m_moveDirection * m_moveSpeed * dt;
