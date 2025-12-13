@@ -1323,6 +1323,7 @@ void Game::processConnectingEvents(const sf::Event &event)
         m_serverIP = m_inputText;
         if (NetworkManager::getInstance().connect(m_serverIP, 9999))
         {
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
           m_mpState.connectionStatus = "Connected! Enter room code or press C to create:";
           m_inputMode = InputMode::RoomCode;
           m_inputText = "";
@@ -1335,6 +1336,7 @@ void Game::processConnectingEvents(const sf::Event &event)
       case InputMode::RoomCode:
         if (!m_inputText.empty())
         {
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
           NetworkManager::getInstance().joinRoom(m_inputText);
         }
         break;
@@ -1348,6 +1350,7 @@ void Game::processConnectingEvents(const sf::Event &event)
         m_inputMode == InputMode::RoomCode &&
         NetworkManager::getInstance().isConnected())
     {
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
       NetworkManager::getInstance().createRoom(m_mazeWidth, m_mazeHeight);
     }
 
