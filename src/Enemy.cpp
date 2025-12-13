@@ -117,10 +117,59 @@ void Enemy::update(float dt, const Maze &maze)
   // 保存旧位置
   sf::Vector2f oldPos = m_hull->getPosition();
 
-  // 定期更新 A* 路径
+  // 定期更新路径（使用智能路径，考虑可破坏墙）
   if (m_pathUpdateClock.getElapsedTime().asSeconds() > m_pathUpdateInterval || m_path.empty())
   {
-    m_path = maze.findPath(oldPos, m_targetPos);
+    // 首先尝试普通路径
+    auto normalPath = maze.findPath(oldPos, m_targetPos);
+
+    // 然后尝试穿过可破坏墙的路径
+    auto smartPathResult = maze.findPathThroughDestructible(oldPos, m_targetPos, 3.0f);
+
+    // 比较两条路径，选择更优的
+    // 如果智能路径明显更短（考虑到可破坏墙的额外代价），则使用智能路径
+    bool useSmartPath = false;
+
+    if (!smartPathResult.path.empty())
+    {
+      if (normalPath.empty())
+      {
+        // 普通路径找不到，使用智能路径
+        useSmartPath = true;
+      }
+      else if (smartPathResult.hasDestructibleWall)
+      {
+        // 如果智能路径穿过可破坏墙，比较实际长度
+        // 智能路径需要比普通路径短很多才值得（因为需要花时间打墙）
+        float normalLen = static_cast<float>(normalPath.size());
+        float smartLen = static_cast<float>(smartPathResult.path.size());
+
+        // 如果智能路径比普通路径短50%以上，使用智能路径
+        if (smartLen < normalLen * 0.5f)
+        {
+          useSmartPath = true;
+        }
+      }
+      else
+      {
+        // 智能路径没有可破坏墙，且不为空，说明和普通路径一样
+        useSmartPath = false;
+      }
+    }
+
+    if (useSmartPath)
+    {
+      m_path = smartPathResult.path;
+      m_hasDestructibleWallOnPath = smartPathResult.hasDestructibleWall;
+      m_destructibleWallTarget = smartPathResult.firstDestructibleWallPos;
+    }
+    else
+    {
+      m_path = normalPath;
+      m_hasDestructibleWallOnPath = false;
+      m_destructibleWallTarget = {0.f, 0.f};
+    }
+
     m_currentPathIndex = 0;
     m_pathUpdateClock.restart();
   }
@@ -159,11 +208,11 @@ void Enemy::update(float dt, const Maze &maze)
   // 计算到玩家的距离
   sf::Vector2f toPlayer = m_targetPos - oldPos;
   float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
-  
+
   // 先进行视线检测，确定是否有直接视线到玩家
   // 使用 m_lastLineOfSightResult 作为缓存（每次路径更新时刷新）
   int losToPlayer = m_lastLineOfSightResult;
-  
+
   // 只有在有直接视线（无墙阻挡）的情况下才保持距离
   if (losToPlayer == 0)
   {
@@ -278,8 +327,31 @@ void Enemy::update(float dt, const Maze &maze)
   }
   else
   {
-    // 不可拆墙阻挡，不射击，继续移动寻找更好的位置
-    m_hasValidTarget = false;
+    // 不可拆墙阻挡
+    // 检查是否有智能路径上的可破坏墙可以攻击
+    if (m_hasDestructibleWallOnPath)
+    {
+      // 检查是否能看到智能路径上的可破坏墙
+      int losToWall = maze.checkLineOfSight(m_hull->getPosition(), m_destructibleWallTarget);
+      if (losToWall != 2) // 不是被不可破坏墙完全挡住
+      {
+        // 可以攻击智能路径上的可破坏墙
+        if (losToWall == 0)
+        {
+          // 可以直接看到目标墙
+          m_shootTarget = m_destructibleWallTarget;
+          m_hasValidTarget = true;
+        }
+        else
+        {
+          // 中间还有其他可破坏墙，攻击第一个
+          m_shootTarget = maze.getFirstBlockedPosition(m_hull->getPosition(), m_destructibleWallTarget);
+          m_hasValidTarget = true;
+        }
+      }
+    }
+
+    // 如果还是没有有效目标，不射击，继续移动寻找更好的位置
   }
 
   // 炮塔朝向射击目标（如果有有效目标）

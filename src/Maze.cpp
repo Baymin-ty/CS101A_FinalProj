@@ -536,6 +536,141 @@ std::vector<sf::Vector2f> Maze::findPath(sf::Vector2f start, sf::Vector2f target
   return {};
 }
 
+bool Maze::isDestructibleWall(int row, int col) const
+{
+  if (row < 0 || row >= m_rows || col < 0 || col >= m_cols)
+    return false;
+  return m_walls[row][col].type == WallType::Destructible;
+}
+
+Maze::PathResult Maze::findPathThroughDestructible(sf::Vector2f start, sf::Vector2f target, float destructibleCost) const
+{
+  PathResult result;
+  
+  GridPos startGrid = worldToGrid(start);
+  GridPos targetGrid = worldToGrid(target);
+
+  // 检查起点和终点是否有效（起点必须可通行，终点可以是空地或可破坏墙）
+  if (!isWalkable(startGrid.y, startGrid.x))
+  {
+    return result;
+  }
+  
+  // 终点如果是不可破坏墙则无法到达
+  if (targetGrid.y >= 0 && targetGrid.y < m_rows && targetGrid.x >= 0 && targetGrid.x < m_cols)
+  {
+    if (m_walls[targetGrid.y][targetGrid.x].type == WallType::Solid)
+    {
+      return result;
+    }
+  }
+
+  // A* 算法（将可破坏墙视为高代价但可通行）
+  auto heuristic = [](GridPos a, GridPos b) -> float
+  {
+    return static_cast<float>(std::abs(a.x - b.x) + std::abs(a.y - b.y));
+  };
+
+  struct Node
+  {
+    GridPos pos;
+    float gCost;
+    float fCost;
+
+    bool operator>(const Node &other) const { return fCost > other.fCost; }
+  };
+
+  std::priority_queue<Node, std::vector<Node>, std::greater<Node>> openSet;
+  std::unordered_map<GridPos, GridPos, GridPosHash> cameFrom;
+  std::unordered_map<GridPos, float, GridPosHash> gScore;
+
+  openSet.push({startGrid, 0.f, heuristic(startGrid, targetGrid)});
+  gScore[startGrid] = 0.f;
+
+  const int dx[] = {0, 1, 0, -1};
+  const int dy[] = {-1, 0, 1, 0};
+
+  while (!openSet.empty())
+  {
+    Node current = openSet.top();
+    openSet.pop();
+
+    if (current.pos == targetGrid)
+    {
+      // 重建路径并查找第一个可破坏墙
+      std::vector<sf::Vector2f> path;
+      GridPos curr = targetGrid;
+      
+      // 先收集所有路径点（从终点到起点）
+      std::vector<GridPos> gridPath;
+      while (curr != startGrid)
+      {
+        gridPath.push_back(curr);
+        curr = cameFrom[curr];
+      }
+      
+      // 反转得到从起点到终点的顺序
+      std::reverse(gridPath.begin(), gridPath.end());
+      
+      // 转换为世界坐标并查找第一个可破坏墙
+      for (const auto& gridPos : gridPath)
+      {
+        path.push_back(gridToWorld(gridPos));
+        
+        // 检查是否是可破坏墙（且还没找到第一个）
+        if (!result.hasDestructibleWall && isDestructibleWall(gridPos.y, gridPos.x))
+        {
+          result.hasDestructibleWall = true;
+          result.firstDestructibleWallPos = gridToWorld(gridPos);
+          result.firstDestructibleWallGrid = gridPos;
+        }
+      }
+      
+      result.path = path;
+      return result;
+    }
+
+    if (gScore.count(current.pos) && current.gCost > gScore[current.pos])
+    {
+      continue;
+    }
+
+    for (int i = 0; i < 4; ++i)
+    {
+      GridPos neighbor = {current.pos.x + dx[i], current.pos.y + dy[i]};
+
+      // 边界检查
+      if (neighbor.y < 0 || neighbor.y >= m_rows || neighbor.x < 0 || neighbor.x >= m_cols)
+        continue;
+
+      WallType neighborType = m_walls[neighbor.y][neighbor.x].type;
+      
+      // 不可破坏墙不能通过
+      if (neighborType == WallType::Solid)
+        continue;
+
+      // 计算移动代价：空地/出口=1，可破坏墙=destructibleCost
+      float moveCost = 1.f;
+      if (neighborType == WallType::Destructible)
+      {
+        moveCost = destructibleCost;
+      }
+
+      float tentativeG = current.gCost + moveCost;
+
+      if (!gScore.count(neighbor) || tentativeG < gScore[neighbor])
+      {
+        cameFrom[neighbor] = current.pos;
+        gScore[neighbor] = tentativeG;
+        float fCost = tentativeG + heuristic(neighbor, targetGrid);
+        openSet.push({neighbor, tentativeG, fCost});
+      }
+    }
+  }
+
+  return result; // 空路径
+}
+
 int Maze::checkLineOfSight(sf::Vector2f start, sf::Vector2f end) const
 {
   // 使用 Bresenham 线段算法检查视线

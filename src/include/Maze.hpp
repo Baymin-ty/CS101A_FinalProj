@@ -127,6 +127,19 @@ public:
 
   // A* 寻路：返回从 start 到 target 的路径（世界坐标点列表）
   std::vector<sf::Vector2f> findPath(sf::Vector2f start, sf::Vector2f target) const;
+  
+  // A* 寻路（考虑可破坏墙）：将可破坏墙视为可通行但代价较高
+  // 返回路径和路径上第一个可破坏墙的位置（如果有）
+  struct PathResult {
+    std::vector<sf::Vector2f> path;
+    bool hasDestructibleWall = false;
+    sf::Vector2f firstDestructibleWallPos = {0, 0};
+    GridPos firstDestructibleWallGrid = {-1, -1};
+  };
+  PathResult findPathThroughDestructible(sf::Vector2f start, sf::Vector2f target, float destructibleCost = 3.0f) const;
+  
+  // 检查某个格子是否是可破坏墙
+  bool isDestructibleWall(int row, int col) const;
 
   // 检查某个网格是否可通行
   bool isWalkable(int row, int col) const;

@@ -97,6 +97,10 @@ private:
   size_t m_currentPathIndex = 0;
   sf::Clock m_pathUpdateClock;
   const float m_pathUpdateInterval = 0.5f; // 每0.5秒更新路径
+  
+  // 智能路径（考虑可破坏墙）
+  bool m_hasDestructibleWallOnPath = false;
+  sf::Vector2f m_destructibleWallTarget = {0.f, 0.f};  // 路径上第一个可破坏墙的位置
 
   float m_hullAngle = 0.f;
   sf::Clock m_shootClock;
