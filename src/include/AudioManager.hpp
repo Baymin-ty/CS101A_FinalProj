@@ -24,6 +24,7 @@ enum class SFXType
   Explode,             // 爆炸（坦克死亡/红色墙爆炸）
   CollectCoins,        // 收集金币（黄色墙被打掉）
   Bingo,               // 蓝色治疗墙被打掉
+  WallBroken,          // 棕色墙被打爆
   MenuSelect,          // 菜单选项切换
   MenuConfirm          // 菜单确认
 };

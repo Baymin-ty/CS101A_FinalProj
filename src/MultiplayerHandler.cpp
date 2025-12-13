@@ -183,7 +183,7 @@ void MultiplayerHandler::update(
         sf::Vector2f toPlayer = ctx.player->getPosition() - npc->getPosition();
         float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
         
-        if (dist < 450.f) {
+        if (dist < 600.f) {
           // 本地玩家触发激活
           int activatorId = state.isHost ? 0 : 1;  // 房主=0, 非房主=1
           

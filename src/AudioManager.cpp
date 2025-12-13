@@ -90,6 +90,13 @@ bool AudioManager::init(const std::string& assetPath)
   }
   m_sfxBuffers[SFXType::Bingo] = buffer;
   
+  if (!buffer.loadFromFile(assetPath + "wallBroken.mp3"))
+  {
+    std::cerr << "[Audio] Failed to load wallBroken.mp3" << std::endl;
+    return false;
+  }
+  m_sfxBuffers[SFXType::WallBroken] = buffer;
+  
   if (!buffer.loadFromFile(assetPath + "chosen.mp3"))
   {
     std::cerr << "[Audio] Failed to load chosen.mp3" << std::endl;

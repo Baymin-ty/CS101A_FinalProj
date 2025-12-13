@@ -39,6 +39,8 @@ void CollisionSystem::handleWallDestroyEffect(const WallDestroyResult &result, T
   case WallAttribute::None:
     // 棕色墙：收集到背包
     shooter->addWallToBag();
+    // 播放墙被打爆音效
+    AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
     break;
 
   default:

@@ -478,14 +478,14 @@ bool Enemy::isPlayerInRange(sf::Vector2f playerPos) const
 
 void Enemy::checkAutoActivation(sf::Vector2f playerPos)
 {
-  // 单人模式使用：距离450内自动激活
+  // 单人模式使用：距离600内自动激活
   if (m_activated)
     return;
 
   sf::Vector2f toPlayer = playerPos - getPosition();
   float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y);
 
-  if (dist < 450.f)
+  if (dist < 600.f)
   {
     m_activated = true;
     m_team = 0; // 单人模式中敌人没有阵营，攻击玩家
