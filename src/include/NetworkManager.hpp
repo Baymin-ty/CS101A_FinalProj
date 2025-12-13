@@ -40,6 +40,9 @@ enum class NetMessageType : uint8_t
   NpcShoot,      // NPC射击
   NpcDamage,     // NPC受伤
   
+  // 墙壁放置同步
+  WallPlace,     // 放置墙壁
+  
   // 音乐同步
   ClimaxStart,   // 开始播放高潮BGM
   
@@ -88,6 +91,7 @@ using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
 using OnPlayerLeftCallback = std::function<void(bool becameHost)>;
 using OnClimaxStartCallback = std::function<void()>;
+using OnWallPlaceCallback = std::function<void(float x, float y)>;
 
 class NetworkManager
 {
@@ -123,6 +127,9 @@ public:
   void sendNpcShoot(int npcId, float x, float y, float angle);  // 发送NPC射击
   void sendNpcDamage(int npcId, float damage);  // 发送NPC受伤
   void sendClimaxStart();  // 发送开始播放高潮BGM
+  
+  // 墙壁放置同步
+  void sendWallPlace(float x, float y);  // 发送墙壁放置
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -146,6 +153,7 @@ public:
   void setOnNpcDamage(OnNpcDamageCallback cb) { m_onNpcDamage = cb; }
   void setOnPlayerLeft(OnPlayerLeftCallback cb) { m_onPlayerLeft = cb; }
   void setOnClimaxStart(OnClimaxStartCallback cb) { m_onClimaxStart = cb; }
+  void setOnWallPlace(OnWallPlaceCallback cb) { m_onWallPlace = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -183,4 +191,5 @@ private:
   OnNpcDamageCallback m_onNpcDamage;
   OnPlayerLeftCallback m_onPlayerLeft;
   OnClimaxStartCallback m_onClimaxStart;
+  OnWallPlaceCallback m_onWallPlace;
 };

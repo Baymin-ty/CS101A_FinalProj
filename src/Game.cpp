@@ -150,6 +150,7 @@ void Game::startGame()
   m_gameOver = false;
   m_gameWon = false;
   m_exitVisible = false;  // 重置终点可见状态
+  m_placementMode = false;  // 重置放置模式
   
   // 播放游戏开始BGM
   AudioManager::getInstance().playBGM(BGMType::Start);
@@ -178,6 +179,7 @@ void Game::resetGame()
   m_gameState = GameState::MainMenu;
   m_gameOver = false;
   m_gameWon = false;
+  m_placementMode = false;  // 重置放置模式
   m_mpState.multiplayerWin = false;
   m_enemies.clear();
   m_bullets.clear();
@@ -262,6 +264,7 @@ void Game::run()
     switch (m_gameState)
     {
     case GameState::MainMenu:
+    case GameState::ModeSelect:
       // 菜单播放菜单BGM
       if (AudioManager::getInstance().getCurrentBGM() != BGMType::Menu)
       {
@@ -309,52 +312,54 @@ void Game::run()
   }
 }
 
-void Game::processMenuEvents(const sf::Event &event)
+void Game::processMainMenuEvents(const sf::Event &event)
 {
   if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>())
   {
-    int optionCount = static_cast<int>(MenuOption::Count);
+    int optionCount = static_cast<int>(MainMenuOption::Count);
 
     switch (keyPressed->code)
     {
     case sf::Keyboard::Key::Up:
     case sf::Keyboard::Key::W:
     {
-      int current = static_cast<int>(m_selectedOption);
+      int current = static_cast<int>(m_mainMenuOption);
       current = (current - 1 + optionCount) % optionCount;
-      m_selectedOption = static_cast<MenuOption>(current);
+      m_mainMenuOption = static_cast<MainMenuOption>(current);
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
     case sf::Keyboard::Key::Down:
     case sf::Keyboard::Key::S:
     {
-      int current = static_cast<int>(m_selectedOption);
+      int current = static_cast<int>(m_mainMenuOption);
       current = (current + 1) % optionCount;
-      m_selectedOption = static_cast<MenuOption>(current);
+      m_mainMenuOption = static_cast<MainMenuOption>(current);
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
     case sf::Keyboard::Key::Enter:
     case sf::Keyboard::Key::Space:
-      switch (m_selectedOption)
+      switch (m_mainMenuOption)
       {
-      case MenuOption::StartGame:
+      case MainMenuOption::SinglePlayer:
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
-        startGame();
+        m_isMultiplayer = false;
+        m_gameState = GameState::ModeSelect;
+        m_gameModeOption = GameModeOption::EscapeMode;
         break;
-      case MenuOption::Multiplayer:
+      case MainMenuOption::MultiPlayer:
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
-        m_gameState = GameState::Connecting;
-        m_inputText = m_serverIP;
-        m_inputMode = InputMode::ServerIP;
+        m_isMultiplayer = true;
+        m_gameState = GameState::ModeSelect;
+        m_gameModeOption = GameModeOption::EscapeMode;
         break;
-      case MenuOption::MapWidth:
-      case MenuOption::MapHeight:
-      case MenuOption::EnemyCount:
+      case MainMenuOption::MapWidth:
+      case MainMenuOption::MapHeight:
+      case MainMenuOption::EnemyCount:
         // 这些选项用左右键调整，Enter不做任何事
         break;
-      case MenuOption::Exit:
+      case MainMenuOption::Exit:
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
         m_window.close();
         break;
@@ -364,17 +369,17 @@ void Game::processMenuEvents(const sf::Event &event)
       break;
     case sf::Keyboard::Key::Left:
     case sf::Keyboard::Key::A:
-      switch (m_selectedOption)
+      switch (m_mainMenuOption)
       {
-      case MenuOption::MapWidth:
+      case MainMenuOption::MapWidth:
         m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
-      case MenuOption::MapHeight:
+      case MainMenuOption::MapHeight:
         m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
-      case MenuOption::EnemyCount:
+      case MainMenuOption::EnemyCount:
         m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
@@ -384,19 +389,93 @@ void Game::processMenuEvents(const sf::Event &event)
       break;
     case sf::Keyboard::Key::Right:
     case sf::Keyboard::Key::D:
-      switch (m_selectedOption)
+      switch (m_mainMenuOption)
       {
-      case MenuOption::MapWidth:
+      case MainMenuOption::MapWidth:
         m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
-      case MenuOption::MapHeight:
+      case MainMenuOption::MapHeight:
         m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
-      case MenuOption::EnemyCount:
+      case MainMenuOption::EnemyCount:
         m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        break;
+      default:
+        break;
+      }
+      break;
+    default:
+      break;
+    }
+  }
+}
+
+void Game::processModeSelectEvents(const sf::Event &event)
+{
+  if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>())
+  {
+    int optionCount = static_cast<int>(GameModeOption::Count);
+
+    switch (keyPressed->code)
+    {
+    case sf::Keyboard::Key::Up:
+    case sf::Keyboard::Key::W:
+    {
+      int current = static_cast<int>(m_gameModeOption);
+      current = (current - 1 + optionCount) % optionCount;
+      m_gameModeOption = static_cast<GameModeOption>(current);
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      break;
+    }
+    case sf::Keyboard::Key::Down:
+    case sf::Keyboard::Key::S:
+    {
+      int current = static_cast<int>(m_gameModeOption);
+      current = (current + 1) % optionCount;
+      m_gameModeOption = static_cast<GameModeOption>(current);
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      break;
+    }
+    case sf::Keyboard::Key::Escape:
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      m_gameState = GameState::MainMenu;
+      break;
+    case sf::Keyboard::Key::Enter:
+    case sf::Keyboard::Key::Space:
+      switch (m_gameModeOption)
+      {
+      case GameModeOption::EscapeMode:
+        if (m_isMultiplayer)
+        {
+          // Multi Player Escape Mode - 还在开发中，不播放确认音效
+        }
+        else
+        {
+          // Single Player Escape Mode - 直接开始游戏
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
+          startGame();
+        }
+        break;
+      case GameModeOption::BattleMode:
+        if (m_isMultiplayer)
+        {
+          // Multi Player Battle Mode - 进入联机流程
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
+          m_gameState = GameState::Connecting;
+          m_inputText = m_serverIP;
+          m_inputMode = InputMode::ServerIP;
+        }
+        else
+        {
+          // Single Player Battle Mode - 还在开发中，不播放确认音效
+        }
+        break;
+      case GameModeOption::Back:
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        m_gameState = GameState::MainMenu;
         break;
       default:
         break;
@@ -426,7 +505,11 @@ void Game::processEvents()
     switch (m_gameState)
     {
     case GameState::MainMenu:
-      processMenuEvents(*event);
+      processMainMenuEvents(*event);
+      break;
+
+    case GameState::ModeSelect:
+      processModeSelectEvents(*event);
       break;
 
     case GameState::Playing:
@@ -434,16 +517,93 @@ void Game::processEvents()
       {
         m_player->handleInput(*event);
       }
-      // 按 ESC 返回菜单，按 P 暂停
+      // 按 ESC 返回菜单，按 P 暂停，按 B 切换放置模式
       if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
       {
         if (keyPressed->code == sf::Keyboard::Key::Escape)
         {
-          resetGame();
+          if (m_placementMode)
+          {
+            m_placementMode = false;  // 先退出放置模式
+          }
+          else
+          {
+            resetGame();
+          }
         }
         else if (keyPressed->code == sf::Keyboard::Key::P)
         {
           m_gameState = GameState::Paused;
+        }
+        else if (keyPressed->code == sf::Keyboard::Key::B)
+        {
+          // 切换放置模式
+          if (m_player && m_player->getWallsInBag() > 0)
+          {
+            m_placementMode = !m_placementMode;
+          }
+          else if (m_placementMode)
+          {
+            m_placementMode = false;
+          }
+        }
+      }
+      // 处理鼠标点击放置墙壁
+      if (m_placementMode && m_player && m_player->getWallsInBag() > 0)
+      {
+        if (const auto *mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
+        {
+          if (mousePressed->button == sf::Mouse::Button::Left)
+          {
+            // 获取鼠标在世界坐标中的位置
+            sf::Vector2f mouseWorldPos = m_window.mapPixelToCoords(mousePressed->position, m_gameView);
+            
+            // 检查位置是否有坦克
+            bool hasTankAtPos = false;
+            GridPos grid = m_maze.worldToGrid(mouseWorldPos);
+            sf::Vector2f gridCenter = m_maze.gridToWorld(grid);
+            float checkRadius = m_maze.getTileSize() * 0.7f;
+            
+            // 检查玩家
+            if (m_player)
+            {
+              float dist = std::hypot(m_player->getPosition().x - gridCenter.x, m_player->getPosition().y - gridCenter.y);
+              if (dist < checkRadius)
+                hasTankAtPos = true;
+            }
+            // 检查NPC
+            if (!hasTankAtPos)
+            {
+              for (const auto& enemy : m_enemies)
+              {
+                if (!enemy->isDead())
+                {
+                  float dist = std::hypot(enemy->getPosition().x - gridCenter.x, enemy->getPosition().y - gridCenter.y);
+                  if (dist < checkRadius)
+                  {
+                    hasTankAtPos = true;
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // 尝试放置墙壁
+            if (!hasTankAtPos && m_maze.placeWall(mouseWorldPos))
+            {
+              m_player->useWallFromBag();
+              // 播放放置音效
+              AudioManager::getInstance().playSFX(SFXType::MenuConfirm, mouseWorldPos, m_player->getPosition());
+              
+              // 放置成功后自动退出放置模式
+              m_placementMode = false;
+            }
+          }
+          else if (mousePressed->button == sf::Mouse::Button::Right)
+          {
+            // 右键取消放置模式
+            m_placementMode = false;
+          }
         }
       }
       break;
@@ -544,14 +704,99 @@ void Game::processEvents()
       {
         if (keyPressed->code == sf::Keyboard::Key::Escape)
         {
-          NetworkManager::getInstance().disconnect();
-          resetGame();
+          if (m_placementMode)
+          {
+            m_placementMode = false;  // 先退出放置模式
+          }
+          else
+          {
+            NetworkManager::getInstance().disconnect();
+            resetGame();
+          }
         }
         // R键激活NPC
         if (keyPressed->code == sf::Keyboard::Key::R)
         {
           m_mpState.rKeyJustPressed = true;
           std::cout << "[DEBUG] R key event detected!" << std::endl;
+        }
+        // B键切换放置模式
+        if (keyPressed->code == sf::Keyboard::Key::B)
+        {
+          if (m_player && m_player->getWallsInBag() > 0)
+          {
+            m_placementMode = !m_placementMode;
+          }
+          else if (m_placementMode)
+          {
+            m_placementMode = false;
+          }
+        }
+      }
+      // 处理鼠标点击放置墙壁
+      if (m_placementMode && m_player && m_player->getWallsInBag() > 0)
+      {
+        if (const auto *mousePressed = event->getIf<sf::Event::MouseButtonPressed>())
+        {
+          if (mousePressed->button == sf::Mouse::Button::Left)
+          {
+            // 获取鼠标在世界坐标中的位置
+            sf::Vector2f mouseWorldPos = m_window.mapPixelToCoords(mousePressed->position, m_gameView);
+            
+            // 检查位置是否有坦克
+            bool hasTankAtPos = false;
+            GridPos grid = m_maze.worldToGrid(mouseWorldPos);
+            sf::Vector2f gridCenter = m_maze.gridToWorld(grid);
+            float checkRadius = m_maze.getTileSize() * 0.7f;
+            
+            // 检查本地玩家
+            if (m_player)
+            {
+              float dist = std::hypot(m_player->getPosition().x - gridCenter.x, m_player->getPosition().y - gridCenter.y);
+              if (dist < checkRadius)
+                hasTankAtPos = true;
+            }
+            // 检查其他玩家
+            if (!hasTankAtPos && m_otherPlayer)
+            {
+              float dist = std::hypot(m_otherPlayer->getPosition().x - gridCenter.x, m_otherPlayer->getPosition().y - gridCenter.y);
+              if (dist < checkRadius)
+                hasTankAtPos = true;
+            }
+            // 检查NPC
+            if (!hasTankAtPos)
+            {
+              for (const auto& enemy : m_enemies)
+              {
+                if (!enemy->isDead())
+                {
+                  float dist = std::hypot(enemy->getPosition().x - gridCenter.x, enemy->getPosition().y - gridCenter.y);
+                  if (dist < checkRadius)
+                  {
+                    hasTankAtPos = true;
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // 尝试放置墙壁
+            if (!hasTankAtPos && m_maze.placeWall(mouseWorldPos))
+            {
+              m_player->useWallFromBag();
+              // 播放放置音效
+              AudioManager::getInstance().playSFX(SFXType::MenuConfirm, mouseWorldPos, m_player->getPosition());
+              // 发送到网络同步
+              NetworkManager::getInstance().sendWallPlace(mouseWorldPos.x, mouseWorldPos.y);
+              // 放置成功后自动退出放置模式
+              m_placementMode = false;
+            }
+          }
+          else if (mousePressed->button == sf::Mouse::Button::Right)
+          {
+            // 右键取消放置模式
+            m_placementMode = false;
+          }
         }
       }
       break;
@@ -781,7 +1026,10 @@ void Game::render()
   switch (m_gameState)
   {
   case GameState::MainMenu:
-    renderMenu();
+    renderMainMenu();
+    break;
+  case GameState::ModeSelect:
+    renderModeSelect();
     break;
   case GameState::Playing:
     renderGame();
@@ -809,7 +1057,7 @@ void Game::render()
   m_window.display();
 }
 
-void Game::renderMenu()
+void Game::renderMainMenu()
 {
   m_window.setView(m_uiView);
 
@@ -820,16 +1068,16 @@ void Game::renderMenu()
   title.setFillColor(sf::Color::White);
   title.setStyle(sf::Text::Bold);
   sf::FloatRect titleBounds = title.getLocalBounds();
-  title.setPosition({(LOGICAL_WIDTH - titleBounds.size.x) / 2.f, 80.f});
+  title.setPosition({(LOGICAL_WIDTH - titleBounds.size.x) / 2.f, 100.f});
   m_window.draw(title);
 
   // 菜单选项
-  float startY = 200.f;
+  float startY = 220.f;
   float spacing = 50.f;
 
   std::vector<std::string> options = {
-      "Start Game",
-      "Multiplayer",
+      "Single Player",
+      "Multi Player",
       std::string("Map Width: < ") + std::to_string(m_widthOptions[m_widthIndex]) + " >",
       std::string("Map Height: < ") + std::to_string(m_heightOptions[m_heightIndex]) + " >",
       std::string("NPCs: < ") + std::to_string(m_enemyOptions[m_enemyIndex]) + " >",
@@ -841,7 +1089,7 @@ void Game::renderMenu()
     optionText.setString(options[i]);
     optionText.setCharacterSize(32);
 
-    if (static_cast<int>(i) == static_cast<int>(m_selectedOption))
+    if (static_cast<int>(i) == static_cast<int>(m_mainMenuOption))
     {
       optionText.setFillColor(sf::Color::Yellow);
       optionText.setString("> " + options[i] + " <");
@@ -870,7 +1118,138 @@ void Game::renderMenu()
 
   // 提示
   sf::Text hint(m_font);
-  hint.setString("W/S: Navigate | A/D or Left/Right: Adjust values | Enter: Select");
+  hint.setString("W/S: Navigate | A/D: Adjust values | Enter: Select");
+  hint.setCharacterSize(18);
+  hint.setFillColor(sf::Color(120, 120, 120));
+  sf::FloatRect hintBounds = hint.getLocalBounds();
+  hint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, LOGICAL_HEIGHT - 60.f});
+  m_window.draw(hint);
+}
+
+void Game::renderModeSelect()
+{
+  m_window.setView(m_uiView);
+
+  // 标题
+  sf::Text title(m_font);
+  title.setString(m_isMultiplayer ? "MULTIPLAYER" : "SINGLE PLAYER");
+  title.setCharacterSize(56);
+  title.setFillColor(sf::Color::White);
+  title.setStyle(sf::Text::Bold);
+  sf::FloatRect titleBounds = title.getLocalBounds();
+  title.setPosition({(LOGICAL_WIDTH - titleBounds.size.x) / 2.f, 100.f});
+  m_window.draw(title);
+
+  // 副标题
+  sf::Text subtitle(m_font);
+  subtitle.setString("Select Game Mode");
+  subtitle.setCharacterSize(28);
+  subtitle.setFillColor(sf::Color(180, 180, 180));
+  sf::FloatRect subtitleBounds = subtitle.getLocalBounds();
+  subtitle.setPosition({(LOGICAL_WIDTH - subtitleBounds.size.x) / 2.f, 170.f});
+  m_window.draw(subtitle);
+
+  // 模式选项
+  float startY = 280.f;
+  float spacing = 80.f;
+
+  // Escape Mode
+  {
+    sf::Text optionText(m_font);
+    std::string modeStr = "Escape Mode";
+    // Multiplayer Escape Mode 还在开发中
+    if (m_isMultiplayer)
+    {
+      modeStr += " [Coming Soon]";
+    }
+    optionText.setCharacterSize(36);
+    
+    if (m_gameModeOption == GameModeOption::EscapeMode)
+    {
+      optionText.setFillColor(m_isMultiplayer ? sf::Color(180, 180, 100) : sf::Color::Yellow);
+      optionText.setString("> " + modeStr + " <");
+    }
+    else
+    {
+      optionText.setFillColor(m_isMultiplayer ? sf::Color(120, 120, 120) : sf::Color(180, 180, 180));
+      optionText.setString(modeStr);
+    }
+
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, startY});
+    m_window.draw(optionText);
+
+    // 模式描述
+    sf::Text desc(m_font);
+    desc.setString("Reach the exit to win!");
+    desc.setCharacterSize(20);
+    desc.setFillColor(sf::Color(100, 180, 100));
+    sf::FloatRect descBounds = desc.getLocalBounds();
+    desc.setPosition({(LOGICAL_WIDTH - descBounds.size.x) / 2.f, startY + 40.f});
+    m_window.draw(desc);
+  }
+
+  // Battle Mode
+  {
+    sf::Text optionText(m_font);
+    std::string modeStr = "Battle Mode";
+    // Single Player Battle Mode 还在开发中
+    if (!m_isMultiplayer)
+    {
+      modeStr += " [Coming Soon]";
+    }
+    optionText.setCharacterSize(36);
+    
+    if (m_gameModeOption == GameModeOption::BattleMode)
+    {
+      optionText.setFillColor(!m_isMultiplayer ? sf::Color(180, 180, 100) : sf::Color::Yellow);
+      optionText.setString("> " + modeStr + " <");
+    }
+    else
+    {
+      optionText.setFillColor(!m_isMultiplayer ? sf::Color(120, 120, 120) : sf::Color(180, 180, 180));
+      optionText.setString(modeStr);
+    }
+
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, startY + spacing});
+    m_window.draw(optionText);
+
+    // 模式描述
+    sf::Text desc(m_font);
+    desc.setString("Defeat your opponent to win!");
+    desc.setCharacterSize(20);
+    desc.setFillColor(sf::Color(180, 100, 100));
+    sf::FloatRect descBounds = desc.getLocalBounds();
+    desc.setPosition({(LOGICAL_WIDTH - descBounds.size.x) / 2.f, startY + spacing + 40.f});
+    m_window.draw(desc);
+  }
+
+  // Back
+  {
+    sf::Text optionText(m_font);
+    std::string str = "Back";
+    optionText.setCharacterSize(32);
+    
+    if (m_gameModeOption == GameModeOption::Back)
+    {
+      optionText.setFillColor(sf::Color::Yellow);
+      optionText.setString("> " + str + " <");
+    }
+    else
+    {
+      optionText.setFillColor(sf::Color(150, 150, 150));
+      optionText.setString(str);
+    }
+
+    sf::FloatRect bounds = optionText.getLocalBounds();
+    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, startY + spacing * 2 + 40.f});
+    m_window.draw(optionText);
+  }
+
+  // 提示
+  sf::Text hint(m_font);
+  hint.setString("W/S: Navigate | Enter: Select | ESC: Back");
   hint.setCharacterSize(18);
   hint.setFillColor(sf::Color(120, 120, 120));
   sf::FloatRect hintBounds = hint.getLocalBounds();
@@ -885,6 +1264,73 @@ void Game::renderGame()
 
   // 绘制迷宫
   m_maze.draw(m_window);
+
+  // 如果处于放置模式，绘制预览
+  if (m_placementMode && m_player && m_player->getWallsInBag() > 0)
+  {
+    // 获取鼠标在世界坐标中的位置
+    sf::Vector2i mousePixelPos = sf::Mouse::getPosition(m_window);
+    sf::Vector2f mouseWorldPos = m_window.mapPixelToCoords(mousePixelPos, m_gameView);
+    
+    // 获取对应的格子位置
+    GridPos grid = m_maze.worldToGrid(mouseWorldPos);
+    sf::Vector2f gridCenter = m_maze.gridToWorld(grid);
+    
+    // 检查是否有坦克在该位置
+    bool hasTankAtPos = false;
+    float checkRadius = m_maze.getTileSize() * 0.7f;
+    
+    // 检查玩家
+    if (m_player)
+    {
+      float dist = std::hypot(m_player->getPosition().x - gridCenter.x, m_player->getPosition().y - gridCenter.y);
+      if (dist < checkRadius)
+        hasTankAtPos = true;
+    }
+    // 检查另一个玩家（联机模式）
+    if (!hasTankAtPos && m_otherPlayer)
+    {
+      float dist = std::hypot(m_otherPlayer->getPosition().x - gridCenter.x, m_otherPlayer->getPosition().y - gridCenter.y);
+      if (dist < checkRadius)
+        hasTankAtPos = true;
+    }
+    // 检查NPC
+    if (!hasTankAtPos)
+    {
+      for (const auto& enemy : m_enemies)
+      {
+        if (!enemy->isDead())
+        {
+          float dist = std::hypot(enemy->getPosition().x - gridCenter.x, enemy->getPosition().y - gridCenter.y);
+          if (dist < checkRadius)
+          {
+            hasTankAtPos = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // 绘制预览方块
+    float tileSize = m_maze.getTileSize();
+    sf::RectangleShape preview({tileSize - 4.f, tileSize - 4.f});
+    preview.setPosition({gridCenter.x - (tileSize - 4.f) / 2.f, gridCenter.y - (tileSize - 4.f) / 2.f});
+    
+    if (!hasTankAtPos && m_maze.canPlaceWall(mouseWorldPos))
+    {
+      // 可放置：绿色半透明
+      preview.setFillColor(sf::Color(100, 200, 100, 150));
+      preview.setOutlineColor(sf::Color(50, 150, 50, 200));
+    }
+    else
+    {
+      // 不可放置：红色半透明
+      preview.setFillColor(sf::Color(200, 100, 100, 150));
+      preview.setOutlineColor(sf::Color(150, 50, 50, 200));
+    }
+    preview.setOutlineThickness(2.f);
+    m_window.draw(preview);
+  }
 
   // 绘制子弹
   for (const auto &bullet : m_bullets)
@@ -914,6 +1360,51 @@ void Game::renderGame()
   if (m_player)
   {
     m_player->drawUI(m_window);
+    
+    float uiY = 50.f;  // UI 起始 Y 位置
+    
+    // Battle 模式显示金币数量
+    if (m_gameModeOption == GameModeOption::BattleMode)
+    {
+      sf::Text coinsText(m_font);
+      coinsText.setString("Coins: " + std::to_string(m_player->getCoins()));
+      coinsText.setCharacterSize(24);
+      coinsText.setFillColor(sf::Color(255, 200, 50));  // 金色
+      coinsText.setPosition({20.f, uiY});
+      m_window.draw(coinsText);
+      uiY += 30.f;
+    }
+    
+    // 绘制背包中的墙壁数量
+    sf::Text wallsText(m_font);
+    wallsText.setString("Walls: " + std::to_string(m_player->getWallsInBag()));
+    wallsText.setCharacterSize(24);
+    wallsText.setFillColor(sf::Color(139, 90, 43));  // 棕色
+    wallsText.setPosition({20.f, uiY});
+    m_window.draw(wallsText);
+    uiY += 30.f;
+    
+    // 如果处于放置模式，显示提示
+    if (m_placementMode)
+    {
+      sf::Text placeHint(m_font);
+      placeHint.setString("[PLACEMENT MODE] Click to place wall, B to cancel");
+      placeHint.setCharacterSize(20);
+      placeHint.setFillColor(sf::Color::Yellow);
+      sf::FloatRect hintBounds = placeHint.getLocalBounds();
+      placeHint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, 20.f});
+      m_window.draw(placeHint);
+    }
+    else if (m_player->getWallsInBag() > 0)
+    {
+      // 提示可以按B进入放置模式
+      sf::Text bagHint(m_font);
+      bagHint.setString("Press B to place walls");
+      bagHint.setCharacterSize(18);
+      bagHint.setFillColor(sf::Color(150, 150, 150));
+      bagHint.setPosition({20.f, uiY});
+      m_window.draw(bagHint);
+    }
   }
 }
 
@@ -1299,6 +1790,11 @@ void Game::setupNetworkCallbacks()
     if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
       m_enemies[npcId]->takeDamage(damage);
     } });
+
+  net.setOnWallPlace([this](float x, float y)
+                     {
+    // 对方放置了墙壁
+    m_maze.placeWall({x, y}); });
 
   net.setOnError([this](const std::string &error)
                  { m_mpState.connectionStatus = "Error: " + error; });

@@ -445,6 +445,14 @@ void MultiplayerHandler::renderUI(
   coinsText.setFillColor(sf::Color::Yellow);
   coinsText.setPosition({barX, barY + 60.f});
   ctx.window.draw(coinsText);
+  
+  // 墙壁背包显示
+  sf::Text wallsText(ctx.font);
+  wallsText.setString("Walls: " + std::to_string(ctx.player ? ctx.player->getWallsInBag() : 0));
+  wallsText.setCharacterSize(20);
+  wallsText.setFillColor(sf::Color(139, 90, 43));  // 棕色
+  wallsText.setPosition({barX, barY + 85.f});
+  ctx.window.draw(wallsText);
 
   // 显示操作提示
   sf::Text controlHint(ctx.font);

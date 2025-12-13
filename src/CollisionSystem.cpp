@@ -36,13 +36,11 @@ void CollisionSystem::handleWallDestroyEffect(const WallDestroyResult& result, T
       AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
       break;
       
-    case WallAttribute::Explosive:
-      // 爆炸墙：爆炸效果已在Maze::bulletHitWithResult中处理（清除周围8格墙）
-      // 播放爆炸音效
-      AudioManager::getInstance().playSFX(SFXType::Explode, result.position, listenerPos);
+    case WallAttribute::None:
+      // 棕色墙：收集到背包
+      shooter->addWallToBag();
       break;
       
-    case WallAttribute::None:
     default:
       break;
   }
@@ -81,11 +79,21 @@ void CollisionSystem::checkSinglePlayerCollisions(
     if (!bullet->isAlive())
       continue;
 
-    // 检查与墙壁碰撞
-    if (checkBulletWallCollision(bullet.get(), maze))
+    // 检查与墙壁碰撞（使用带属性返回的版本）
+    WallDestroyResult wallResult = checkBulletWallCollisionWithResult(bullet.get(), maze);
+    bool hitWall = (wallResult.position.x != 0 || wallResult.position.y != 0);
+    
+    if (hitWall || wallResult.destroyed)
     {
       // 播放子弹击中墙壁音效
       AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bullet->getPosition(), listenerPos);
+      
+      // 如果墙被摧毁且是玩家子弹，处理增益效果
+      if (wallResult.destroyed && bullet->getOwner() == BulletOwner::Player)
+      {
+        handleWallDestroyEffect(wallResult, player, maze);
+      }
+      
       bullet->setInactive();
       continue;
     }

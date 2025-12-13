@@ -79,6 +79,15 @@ public:
   }
   void addCoins(int amount) { m_coins += amount; }
 
+  // 背包系统（存储棕色格子）
+  int getWallsInBag() const { return m_wallsInBag; }
+  void setWallsInBag(int count) { m_wallsInBag = count; }
+  void addWallToBag() { m_wallsInBag++; }
+  bool useWallFromBag() {
+    if (m_wallsInBag > 0) { m_wallsInBag--; return true; }
+    return false;
+  }
+
   // 阵营（用于多人模式，0=未设置，1=玩家1阵营，2=玩家2阵营）
   int getTeam() const { return m_team; }
   void setTeam(int team) { m_team = team; }
@@ -121,6 +130,9 @@ private:
 
   // 金币系统（多人模式）
   int m_coins = 10;  // 初始10个金币
+  
+  // 背包系统
+  int m_wallsInBag = 0;  // 初始0个棕色格子
   
   // 阵营（多人模式）
   int m_team = 0;  // 0=未设置，1=玩家1，2=玩家2

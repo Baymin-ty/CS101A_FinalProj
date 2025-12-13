@@ -22,12 +22,15 @@ void MazeGenerator::setSeed(unsigned int seed)
 std::vector<std::string> MazeGenerator::generate()
 {
   // 在生成开始时设置随机数种子，确保相同种子产生相同结果
-  if (m_seedSet) {
+  if (m_seedSet)
+  {
     m_rng.seed(m_seed);
-  } else {
+  }
+  else
+  {
     m_rng.seed(static_cast<unsigned int>(std::time(nullptr)));
   }
-  
+
   // 初始化网格，全部填充墙
   m_grid.clear();
   m_grid.resize(m_height, std::vector<char>(m_width, '#'));
@@ -261,7 +264,7 @@ void MazeGenerator::placeDestructibleWalls()
 {
   // 首先收集所有可以变成可破坏墙的位置
   std::vector<std::pair<int, int>> destructibleCandidates;
-  
+
   for (int y = 1; y < m_height - 1; ++y)
   {
     for (int x = 1; x < m_width - 1; ++x)
@@ -299,82 +302,33 @@ void MazeGenerator::placeDestructibleWalls()
       }
     }
   }
-  
+
   // 单机模式：所有可破坏墙都是普通的（无特殊属性）
   if (!m_multiplayerMode)
   {
-    for (const auto& [x, y] : destructibleCandidates)
+    for (const auto &[x, y] : destructibleCandidates)
     {
       m_grid[y][x] = '*'; // 普通可破坏墙
     }
     return;
   }
-  
+
   // 联机模式：生成特殊方块
-  // 先放置爆炸墙（10%，避开边缘）
-  std::vector<std::pair<int, int>> explosiveWalls;
-  for (auto it = destructibleCandidates.begin(); it != destructibleCandidates.end();)
+  // 剩余墙体分配属性：40%金色，20%治疗，40%普通
+  for (const auto &[x, y] : destructibleCandidates)
   {
-    int x = it->first;
-    int y = it->second;
-    
-    // 爆炸墙不能在边缘一圈（距离边界至少2格）
-    bool nearEdge = (x <= 2 || x >= m_width - 3 || y <= 2 || y >= m_height - 3);
-    
-    if (!nearEdge)
+    float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
+    if (roll < 0.40f)
     {
-      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
-      if (roll < 0.10f) // 10%概率变成爆炸墙
-      {
-        m_grid[y][x] = 'B'; // B = Bomb/Explosive
-        explosiveWalls.push_back({x, y});
-        it = destructibleCandidates.erase(it);
-        continue;
-      }
+      m_grid[y][x] = 'G'; // Gold
     }
-    ++it;
-  }
-  
-  // 标记爆炸墙周围8格不能有增益墙
-  std::set<std::pair<int, int>> noBuffZone;
-  for (const auto& [ex, ey] : explosiveWalls)
-  {
-    for (int dy = -1; dy <= 1; ++dy)
+    else if (roll < 0.60f)
     {
-      for (int dx = -1; dx <= 1; ++dx)
-      {
-        if (dx == 0 && dy == 0) continue;
-        noBuffZone.insert({ex + dx, ey + dy});
-      }
-    }
-  }
-  
-  // 剩余墙体分配属性
-  for (const auto& [x, y] : destructibleCandidates)
-  {
-    // 检查是否在禁止增益区域
-    bool inNoBuffZone = noBuffZone.count({x, y}) > 0;
-    
-    if (inNoBuffZone)
-    {
-      m_grid[y][x] = '*'; // 普通可破坏墙
+      m_grid[y][x] = 'H'; // Heal
     }
     else
     {
-      // 分配属性：50%金色，25%治疗，25%普通
-      float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
-      if (roll < 0.50f)
-      {
-        m_grid[y][x] = 'G'; // Gold
-      }
-      else if (roll < 0.75f)
-      {
-        m_grid[y][x] = 'H'; // Heal
-      }
-      else
-      {
-        m_grid[y][x] = '*'; // 普通
-      }
+      m_grid[y][x] = '*'; // 普通
     }
   }
 }
@@ -385,9 +339,10 @@ void MazeGenerator::placeMultiplayerSpawns()
   // 1. 两个出生点在地图中部区域，有一定距离
   // 2. 终点在地图边缘/四周区域
   // 3. 两个出生点到终点的距离要相近（公平）
-  
+
   auto emptySpaces = getEmptySpaces();
-  if (emptySpaces.size() < 3) {
+  if (emptySpaces.size() < 3)
+  {
     // 回退到起点附近
     m_spawn1X = m_startX;
     m_spawn1Y = m_startY;
@@ -405,38 +360,47 @@ void MazeGenerator::placeMultiplayerSpawns()
   int centerMaxY = m_height - centerMarginY;
 
   // 定义边缘区域（距边界25%以内）
-  auto isEdgeArea = [&](int x, int y) {
+  auto isEdgeArea = [&](int x, int y)
+  {
     return x < centerMarginX || x >= m_width - centerMarginX ||
            y < centerMarginY || y >= m_height - centerMarginY;
   };
 
   // 筛选中部区域的空地作为出生点候选
   std::vector<std::pair<int, int>> spawnCandidates;
-  for (const auto& [x, y] : emptySpaces) {
-    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+  for (const auto &[x, y] : emptySpaces)
+  {
+    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S')
+    {
       // 在中部区域
-      if (x >= centerMinX && x < centerMaxX && y >= centerMinY && y < centerMaxY) {
+      if (x >= centerMinX && x < centerMaxX && y >= centerMinY && y < centerMaxY)
+      {
         spawnCandidates.push_back({x, y});
       }
     }
   }
-  
+
   // 如果中部候选太少，扩大范围
-  if (spawnCandidates.size() < 10) {
+  if (spawnCandidates.size() < 10)
+  {
     spawnCandidates.clear();
     int smallMarginX = m_width / 6;
     int smallMarginY = m_height / 6;
-    for (const auto& [x, y] : emptySpaces) {
-      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
-        if (x >= smallMarginX && x < m_width - smallMarginX && 
-            y >= smallMarginY && y < m_height - smallMarginY) {
+    for (const auto &[x, y] : emptySpaces)
+    {
+      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S')
+      {
+        if (x >= smallMarginX && x < m_width - smallMarginX &&
+            y >= smallMarginY && y < m_height - smallMarginY)
+        {
           spawnCandidates.push_back({x, y});
         }
       }
     }
   }
 
-  if (spawnCandidates.size() < 2) {
+  if (spawnCandidates.size() < 2)
+  {
     spawnCandidates = emptySpaces; // 回退
   }
 
@@ -444,37 +408,45 @@ void MazeGenerator::placeMultiplayerSpawns()
   std::shuffle(spawnCandidates.begin(), spawnCandidates.end(), m_rng);
 
   // 找两个有一定距离的出生点
-  int minSpawnDist = std::max(6, std::min(m_width, m_height) / 4); // 最小距离（增大）
+  int minSpawnDist = std::max(6, std::min(m_width, m_height) / 4);  // 最小距离（增大）
   int maxSpawnDist = std::max(15, std::min(m_width, m_height) / 2); // 最大距离
-  
+
   // 收集符合条件的出生点对
   std::vector<std::pair<int, int>> validSpawnPairs; // 存储索引对
-  for (size_t i = 0; i < spawnCandidates.size() && i < 30; ++i) {
-    for (size_t j = i + 1; j < spawnCandidates.size() && j < 30; ++j) {
+  for (size_t i = 0; i < spawnCandidates.size() && i < 30; ++i)
+  {
+    for (size_t j = i + 1; j < spawnCandidates.size() && j < 30; ++j)
+    {
       auto [x1, y1] = spawnCandidates[i];
       auto [x2, y2] = spawnCandidates[j];
       int dist = std::abs(x1 - x2) + std::abs(y1 - y2);
-      if (dist >= minSpawnDist && dist <= maxSpawnDist) {
+      if (dist >= minSpawnDist && dist <= maxSpawnDist)
+      {
         validSpawnPairs.push_back({static_cast<int>(i), static_cast<int>(j)});
       }
     }
   }
 
   // 从有效的出生点对中随机选择一对
-  if (!validSpawnPairs.empty()) {
+  if (!validSpawnPairs.empty())
+  {
     int pairIdx = m_rng() % validSpawnPairs.size();
     auto [idx1, idx2] = validSpawnPairs[pairIdx];
     m_spawn1X = spawnCandidates[idx1].first;
     m_spawn1Y = spawnCandidates[idx1].second;
     m_spawn2X = spawnCandidates[idx2].first;
     m_spawn2Y = spawnCandidates[idx2].second;
-  } else if (spawnCandidates.size() >= 2) {
+  }
+  else if (spawnCandidates.size() >= 2)
+  {
     // 回退：直接选前两个
     m_spawn1X = spawnCandidates[0].first;
     m_spawn1Y = spawnCandidates[0].second;
     m_spawn2X = spawnCandidates[1].first;
     m_spawn2Y = spawnCandidates[1].second;
-  } else {
+  }
+  else
+  {
     // 最终回退
     m_spawn1X = m_width / 2 - 2;
     m_spawn1Y = m_height / 2;
@@ -484,18 +456,22 @@ void MazeGenerator::placeMultiplayerSpawns()
 
   // 筛选边缘区域的空地作为终点候选，并计算到两个出生点的距离
   std::vector<std::tuple<int, int, int, int>> endCandidates; // {x, y, minDist, distDiff}
-  
-  for (const auto& [x, y] : emptySpaces) {
-    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
+
+  for (const auto &[x, y] : emptySpaces)
+  {
+    if (m_grid[y][x] == '.' || m_grid[y][x] == 'S')
+    {
       // 优先选择边缘区域的点
-      if (isEdgeArea(x, y)) {
+      if (isEdgeArea(x, y))
+      {
         int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
         int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
         int minDist = std::min(distToSpawn1, distToSpawn2);
         int distDiff = std::abs(distToSpawn1 - distToSpawn2);
-        
+
         // 确保两个出生点到终点的距离差不要太大（公平性）
-        if (distDiff <= std::max(3, minDist / 3)) {
+        if (distDiff <= std::max(3, minDist / 3))
+        {
           endCandidates.push_back({x, y, minDist, distDiff});
         }
       }
@@ -503,17 +479,22 @@ void MazeGenerator::placeMultiplayerSpawns()
   }
 
   // 如果边缘区域候选太少，也加入一些非边缘但距离较远的点
-  if (endCandidates.size() < 5) {
-    for (const auto& [x, y] : emptySpaces) {
-      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S') {
-        if (!isEdgeArea(x, y)) {
+  if (endCandidates.size() < 5)
+  {
+    for (const auto &[x, y] : emptySpaces)
+    {
+      if (m_grid[y][x] == '.' || m_grid[y][x] == 'S')
+      {
+        if (!isEdgeArea(x, y))
+        {
           int distToSpawn1 = std::abs(x - m_spawn1X) + std::abs(y - m_spawn1Y);
           int distToSpawn2 = std::abs(x - m_spawn2X) + std::abs(y - m_spawn2Y);
           int minDist = std::min(distToSpawn1, distToSpawn2);
           int distDiff = std::abs(distToSpawn1 - distToSpawn2);
-          
+
           // 要求距离较远
-          if (minDist > std::min(m_width, m_height) / 3 && distDiff <= std::max(3, minDist / 3)) {
+          if (minDist > std::min(m_width, m_height) / 3 && distDiff <= std::max(3, minDist / 3))
+          {
             endCandidates.push_back({x, y, minDist, distDiff});
           }
         }
@@ -523,11 +504,13 @@ void MazeGenerator::placeMultiplayerSpawns()
 
   // 按距离排序（从远到近），优先选择距离远的
   std::sort(endCandidates.begin(), endCandidates.end(),
-            [](const auto &a, const auto &b) { return std::get<2>(a) > std::get<2>(b); });
+            [](const auto &a, const auto &b)
+            { return std::get<2>(a) > std::get<2>(b); });
 
   // 从距离最远的前 30% 中随机选一个作为终点
   int bestEndX = m_endX, bestEndY = m_endY;
-  if (!endCandidates.empty()) {
+  if (!endCandidates.empty())
+  {
     int topCount = std::max(1, static_cast<int>(endCandidates.size() * 0.3));
     int selectedIdx = m_rng() % topCount;
     bestEndX = std::get<0>(endCandidates[selectedIdx]);
@@ -535,9 +518,11 @@ void MazeGenerator::placeMultiplayerSpawns()
   }
 
   // 更新终点位置
-  if (bestEndX != m_endX || bestEndY != m_endY) {
+  if (bestEndX != m_endX || bestEndY != m_endY)
+  {
     // 清除旧终点
-    if (m_grid[m_endY][m_endX] == 'E') {
+    if (m_grid[m_endY][m_endX] == 'E')
+    {
       m_grid[m_endY][m_endX] = '.';
     }
     m_endX = bestEndX;
@@ -547,13 +532,17 @@ void MazeGenerator::placeMultiplayerSpawns()
 
   // 在地图上标记出生点，用 '1' 和 '2' 表示
   // 确保位置是空地才标记
-  if (m_spawn1Y >= 0 && m_spawn1Y < m_height && m_spawn1X >= 0 && m_spawn1X < m_width) {
-    if (m_grid[m_spawn1Y][m_spawn1X] == '.' || m_grid[m_spawn1Y][m_spawn1X] == 'S') {
+  if (m_spawn1Y >= 0 && m_spawn1Y < m_height && m_spawn1X >= 0 && m_spawn1X < m_width)
+  {
+    if (m_grid[m_spawn1Y][m_spawn1X] == '.' || m_grid[m_spawn1Y][m_spawn1X] == 'S')
+    {
       m_grid[m_spawn1Y][m_spawn1X] = '1';
     }
   }
-  if (m_spawn2Y >= 0 && m_spawn2Y < m_height && m_spawn2X >= 0 && m_spawn2X < m_width) {
-    if (m_grid[m_spawn2Y][m_spawn2X] == '.' || m_grid[m_spawn2Y][m_spawn2X] == 'S') {
+  if (m_spawn2Y >= 0 && m_spawn2Y < m_height && m_spawn2X >= 0 && m_spawn2X < m_width)
+  {
+    if (m_grid[m_spawn2Y][m_spawn2X] == '.' || m_grid[m_spawn2Y][m_spawn2X] == 'S')
+    {
       m_grid[m_spawn2Y][m_spawn2X] = '2';
     }
   }

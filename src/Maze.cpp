@@ -81,16 +81,6 @@ void Maze::loadFromString(const std::vector<std::string> &map)
         wall.shape.setOutlineThickness(1.f);
         break;
 
-      case 'B': // 爆炸墙 - 爆炸杀伤周围
-        wall.type = WallType::Destructible;
-        wall.attribute = WallAttribute::Explosive;
-        wall.health = 100.f;
-        wall.maxHealth = 100.f;
-        wall.shape.setFillColor(m_explosiveWallColor);
-        wall.shape.setOutlineColor(sf::Color(200, 50, 50)); // 红色边框
-        wall.shape.setOutlineThickness(1.f);
-        break;
-
       case 'S': // 起点
         wall.type = WallType::None;
         m_startPosition = {x + m_tileSize / 2.f, y + m_tileSize / 2.f};
@@ -176,15 +166,6 @@ void Maze::update(float dt)
           color.r = static_cast<std::uint8_t>(dark.r + (m_healWallColor.r - dark.r) * healthRatio);
           color.g = static_cast<std::uint8_t>(dark.g + (m_healWallColor.g - dark.g) * healthRatio);
           color.b = static_cast<std::uint8_t>(dark.b + (m_healWallColor.b - dark.b) * healthRatio);
-          break;
-        }
-        case WallAttribute::Explosive:
-        {
-          // 红色墙：从深红色到亮红色
-          sf::Color dark(150, 40, 40);
-          color.r = static_cast<std::uint8_t>(dark.r + (m_explosiveWallColor.r - dark.r) * healthRatio);
-          color.g = static_cast<std::uint8_t>(dark.g + (m_explosiveWallColor.g - dark.g) * healthRatio);
-          color.b = static_cast<std::uint8_t>(dark.b + (m_explosiveWallColor.b - dark.b) * healthRatio);
           break;
         }
         default: // WallAttribute::None - 普通可破坏墙（棕色）
@@ -319,15 +300,7 @@ bool Maze::bulletHit(sf::Vector2f bulletPos, float damage)
     wall.health -= damage;
     if (wall.health <= 0)
     {
-      // 保存属性以便处理爆炸
-      WallAttribute attr = wall.attribute;
       wall.type = WallType::None; // 墙被摧毁
-
-      // 如果是爆炸墙，处理周围8格
-      if (attr == WallAttribute::Explosive)
-      {
-        handleExplosion(c, r);
-      }
     }
     return true;
   }
@@ -373,12 +346,6 @@ WallDestroyResult Maze::bulletHitWithResult(sf::Vector2f bulletPos, float damage
 
       // 清除当前墙格
       wall.type = WallType::None;
-
-      // 如果是爆炸属性，处理周围8格
-      if (result.attribute == WallAttribute::Explosive)
-      {
-        handleExplosion(result.gridX, result.gridY);
-      }
     }
     else
     {
@@ -397,50 +364,6 @@ WallDestroyResult Maze::bulletHitWithResult(sf::Vector2f bulletPos, float damage
   return result;
 }
 
-void Maze::handleExplosion(int gridX, int gridY)
-{
-  // 移除周围8格的可破坏墙（不影响不可破坏墙和出口）
-  for (int dr = -1; dr <= 1; ++dr)
-  {
-    for (int dc = -1; dc <= 1; ++dc)
-    {
-      if (dr == 0 && dc == 0)
-        continue;
-
-      int nr = gridY + dr; // 行
-      int nc = gridX + dc; // 列
-
-      if (nr < 0 || nr >= m_rows || nc < 0 || nc >= m_cols)
-        continue;
-
-      Wall &neighbor = m_walls[nr][nc];
-      if (neighbor.type == WallType::Destructible)
-      {
-        neighbor.type = WallType::None;
-      }
-    }
-  }
-}
-
-std::vector<sf::Vector2f> Maze::getExplosionArea(int gridX, int gridY) const
-{
-  std::vector<sf::Vector2f> area;
-  for (int dx = -1; dx <= 1; ++dx)
-  {
-    for (int dy = -1; dy <= 1; ++dy)
-    {
-      if (dx == 0 && dy == 0)
-        continue;
-      int gx = gridX + dx;
-      int gy = gridY + dy;
-      if (gy < 0 || gy >= m_rows || gx < 0 || gx >= m_cols)
-        continue;
-      area.push_back({gx * m_tileSize + m_tileSize / 2.f, gy * m_tileSize + m_tileSize / 2.f});
-    }
-  }
-  return area;
-}
-
 bool Maze::isAtExit(sf::Vector2f position, float radius) const
 {
   float dx = position.x - m_exitPosition.x;
@@ -455,6 +378,67 @@ bool Maze::isWalkable(int row, int col) const
     return false;
   WallType type = m_walls[row][col].type;
   return type == WallType::None || type == WallType::Exit;
+}
+
+bool Maze::canPlaceWall(sf::Vector2f worldPos) const
+{
+  int c = static_cast<int>(worldPos.x / m_tileSize);
+  int r = static_cast<int>(worldPos.y / m_tileSize);
+
+  // 检查边界
+  if (r < 0 || r >= m_rows || c < 0 || c >= m_cols)
+    return false;
+
+  const Wall &wall = m_walls[r][c];
+
+  // 只能在空地上放置
+  if (wall.type != WallType::None)
+    return false;
+
+  // 不能放在起点
+  sf::Vector2f cellCenter = {c * m_tileSize + m_tileSize / 2.f, r * m_tileSize + m_tileSize / 2.f};
+  float distToStart = std::hypot(cellCenter.x - m_startPosition.x, cellCenter.y - m_startPosition.y);
+  if (distToStart < m_tileSize)
+    return false;
+
+  // 不能放在出口
+  float distToExit = std::hypot(cellCenter.x - m_exitPosition.x, cellCenter.y - m_exitPosition.y);
+  if (distToExit < m_tileSize)
+    return false;
+
+  return true;
+}
+
+bool Maze::placeWall(sf::Vector2f worldPos)
+{
+  if (!canPlaceWall(worldPos))
+    return false;
+
+  int c = static_cast<int>(worldPos.x / m_tileSize);
+  int r = static_cast<int>(worldPos.y / m_tileSize);
+
+  Wall &wall = m_walls[r][c];
+
+  // 设置为可破坏的棕色墙
+  wall.type = WallType::Destructible;
+  wall.attribute = WallAttribute::None;
+  wall.health = 100.f;
+  wall.maxHealth = 100.f;
+
+  // 设置形状
+  float x = c * m_tileSize;
+  float y = r * m_tileSize;
+  wall.shape.setSize({m_tileSize - 2.f, m_tileSize - 2.f});
+  wall.shape.setCornerRadius(WALL_CORNER_RADIUS);
+  wall.shape.setPosition({x + 1.f, y + 1.f});
+  wall.shape.setFillColor(m_destructibleColor);
+  wall.shape.setOutlineColor(sf::Color(100, 60, 20));
+  wall.shape.setOutlineThickness(1.f);
+
+  // 重新计算圆角
+  calculateRoundedCorners();
+
+  return true;
 }
 
 GridPos Maze::worldToGrid(sf::Vector2f pos) const

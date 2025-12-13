@@ -180,6 +180,25 @@ void NetworkManager::sendClimaxStart()
   sendPacket(data);
 }
 
+void NetworkManager::sendWallPlace(float x, float y)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::WallPlace));
+
+  auto addFloat = [&data](float value) {
+    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+    for (int i = 0; i < 4; i++)
+      data.push_back(bytes[i]);
+  };
+
+  addFloat(x);
+  addFloat(y);
+
+  sendPacket(data);
+}
+
 void NetworkManager::sendNpcActivate(int npcId, int team)
 {
   if (!m_connected) return;
@@ -579,6 +598,18 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     if (m_onClimaxStart)
     {
       m_onClimaxStart();
+    }
+    break;
+  }
+  case NetMessageType::WallPlace:
+  {
+    // 对方放置墙壁
+    if (data.size() >= 9 && m_onWallPlace)
+    {
+      float x, y;
+      std::memcpy(&x, &data[1], sizeof(float));
+      std::memcpy(&y, &data[5], sizeof(float));
+      m_onWallPlace(x, y);
     }
     break;
   }

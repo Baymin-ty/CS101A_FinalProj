@@ -15,7 +15,8 @@
 // 游戏状态枚举
 enum class GameState
 {
-  MainMenu,
+  MainMenu,        // 主菜单（选择 Single/Multi Player 和设置）
+  ModeSelect,      // 模式选择（选择 Escape/Battle）
   Playing,
   Paused,
   Connecting,
@@ -25,16 +26,25 @@ enum class GameState
   Victory
 };
 
-// 菜单选项枚举
-enum class MenuOption
+// 主菜单选项
+enum class MainMenuOption
 {
-  StartGame,
-  Multiplayer,
+  SinglePlayer,
+  MultiPlayer,
   MapWidth,
   MapHeight,
   EnemyCount,
   Exit,
-  Count // 用于计数
+  Count
+};
+
+// 模式选择选项
+enum class GameModeOption
+{
+  EscapeMode,    // 逃脱模式（到达终点获胜）
+  BattleMode,    // 战斗模式（击败对手获胜）
+  Back,
+  Count
 };
 
 // 输入模式
@@ -55,12 +65,14 @@ public:
 
 private:
   void processEvents();
-  void processMenuEvents(const sf::Event &event);
+  void processMainMenuEvents(const sf::Event &event);
+  void processModeSelectEvents(const sf::Event &event);
   void processConnectingEvents(const sf::Event &event);
   void update(float dt);
   void updateMultiplayer(float dt);
   void render();
-  void renderMenu();
+  void renderMainMenu();
+  void renderModeSelect();
   void renderGame();
   void renderPaused();
   void renderGameOver();
@@ -114,7 +126,11 @@ private:
 
   // 游戏状态
   GameState m_gameState = GameState::MainMenu;
-  MenuOption m_selectedOption = MenuOption::StartGame;
+  MainMenuOption m_mainMenuOption = MainMenuOption::SinglePlayer;
+  GameModeOption m_gameModeOption = GameModeOption::EscapeMode;
+  
+  // 当前选择的玩家模式和游戏模式
+  bool m_isMultiplayer = false;  // true = Multi Player, false = Single Player
 
   // 多人游戏状态（使用MultiplayerState结构体）
   MultiplayerState m_mpState;
@@ -138,6 +154,9 @@ private:
 
   // 多人模式：R键状态跟踪（事件驱动）
   bool m_rKeyWasPressed = false;
+
+  // 墙壁放置模式
+  bool m_placementMode = false;  // 是否处于放置模式
 
   bool m_gameOver = false;
   bool m_gameWon = false;
