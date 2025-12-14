@@ -967,9 +967,9 @@ void MultiplayerHandler::renderUI(
   wallsText.setPosition({barX, wallsY});
   ctx.window.draw(wallsText);
   
-  // 暗黑模式下显示剩余存活的敌人数量
+  // Escape模式暗黑模式下显示剩余存活的敌人数量（Battle模式不显示）
   float enemyCountY = wallsY + 25.f;
-  if (ctx.isDarkMode)
+  if (ctx.isDarkMode && state.isEscapeMode)
   {
     int aliveEnemies = 0;
     for (const auto &enemy : ctx.enemies)
