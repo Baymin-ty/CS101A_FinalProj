@@ -30,7 +30,7 @@ Game::Game()
 
   // 创建窗口（使用实际尺寸）
   m_window.create(sf::VideoMode({m_screenWidth, m_screenHeight}), "Tank Maze Game");
-  m_window.setFramerateLimit(60);
+  m_window.setFramerateLimit(120);
 
   // 初始化视图 - 使用固定的逻辑分辨率，保证所有屏幕看到的范围相同
   m_gameView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)}));
@@ -1978,6 +1978,35 @@ void Game::setupNetworkCallbacks()
                      {
     // 对方放置了墙壁
     m_maze.placeWall({x, y}); });
+
+  net.setOnWallDamage([this](int row, int col, float damage, bool destroyed, int attribute)
+                      {
+    // 非房主接收墙壁伤害同步
+    if (!m_mpState.isHost) {
+      WallDestroyResult result = m_maze.applyWallDamage(row, col, damage, destroyed);
+      
+      // 如果墙被摧毁且是本地玩家的子弹造成的，给本地玩家加效果
+      // 注意：这里无法判断是谁的子弹，增益效果需要另外同步
+      // 目前简化处理：墙壁摧毁时不给非房主加增益，增益由房主处理
+      if (destroyed && result.destroyed && m_player) {
+        // 播放对应的音效
+        sf::Vector2f listenerPos = m_player->getPosition();
+        WallAttribute attr = static_cast<WallAttribute>(attribute);
+        switch (attr) {
+          case WallAttribute::Gold:
+            AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
+            break;
+          case WallAttribute::Heal:
+            AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
+            break;
+          case WallAttribute::None:
+            AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
+            break;
+          default:
+            break;
+        }
+      }
+    } });
 
   // Escape 模式救援回调
   net.setOnRescueStart([this]()

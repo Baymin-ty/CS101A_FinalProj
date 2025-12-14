@@ -38,7 +38,9 @@ const MessageType = {
   // 房间大厅
   PlayerReady: 29,
   HostStartGame: 30,
-  RoomInfo: 31
+  RoomInfo: 31,
+  // 墙壁伤害同步
+  WallDamage: 32
 };
 
 // 房间管理
@@ -420,7 +422,8 @@ function handleMessage(socket, data) {
     case MessageType.NpcShoot:
     case MessageType.NpcDamage:
     case MessageType.ClimaxStart:
-    case MessageType.WallPlace: {
+    case MessageType.WallPlace:
+    case MessageType.WallDamage: {
       const roomCode = socket.roomCode;
       if (!roomCode) break;
 

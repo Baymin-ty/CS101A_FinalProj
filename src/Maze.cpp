@@ -366,6 +366,53 @@ WallDestroyResult Maze::bulletHitWithResult(sf::Vector2f bulletPos, float damage
   return result;
 }
 
+WallDestroyResult Maze::applyWallDamage(int row, int col, float damage, bool forceDestroy)
+{
+  WallDestroyResult result;
+
+  if (row < 0 || row >= m_rows || col < 0 || col >= m_cols)
+    return result;
+
+  Wall &wall = m_walls[row][col];
+
+  if (wall.type == WallType::Destructible)
+  {
+    if (forceDestroy)
+    {
+      // 强制摧毁（用于同步已确定摧毁的墙）
+      result.destroyed = true;
+      result.attribute = wall.attribute;
+      result.position = {col * m_tileSize + m_tileSize / 2.f, row * m_tileSize + m_tileSize / 2.f};
+      result.gridX = col;
+      result.gridY = row;
+      wall.type = WallType::None;
+    }
+    else
+    {
+      wall.health -= damage;
+      if (wall.health <= 0)
+      {
+        result.destroyed = true;
+        result.attribute = wall.attribute;
+        result.position = {col * m_tileSize + m_tileSize / 2.f, row * m_tileSize + m_tileSize / 2.f};
+        result.gridX = col;
+        result.gridY = row;
+        wall.type = WallType::None;
+      }
+      else
+      {
+        result.destroyed = false;
+        result.attribute = WallAttribute::None;
+        result.position = {col * m_tileSize + m_tileSize / 2.f, row * m_tileSize + m_tileSize / 2.f};
+        result.gridX = col;
+        result.gridY = row;
+      }
+    }
+  }
+
+  return result;
+}
+
 bool Maze::isAtExit(sf::Vector2f position, float radius) const
 {
   float dx = position.x - m_exitPosition.x;

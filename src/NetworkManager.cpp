@@ -200,6 +200,34 @@ void NetworkManager::sendWallPlace(float x, float y)
   sendPacket(data);
 }
 
+void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroyed, int attribute)
+{
+  if (!m_connected) return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::WallDamage));
+
+  auto addInt = [&data](int value) {
+    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+    for (int i = 0; i < 4; i++)
+      data.push_back(bytes[i]);
+  };
+
+  auto addFloat = [&data](float value) {
+    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+    for (int i = 0; i < 4; i++)
+      data.push_back(bytes[i]);
+  };
+
+  addInt(row);
+  addInt(col);
+  addFloat(damage);
+  data.push_back(destroyed ? 1 : 0);
+  addInt(attribute);
+
+  sendPacket(data);
+}
+
 void NetworkManager::sendRescueStart()
 {
   if (!m_connected) return;
@@ -690,6 +718,23 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       std::memcpy(&x, &data[1], sizeof(float));
       std::memcpy(&y, &data[5], sizeof(float));
       m_onWallPlace(x, y);
+    }
+    break;
+  }
+  case NetMessageType::WallDamage:
+  {
+    // 墙壁受到伤害同步
+    if (data.size() >= 18 && m_onWallDamage)
+    {
+      int row, col, attribute;
+      float damage;
+      bool destroyed;
+      std::memcpy(&row, &data[1], sizeof(int));
+      std::memcpy(&col, &data[5], sizeof(int));
+      std::memcpy(&damage, &data[9], sizeof(float));
+      destroyed = (data[13] != 0);
+      std::memcpy(&attribute, &data[14], sizeof(int));
+      m_onWallDamage(row, col, damage, destroyed, attribute);
     }
     break;
   }

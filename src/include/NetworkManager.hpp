@@ -59,6 +59,9 @@ enum class NetMessageType : uint8_t
   PlayerReady,    // 玩家准备就绪
   HostStartGame,  // 房主开始游戏
   RoomInfo,       // 房间信息同步
+  
+  // 墙壁伤害同步
+  WallDamage,     // 墙壁受到伤害
 };
 
 // 玩家状态数据
@@ -111,6 +114,7 @@ using OnRescueCancelCallback = std::function<void()>;
 using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
 using OnPlayerReadyCallback = std::function<void(bool isReady)>;
 using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady)>;
+using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute)>;
 
 class NetworkManager
 {
@@ -149,6 +153,7 @@ public:
   
   // 墙壁放置同步
   void sendWallPlace(float x, float y);  // 发送墙壁放置
+  void sendWallDamage(int row, int col, float damage, bool destroyed, int attribute);  // 发送墙壁伤害
   
   // 救援同步
   void sendRescueStart();    // 开始救援
@@ -183,6 +188,7 @@ public:
   void setOnPlayerLeft(OnPlayerLeftCallback cb) { m_onPlayerLeft = cb; }
   void setOnClimaxStart(OnClimaxStartCallback cb) { m_onClimaxStart = cb; }
   void setOnWallPlace(OnWallPlaceCallback cb) { m_onWallPlace = cb; }
+  void setOnWallDamage(OnWallDamageCallback cb) { m_onWallDamage = cb; }
   void setOnRescueStart(OnRescueStartCallback cb) { m_onRescueStart = cb; }
   void setOnRescueProgress(OnRescueProgressCallback cb) { m_onRescueProgress = cb; }
   void setOnRescueComplete(OnRescueCompleteCallback cb) { m_onRescueComplete = cb; }
@@ -228,6 +234,7 @@ private:
   OnPlayerLeftCallback m_onPlayerLeft;
   OnClimaxStartCallback m_onClimaxStart;
   OnWallPlaceCallback m_onWallPlace;
+  OnWallDamageCallback m_onWallDamage;
   OnRescueStartCallback m_onRescueStart;
   OnRescueProgressCallback m_onRescueProgress;
   OnRescueCompleteCallback m_onRescueComplete;

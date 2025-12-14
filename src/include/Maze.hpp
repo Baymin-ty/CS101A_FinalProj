@@ -143,6 +143,9 @@ public:
 
   // 检查某个网格是否可通行
   bool isWalkable(int row, int col) const;
+  
+  // 网络同步：应用墙壁伤害（用于非房主接收同步数据）
+  WallDestroyResult applyWallDamage(int row, int col, float damage, bool forceDestroy = false);
 
   // 世界坐标转网格坐标
   GridPos worldToGrid(sf::Vector2f pos) const;

@@ -167,30 +167,59 @@ void CollisionSystem::checkMultiplayerCollisions(
     sf::Vector2f bulletPos = bullet->getPosition();
     int bulletTeam = bullet->getTeam();
 
-    // 检查与墙壁碰撞（使用带属性返回的版本）
-    WallDestroyResult wallResult = checkBulletWallCollisionWithResult(bullet.get(), maze);
-    // 判断是否击中了墙（包括击中但未摧毁的情况）
-    bool hitWall = (wallResult.position.x != 0 || wallResult.position.y != 0);
-
-    if (hitWall || wallResult.destroyed)
+    // 墙壁碰撞检测：只有房主处理伤害和同步
+    // 非房主只检测是否击中（用于播放音效和销毁子弹），不处理墙壁伤害
+    if (isHost)
     {
-      // 播放子弹击中墙壁音效
-      AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
+      // 房主：处理墙壁伤害并同步给非房主
+      WallDestroyResult wallResult = checkBulletWallCollisionWithResult(bullet.get(), maze);
+      bool hitWall = (wallResult.position.x != 0 || wallResult.position.y != 0);
 
-      // 如果墙被摧毁且有属性效果，处理增益
-      if (wallResult.destroyed)
+      if (hitWall || wallResult.destroyed)
       {
-        // 判断子弹是谁发射的，给对应玩家加效果
-        bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
-        if (isLocalPlayerBullet)
-        {
-          handleWallDestroyEffect(wallResult, player, maze);
-        }
-        // 注意：对方玩家的增益效果由对方客户端处理
-      }
+        // 播放子弹击中墙壁音效
+        AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
 
-      bullet->setInactive();
-      continue;
+        // 同步墙壁伤害给非房主
+        NetworkManager::getInstance().sendWallDamage(
+            wallResult.gridY, wallResult.gridX,
+            bullet->getDamage(),
+            wallResult.destroyed,
+            static_cast<int>(wallResult.attribute));
+
+        // 如果墙被摧毁且有属性效果，处理增益
+        if (wallResult.destroyed)
+        {
+          // 判断子弹是谁发射的，给对应玩家加效果
+          bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+          if (isLocalPlayerBullet)
+          {
+            handleWallDestroyEffect(wallResult, player, maze);
+          }
+          // 对方玩家的增益效果由网络同步触发
+        }
+
+        bullet->setInactive();
+        continue;
+      }
+    }
+    else
+    {
+      // 非房主：只检测是否击中墙壁（用于播放音效），不处理伤害
+      // 墙壁伤害由房主同步过来
+      int c = static_cast<int>(bulletPos.x / maze.getTileSize());
+      int r = static_cast<int>(bulletPos.y / maze.getTileSize());
+      if (c >= 0 && r >= 0)
+      {
+        // 简单检查是否在墙壁位置
+        if (maze.checkCollision(bulletPos, 1.f))
+        {
+          // 播放子弹击中墙壁音效
+          AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
+          bullet->setInactive();
+          continue;
+        }
+      }
     }
 
     // 判断子弹是否是本地玩家发射的
