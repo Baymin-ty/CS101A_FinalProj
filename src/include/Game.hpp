@@ -164,6 +164,9 @@ private:
   // 墙壁放置模式
   bool m_placementMode = false;  // 是否处于放置模式
 
+  // 暗黑模式（创建房间时选择）
+  bool m_darkModeOption = false;
+
   bool m_gameOver = false;
   bool m_gameWon = false;
   
@@ -175,4 +178,7 @@ private:
   
   // 检查终点是否在玩家视野内
   bool isExitInView() const;
+  
+  // 渲染暗黑模式遮罩
+  void renderDarkModeOverlay();
 };

@@ -468,6 +468,11 @@ void Game::processModeSelectEvents(const sf::Event &event)
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       m_gameState = GameState::MainMenu;
       break;
+    case sf::Keyboard::Key::D:
+      // 切换暗黑模式
+      m_darkModeOption = !m_darkModeOption;
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      break;
     case sf::Keyboard::Key::Enter:
     case sf::Keyboard::Key::Space:
       switch (m_gameModeOption)
@@ -654,7 +659,7 @@ void Game::processEvents()
               int npcCount = m_enemyOptions[m_enemyIndex];
               m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, npcCount, true, m_mpState.isEscapeMode);
               m_mpState.generatedMazeData = m_maze.getMazeData();
-              NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+              NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode, m_mpState.isDarkMode);
 
               // 房主默认准备
               m_mpState.localPlayerReady = true;
@@ -1275,6 +1280,28 @@ void Game::renderModeSelect()
     m_window.draw(desc);
   }
 
+  // 暗黑模式选项（单人模式）- 在 Back 上方
+  if (!m_isMultiplayer)
+  {
+    sf::Text darkModeText(m_font);
+    std::string darkStr = "Dark Mode: " + std::string(m_darkModeOption ? "ON" : "OFF");
+    darkModeText.setCharacterSize(28);
+    darkModeText.setFillColor(m_darkModeOption ? sf::Color(200, 100, 255) : sf::Color(150, 150, 150));
+    darkModeText.setString(darkStr);
+    sf::FloatRect darkBounds = darkModeText.getLocalBounds();
+    darkModeText.setPosition({(LOGICAL_WIDTH - darkBounds.size.x) / 2.f, startY + spacing * 2 + 20.f});
+    m_window.draw(darkModeText);
+    
+    // 暗黑模式描述
+    sf::Text darkDesc(m_font);
+    darkDesc.setString("Limited vision with fog of war (D to toggle)");
+    darkDesc.setCharacterSize(18);
+    darkDesc.setFillColor(sf::Color(120, 120, 120));
+    sf::FloatRect darkDescBounds = darkDesc.getLocalBounds();
+    darkDesc.setPosition({(LOGICAL_WIDTH - darkDescBounds.size.x) / 2.f, startY + spacing * 2 + 55.f});
+    m_window.draw(darkDesc);
+  }
+
   // Back
   {
     sf::Text optionText(m_font);
@@ -1293,13 +1320,15 @@ void Game::renderModeSelect()
     }
 
     sf::FloatRect bounds = optionText.getLocalBounds();
-    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, startY + spacing * 2 + 40.f});
+    // 单人模式有暗黑模式选项，Back 位置下移
+    float backY = m_isMultiplayer ? (startY + spacing * 2 + 40.f) : (startY + spacing * 2 + 110.f);
+    optionText.setPosition({(LOGICAL_WIDTH - bounds.size.x) / 2.f, backY});
     m_window.draw(optionText);
   }
 
   // 提示
   sf::Text hint(m_font);
-  hint.setString("W/S: Navigate | Enter: Select | ESC: Back");
+  hint.setString("W/S: Game Mode | D: Dark Mode | Enter: Select | ESC: Back");
   hint.setCharacterSize(18);
   hint.setFillColor(sf::Color(120, 120, 120));
   sf::FloatRect hintBounds = hint.getLocalBounds();
@@ -1400,6 +1429,21 @@ void Game::renderGame()
     if (!enemy->isDead())
     {
       enemy->draw(m_window);
+    }
+  }
+
+  // 单人模式暗黑模式遮罩（在游戏世界上方，UI下方）
+  if (m_darkModeOption && !m_isMultiplayer)
+  {
+    renderDarkModeOverlay();
+  }
+
+  // 在遮罩上方绘制敌人血条（暗黑模式下也可见）
+  for (const auto &enemy : m_enemies)
+  {
+    if (!enemy->isDead())
+    {
+      enemy->drawHealthBar(m_window);
     }
   }
 
@@ -1667,7 +1711,7 @@ void Game::setupNetworkCallbacks()
     }
     std::cout << "[DEBUG] Maze data contains " << xCount << " enemy markers (X)" << std::endl;
     
-    NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+    NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode, m_mpState.isDarkMode);
     
     // 进入房间大厅
     m_gameState = GameState::RoomLobby;
@@ -1685,10 +1729,11 @@ void Game::setupNetworkCallbacks()
     m_gameState = GameState::RoomLobby;
     m_mpState.connectionStatus = "Joined room: " + roomCode; });
 
-  net.setOnMazeData([this](const std::vector<std::string> &mazeData)
+  net.setOnMazeData([this](const std::vector<std::string> &mazeData, bool isDarkMode)
                     {
     // 收到迷宫数据（非房主）
     m_mpState.generatedMazeData = mazeData;
+    m_mpState.isDarkMode = isDarkMode;
     
     // 解析迷宫尺寸
     if (!mazeData.empty()) {
@@ -1717,7 +1762,7 @@ void Game::setupNetworkCallbacks()
                        {
     // 服务器请求迷宫数据（房主收到）
     if (m_mpState.isHost && !m_mpState.generatedMazeData.empty()) {
-      NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+      NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode, m_mpState.isDarkMode);
     } });
 
   net.setOnGameStart([this]()
@@ -2092,7 +2137,7 @@ void Game::setupNetworkCallbacks()
     m_mpState.otherPlayerReady = isReady;
     std::cout << "[DEBUG] Other player ready: " << isReady << std::endl; });
 
-  net.setOnRoomInfo([this](const std::string &hostIP, const std::string &guestIP, bool guestReady)
+  net.setOnRoomInfo([this](const std::string &hostIP, const std::string &guestIP, bool guestReady, bool isDarkMode)
                     {
     // 收到房间信息
     if (m_mpState.isHost) {
@@ -2106,7 +2151,8 @@ void Game::setupNetworkCallbacks()
       m_mpState.otherPlayerInRoom = true;  // 房主肯定在
       m_mpState.otherPlayerReady = true;   // 房主默认准备
     }
-    std::cout << "[DEBUG] Room info: host=" << hostIP << ", guest=" << guestIP << ", guestReady=" << guestReady << std::endl; });
+    m_mpState.isDarkMode = isDarkMode;
+    std::cout << "[DEBUG] Room info: host=" << hostIP << ", guest=" << guestIP << ", guestReady=" << guestReady << ", darkMode=" << isDarkMode << std::endl; });
 
   net.setOnError([this](const std::string &error)
                  { m_mpState.connectionStatus = "Error: " + error; });
@@ -2205,7 +2251,8 @@ MultiplayerContext Game::getMultiplayerContext()
       LOGICAL_HEIGHT, // 使用逻辑分辨率
       m_tankScale,
       m_placementMode,
-      m_mpState.isEscapeMode};
+      m_mpState.isEscapeMode,
+      m_mpState.isDarkMode};
 }
 
 void Game::updateMultiplayer(float dt)
@@ -2281,7 +2328,7 @@ void Game::processRoomLobbyEvents(const sf::Event &event)
         m_mpState.generatedMazeData = m_maze.getMazeData();
 
         // 发送新地图给服务器和对方玩家
-        NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+        NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode, m_mpState.isDarkMode);
 
         std::cout << "[DEBUG] Host generated new maze before game start: "
                   << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight
@@ -2354,6 +2401,15 @@ void Game::renderRoomLobby()
   modeText.setFillColor(m_mpState.isEscapeMode ? sf::Color::Green : sf::Color::Red);
   modeText.setPosition({textX, textY});
   m_window.draw(modeText);
+  textY += lineHeight;
+
+  // 暗黑模式
+  sf::Text darkModeText(m_font);
+  darkModeText.setString(std::string("Dark Mode: ") + (m_mpState.isDarkMode ? "ON" : "OFF"));
+  darkModeText.setCharacterSize(28);
+  darkModeText.setFillColor(m_mpState.isDarkMode ? sf::Color(200, 100, 255) : sf::Color(150, 150, 150));
+  darkModeText.setPosition({textX, textY});
+  m_window.draw(darkModeText);
   textY += lineHeight;
 
   // 迷宫尺寸
@@ -2515,6 +2571,11 @@ void Game::processCreatingRoomEvents(const sf::Event &event)
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
+    case sf::Keyboard::Key::D:
+      // 切换暗黑模式
+      m_darkModeOption = !m_darkModeOption;
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      break;
     case sf::Keyboard::Key::Escape:
       // 返回连接界面
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
@@ -2525,7 +2586,8 @@ void Game::processCreatingRoomEvents(const sf::Event &event)
       // 确认选择并创建房间
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
       m_mpState.isEscapeMode = (m_gameModeOption == GameModeOption::EscapeMode);
-      NetworkManager::getInstance().createRoom(m_mazeWidth, m_mazeHeight);
+      m_mpState.isDarkMode = m_darkModeOption;
+      NetworkManager::getInstance().createRoom(m_mazeWidth, m_mazeHeight, m_darkModeOption);
       break;
     default:
       break;
@@ -2624,6 +2686,27 @@ void Game::renderCreatingRoom()
     m_window.draw(desc);
   }
 
+  // 暗黑模式选项
+  {
+    sf::Text darkModeText(m_font);
+    std::string darkStr = "Dark Mode: " + std::string(m_darkModeOption ? "ON" : "OFF");
+    darkModeText.setCharacterSize(28);
+    darkModeText.setFillColor(m_darkModeOption ? sf::Color(200, 100, 255) : sf::Color(150, 150, 150));
+    darkModeText.setString(darkStr);
+    sf::FloatRect bounds = darkModeText.getLocalBounds();
+    darkModeText.setPosition({centerX - bounds.size.x / 2.f, startY + spacing * 2 + 20.f});
+    m_window.draw(darkModeText);
+
+    // 暗黑模式描述
+    sf::Text desc(m_font);
+    desc.setString("Limited vision with fog of war (D to toggle)");
+    desc.setCharacterSize(18);
+    desc.setFillColor(sf::Color(120, 120, 120));
+    sf::FloatRect descBounds = desc.getLocalBounds();
+    desc.setPosition({centerX - descBounds.size.x / 2.f, startY + spacing * 2 + 55.f});
+    m_window.draw(desc);
+  }
+
   // 地图信息
   sf::Text mapInfo(m_font);
   mapInfo.setString("Map: " + std::to_string(m_mazeWidth) + " x " + std::to_string(m_mazeHeight) +
@@ -2631,12 +2714,12 @@ void Game::renderCreatingRoom()
   mapInfo.setCharacterSize(24);
   mapInfo.setFillColor(sf::Color(100, 200, 100));
   sf::FloatRect mapBounds = mapInfo.getLocalBounds();
-  mapInfo.setPosition({centerX - mapBounds.size.x / 2.f, 520.f});
+  mapInfo.setPosition({centerX - mapBounds.size.x / 2.f, 560.f});
   m_window.draw(mapInfo);
 
   // 提示
   sf::Text hint(m_font);
-  hint.setString("W/S: Navigate | Enter: Create Room | ESC: Back");
+  hint.setString("W/S: Game Mode | D: Dark Mode | Enter: Create Room | ESC: Back");
   hint.setCharacterSize(18);
   hint.setFillColor(sf::Color(120, 120, 120));
   sf::FloatRect hintBounds = hint.getLocalBounds();
@@ -2685,4 +2768,88 @@ bool Game::isExitInView() const
 
   return (exitPos.x >= viewCenter.x - halfWidth && exitPos.x <= viewCenter.x + halfWidth &&
           exitPos.y >= viewCenter.y - halfHeight && exitPos.y <= viewCenter.y + halfHeight);
+}
+
+void Game::renderDarkModeOverlay()
+{
+  if (!m_player) return;
+  
+  // 保存当前视图
+  sf::View currentView = m_window.getView();
+  
+  // 切换到游戏视图来绘制遮罩
+  m_window.setView(m_gameView);
+  
+  // 获取玩家位置和视图尺寸
+  sf::Vector2f playerPos = m_player->getPosition();
+  sf::Vector2f viewSize = m_gameView.getSize();
+  sf::Vector2f viewCenter = m_gameView.getCenter();
+  
+  // 椭圆参数：短半轴保持屏幕高度的30%，长半轴稍短
+  float ellipseB = viewSize.y * 0.28f;  // 椭圆短半轴（垂直方向）
+  float ellipseA = viewSize.x * 0.22f;  // 椭圆长半轴（水平方向）- 稍短
+  
+  // 渐变区域（椭圆外扩展）
+  float fadeScale = 0.3f;  // 渐变区域为椭圆尺寸的30%
+  float fadeA = ellipseA * fadeScale;
+  float fadeB = ellipseB * fadeScale;
+  
+  // 使用像素级绘制：创建一个覆盖整个视图的网格
+  // 为了性能，使用较大的格子
+  const int gridSize = 8;  // 每个格子的像素大小
+  
+  float startX = viewCenter.x - viewSize.x / 2.f;
+  float startY = viewCenter.y - viewSize.y / 2.f;
+  
+  int cols = static_cast<int>(viewSize.x / gridSize) + 1;
+  int rows = static_cast<int>(viewSize.y / gridSize) + 1;
+  
+  for (int row = 0; row < rows; row++) {
+    for (int col = 0; col < cols; col++) {
+      float x = startX + col * gridSize + gridSize / 2.f;
+      float y = startY + row * gridSize + gridSize / 2.f;
+      
+      // 计算点到玩家的椭圆距离
+      float dx = x - playerPos.x;
+      float dy = y - playerPos.y;
+      
+      // 椭圆方程: (dx/a)^2 + (dy/b)^2 = 1
+      // 计算归一化椭圆距离
+      float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
+      
+      uint8_t alpha;
+      if (ellipseDist <= 1.0f) {
+        // 在椭圆内部，完全透明
+        alpha = 0;
+      } else {
+        // 计算外圈椭圆的归一化距离
+        float outerA = ellipseA + fadeA;
+        float outerB = ellipseB + fadeB;
+        float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
+        
+        if (outerDist >= 1.0f) {
+          // 在渐变区域外，完全黑色
+          alpha = 255;
+        } else {
+          // 在渐变区域内，计算渐变
+          // ellipseDist 从 1.0 到 outerDist 对应的内椭圆距离
+          float t = (ellipseDist - 1.0f) / (1.0f / outerDist * ellipseDist - 1.0f);
+          // 简化：线性插值
+          float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
+          fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
+          alpha = static_cast<uint8_t>(255 * fadeProgress);
+        }
+      }
+      
+      if (alpha > 0) {
+        sf::RectangleShape cell({static_cast<float>(gridSize), static_cast<float>(gridSize)});
+        cell.setPosition({startX + col * gridSize, startY + row * gridSize});
+        cell.setFillColor(sf::Color(0, 0, 0, alpha));
+        m_window.draw(cell);
+      }
+    }
+  }
+  
+  // 恢复之前的视图
+  m_window.setView(currentView);
 }

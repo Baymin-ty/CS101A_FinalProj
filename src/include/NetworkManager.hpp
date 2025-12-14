@@ -93,7 +93,7 @@ using OnDisconnectedCallback = std::function<void()>;
 using OnRoomCreatedCallback = std::function<void(const std::string& roomCode)>;
 using OnRoomJoinedCallback = std::function<void(const std::string& roomCode)>;
 using OnGameStartCallback = std::function<void()>;
-using OnMazeDataCallback = std::function<void(const std::vector<std::string>& mazeData)>;
+using OnMazeDataCallback = std::function<void(const std::vector<std::string>& mazeData, bool isDarkMode)>;
 using OnRequestMazeCallback = std::function<void()>;
 using OnPlayerUpdateCallback = std::function<void(const PlayerState& state)>;
 using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>;
@@ -113,7 +113,7 @@ using OnRescueCompleteCallback = std::function<void()>;
 using OnRescueCancelCallback = std::function<void()>;
 using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
 using OnPlayerReadyCallback = std::function<void(bool isReady)>;
-using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady)>;
+using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady, bool isDarkMode)>;
 using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)>;
 
 class NetworkManager
@@ -131,11 +131,11 @@ public:
   bool isConnected() const { return m_connected; }
 
   // 房间操作
-  void createRoom(int mazeWidth, int mazeHeight);
+  void createRoom(int mazeWidth, int mazeHeight, bool isDarkMode = false);
   void joinRoom(const std::string& roomCode);
 
   // 发送迷宫数据（房主调用）
-  void sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode = false);
+  void sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode = false, bool isDarkMode = false);
 
   // 发送游戏数据
   void sendPosition(const PlayerState& state);

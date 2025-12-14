@@ -731,6 +731,32 @@ void MultiplayerHandler::renderMultiplayer(
     ctx.window.draw(activateHint);
   }
 
+  // 暗黑模式遮罩（在游戏世界上方，UI下方）
+  if (ctx.isDarkMode) {
+    renderDarkModeOverlay(ctx);
+  }
+
+  // 在遮罩上方绘制NPC血条和阵营标记（暗黑模式下也可见）
+  for (const auto& npc : ctx.enemies) {
+    if (npc->isDead()) continue;
+    
+    npc->drawHealthBar(ctx.window);
+    
+    sf::Vector2f npcPos = npc->getPosition();
+    // Battle 模式：显示阵营标记
+    if (!state.isEscapeMode) {
+      if (npc->isActivated()) {
+        sf::Color markerColor = (npc->getTeam() == ctx.player->getTeam()) 
+          ? sf::Color(0, 255, 0, 200)   // 己方：绿色
+          : sf::Color(255, 0, 0, 200);  // 敌方：红色
+        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, markerColor);
+      } else {
+        // 未激活：灰色
+        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
+      }
+    }
+  }
+
   // 渲染UI
   renderUI(ctx, state);
 
@@ -745,22 +771,7 @@ void MultiplayerHandler::renderNpcs(
     if (npc->isDead()) continue;
 
     npc->draw(ctx.window);
-
-    sf::Vector2f npcPos = npc->getPosition();
-    
-    // Escape 模式：NPC 是敌人，不需要显示标记（显而易见）
-    // Battle 模式：显示阵营标记
-    if (!state.isEscapeMode) {
-      if (npc->isActivated()) {
-        sf::Color markerColor = (npc->getTeam() == ctx.player->getTeam()) 
-          ? sf::Color(0, 255, 0, 200)   // 己方：绿色
-          : sf::Color(255, 0, 0, 200);  // 敌方：红色
-        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, markerColor);
-      } else {
-        // 未激活：灰色
-        UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
-      }
-    }
+    // 血条和阵营标记在遮罩之后单独绘制
   }
 }
 
@@ -902,8 +913,10 @@ void MultiplayerHandler::renderUI(
   controlHint.setPosition({barX, static_cast<float>(ctx.screenHeight) - 30.f});
   ctx.window.draw(controlHint);
 
-  // 渲染小地图（左下角）
-  renderMinimap(ctx, state);
+  // 渲染小地图（左下角）- 暗黑模式下隐藏
+  if (!ctx.isDarkMode) {
+    renderMinimap(ctx, state);
+  }
 }
 
 void MultiplayerHandler::renderMinimap(
@@ -1020,4 +1033,88 @@ void MultiplayerHandler::renderMinimap(
   minimapLabel.setFillColor(sf::Color(180, 180, 180));
   minimapLabel.setPosition({minimapX + 5.f, minimapY + 3.f});
   ctx.window.draw(minimapLabel);
+}
+
+void MultiplayerHandler::renderDarkModeOverlay(MultiplayerContext& ctx)
+{
+  if (!ctx.player) return;
+  
+  // 保存当前视图
+  sf::View currentView = ctx.window.getView();
+  
+  // 切换到游戏视图来绘制遮罩
+  ctx.window.setView(ctx.gameView);
+  
+  // 获取玩家位置和视图尺寸
+  sf::Vector2f playerPos = ctx.player->getPosition();
+  sf::Vector2f viewSize = ctx.gameView.getSize();
+  sf::Vector2f viewCenter = ctx.gameView.getCenter();
+  
+  // 椭圆参数：短半轴保持屏幕高度的30%，长半轴稍短
+  float ellipseB = viewSize.y * 0.28f;  // 椭圆短半轴（垂直方向）
+  float ellipseA = viewSize.x * 0.22f;  // 椭圆长半轴（水平方向）- 稍短
+  
+  // 渐变区域（椭圆外扩展）
+  float fadeScale = 0.3f;  // 渐变区域为椭圆尺寸的30%
+  float fadeA = ellipseA * fadeScale;
+  float fadeB = ellipseB * fadeScale;
+  
+  // 使用像素级绘制：创建一个覆盖整个视图的网格
+  // 为了性能，使用较大的格子
+  const int gridSize = 8;  // 每个格子的像素大小
+  
+  float startX = viewCenter.x - viewSize.x / 2.f;
+  float startY = viewCenter.y - viewSize.y / 2.f;
+  
+  int cols = static_cast<int>(viewSize.x / gridSize) + 1;
+  int rows = static_cast<int>(viewSize.y / gridSize) + 1;
+  
+  for (int row = 0; row < rows; row++) {
+    for (int col = 0; col < cols; col++) {
+      float x = startX + col * gridSize + gridSize / 2.f;
+      float y = startY + row * gridSize + gridSize / 2.f;
+      
+      // 计算点到玩家的椭圆距离
+      float dx = x - playerPos.x;
+      float dy = y - playerPos.y;
+      
+      // 椭圆方程: (dx/a)^2 + (dy/b)^2 = 1
+      // 计算归一化椭圆距离
+      float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
+      
+      uint8_t alpha;
+      if (ellipseDist <= 1.0f) {
+        // 在椭圆内部，完全透明
+        alpha = 0;
+      } else {
+        // 计算外圈椭圆的归一化距离
+        float outerA = ellipseA + fadeA;
+        float outerB = ellipseB + fadeB;
+        float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
+        
+        if (outerDist >= 1.0f) {
+          // 在渐变区域外，完全黑色
+          alpha = 255;
+        } else {
+          // 在渐变区域内，计算渐变
+          // ellipseDist 从 1.0 到 outerDist 对应的内椭圆距离
+          float t = (ellipseDist - 1.0f) / (1.0f / outerDist * ellipseDist - 1.0f);
+          // 简化：线性插值
+          float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
+          fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
+          alpha = static_cast<uint8_t>(255 * fadeProgress);
+        }
+      }
+      
+      if (alpha > 0) {
+        sf::RectangleShape cell({static_cast<float>(gridSize), static_cast<float>(gridSize)});
+        cell.setPosition({startX + col * gridSize, startY + row * gridSize});
+        cell.setFillColor(sf::Color(0, 0, 0, alpha));
+        ctx.window.draw(cell);
+      }
+    }
+  }
+  
+  // 恢复之前的视图
+  ctx.window.setView(currentView);
 }

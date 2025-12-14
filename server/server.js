@@ -68,10 +68,10 @@ function sendRoomInfo(room) {
   const guestIP = guest ? getClientIP(guest.socket) : '';
   const guestReady = guest ? guest.ready : false;
 
-  // 构建消息: RoomInfo + hostIPLen + hostIP + guestIPLen + guestIP + guestReady
+  // 构建消息: RoomInfo + hostIPLen + hostIP + guestIPLen + guestIP + guestReady + isDarkMode
   const hostIPBuf = Buffer.from(hostIP);
   const guestIPBuf = Buffer.from(guestIP);
-  const response = Buffer.alloc(1 + 1 + hostIPBuf.length + 1 + guestIPBuf.length + 1);
+  const response = Buffer.alloc(1 + 1 + hostIPBuf.length + 1 + guestIPBuf.length + 1 + 1);
 
   let offset = 0;
   response[offset++] = MessageType.RoomInfo;
@@ -82,6 +82,7 @@ function sendRoomInfo(room) {
   guestIPBuf.copy(response, offset);
   offset += guestIPBuf.length;
   response[offset++] = guestReady ? 1 : 0;
+  response[offset++] = room.isDarkMode ? 1 : 0;
 
   for (const player of room.players) {
     sendMessage(player.socket, response);
@@ -133,6 +134,8 @@ function handleMessage(socket, data) {
       // 读取迷宫尺寸
       const mazeWidth = data.readUInt16LE(1);
       const mazeHeight = data.readUInt16LE(3);
+      // 读取暗黑模式标志（如果存在）
+      const isDarkMode = data.length > 5 ? data[5] !== 0 : false;
 
       // 创建房间
       let roomCode;
@@ -147,14 +150,15 @@ function handleMessage(socket, data) {
         mazeData: null,  // 存储迷宫数据
         players: [{ socket: socket, reachedExit: false, isHost: true, ready: true }],
         started: false,
-        isEscapeMode: false  // 游戏模式（从迷宫数据中读取）
+        isEscapeMode: false,  // 游戏模式（从迷宫数据中读取）
+        isDarkMode: isDarkMode  // 暗黑模式
       };
 
       rooms.set(roomCode, room);
       socket.roomCode = roomCode;
       socket.isHost = true;
 
-      console.log(`Room created: ${roomCode} (${mazeWidth}x${mazeHeight})`);
+      console.log(`Room created: ${roomCode} (${mazeWidth}x${mazeHeight}) darkMode=${isDarkMode}`);
 
       // 发送房间创建成功
       const response = Buffer.alloc(2 + roomCode.length);

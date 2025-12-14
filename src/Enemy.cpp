@@ -408,8 +408,12 @@ void Enemy::draw(sf::RenderWindow &window) const
   {
     window.draw(*m_hull);
     window.draw(*m_turret);
-    m_healthBar.draw(window);
   }
+}
+
+void Enemy::drawHealthBar(sf::RenderWindow &window) const
+{
+  m_healthBar.draw(window);
 }
 
 sf::Vector2f Enemy::getPosition() const

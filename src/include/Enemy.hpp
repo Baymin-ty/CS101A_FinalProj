@@ -20,6 +20,7 @@ public:
   void setTarget(sf::Vector2f targetPos);
   void update(float dt, const Maze &maze); // 添加迷宫参数用于碰撞检测
   void draw(sf::RenderWindow &window) const;
+  void drawHealthBar(sf::RenderWindow &window) const;  // 单独绘制血条
 
   sf::Vector2f getPosition() const;
   float getTurretAngle() const;

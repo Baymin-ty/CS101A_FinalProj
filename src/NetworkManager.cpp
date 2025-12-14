@@ -68,7 +68,7 @@ void NetworkManager::disconnect()
   }
 }
 
-void NetworkManager::createRoom(int mazeWidth, int mazeHeight)
+void NetworkManager::createRoom(int mazeWidth, int mazeHeight, bool isDarkMode)
 {
   if (!m_connected) return;
 
@@ -80,6 +80,9 @@ void NetworkManager::createRoom(int mazeWidth, int mazeHeight)
   data.push_back(static_cast<uint8_t>((mazeWidth >> 8) & 0xFF));
   data.push_back(static_cast<uint8_t>(mazeHeight & 0xFF));
   data.push_back(static_cast<uint8_t>((mazeHeight >> 8) & 0xFF));
+  
+  // 添加暗黑模式标志
+  data.push_back(static_cast<uint8_t>(isDarkMode ? 1 : 0));
 
   sendPacket(data);
 }
@@ -369,15 +372,16 @@ void NetworkManager::sendNpcDamage(int npcId, float damage)
   sendPacket(data);
 }
 
-void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode)
+void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode, bool isDarkMode)
 {
   if (!m_connected) return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::MazeData));
   
-  // 游戏模式: 0=Battle, 1=Escape
-  data.push_back(isEscapeMode ? 1 : 0);
+  // 游戏模式标志: bit 0 = isEscapeMode, bit 1 = isDarkMode
+  uint8_t modeFlags = (isEscapeMode ? 1 : 0) | (isDarkMode ? 2 : 0);
+  data.push_back(modeFlags);
   
   // 迷宫行数
   uint16_t rows = static_cast<uint16_t>(mazeData.size());
@@ -531,8 +535,10 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     {
       size_t offset = 1;
       
-      // 读取游戏模式
-      bool isEscapeMode = (data[offset] != 0);
+      // 读取游戏模式标志: bit 0 = isEscapeMode, bit 1 = isDarkMode
+      uint8_t modeFlags = data[offset];
+      bool isEscapeMode = (modeFlags & 1) != 0;
+      bool isDarkMode = (modeFlags & 2) != 0;
       offset += 1;
       
       uint16_t rows = data[offset] | (data[offset + 1] << 8);
@@ -559,7 +565,7 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       
       if (m_onMazeData)
       {
-        m_onMazeData(mazeData);
+        m_onMazeData(mazeData, isDarkMode);
       }
     }
     break;
@@ -785,7 +791,7 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   }
   case NetMessageType::RoomInfo:
   {
-    // 房间信息：hostIP长度(1) + hostIP + guestIP长度(1) + guestIP + guestReady(1)
+    // 房间信息：hostIP长度(1) + hostIP + guestIP长度(1) + guestIP + guestReady(1) + isDarkMode(1)
     if (data.size() >= 3 && m_onRoomInfo)
     {
       size_t offset = 1;
@@ -800,8 +806,9 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
         offset += guestIPLen;
       }
       
-      bool guestReady = (data.size() > offset) ? (data[offset] != 0) : false;
-      m_onRoomInfo(hostIP, guestIP, guestReady);
+      bool guestReady = (data.size() > offset) ? (data[offset++] != 0) : false;
+      bool isDarkMode = (data.size() > offset) ? (data[offset] != 0) : false;
+      m_onRoomInfo(hostIP, guestIP, guestReady, isDarkMode);
     }
     break;
   }

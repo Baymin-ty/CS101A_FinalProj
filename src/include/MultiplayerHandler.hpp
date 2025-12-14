@@ -46,6 +46,7 @@ struct MultiplayerState
   int npcCount = 10;              // NPC数量
   int mazeWidth = 41;             // 迷宫宽度
   int mazeHeight = 31;            // 迷宫高度
+  bool isDarkMode = false;        // 是否是暗黑模式
 };
 
 // 多人游戏渲染和更新所需的上下文
@@ -65,6 +66,7 @@ struct MultiplayerContext
   float tankScale;
   bool placementMode;  // 墙壁放置模式
   bool isEscapeMode;   // 是否是 Escape 模式
+  bool isDarkMode;     // 是否是暗黑模式
 };
 
 // 多人模式处理器
@@ -135,4 +137,8 @@ private:
   static void renderMinimap(
     MultiplayerContext& ctx,
     MultiplayerState& state);
+
+  // 渲染暗黑模式遮罩
+  static void renderDarkModeOverlay(
+    MultiplayerContext& ctx);
 };
