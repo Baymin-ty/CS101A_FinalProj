@@ -241,6 +241,15 @@ function handleMessage(socket, data) {
       if (room.mazeData) {
         sendMessage(socket, room.mazeData);
         console.log(`Sent existing maze data to guest in room ${roomCode}`);
+      } else {
+        // 如果没有迷宫数据，请求房主发送
+        const host = room.players.find(p => p.isHost);
+        if (host) {
+          const requestMaze = Buffer.alloc(1);
+          requestMaze[0] = MessageType.RequestMaze;
+          sendMessage(host.socket, requestMaze);
+          console.log(`Requested maze data from host in room ${roomCode}`);
+        }
       }
 
       // 发送房间信息给所有玩家

@@ -1598,14 +1598,36 @@ void Game::setupNetworkCallbacks()
     if (becameHost) {
       m_mpState.isHost = true;
       m_mpState.localPlayerReady = true;  // 新房主默认准备
+      
+      // 保留当前的游戏设置（迷宫数据、模式等）
+      // 这些已经在之前的游戏中设置过了
+      // 确保 mazeWidth, mazeHeight, npcCount 与 generatedMazeData 一致
+      if (!m_mpState.generatedMazeData.empty()) {
+        m_mpState.mazeHeight = static_cast<int>(m_mpState.generatedMazeData.size());
+        m_mpState.mazeWidth = static_cast<int>(m_mpState.generatedMazeData[0].size());
+        
+        // 重新计算NPC数量
+        int npcCount = 0;
+        for (const auto& row : m_mpState.generatedMazeData) {
+          for (char c : row) {
+            if (c == 'X') npcCount++;
+          }
+        }
+        m_mpState.npcCount = npcCount;
+        
+        // 新房主重新发送迷宫数据给服务器，以便更新服务器存储
+        NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+        std::cout << "[DEBUG] New host resent maze data to server" << std::endl;
+      }
+      
+      std::cout << "[DEBUG] Became host. Keeping maze: " << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight 
+                << ", NPCs: " << m_mpState.npcCount << ", Mode: " << (m_mpState.isEscapeMode ? "Escape" : "Battle") << std::endl;
     }
     
     // 返回房间大厅
     m_gameState = GameState::RoomLobby;
     if (becameHost) {
       m_mpState.connectionStatus = "Other player left. You are now the host.";
-      
-      // 新房主保留原来的迷宫设置
     } else {
       m_mpState.connectionStatus = "Other player left. Waiting for new player...";
     }
