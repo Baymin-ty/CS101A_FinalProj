@@ -967,6 +967,25 @@ void MultiplayerHandler::renderUI(
   wallsText.setPosition({barX, wallsY});
   ctx.window.draw(wallsText);
   
+  // 暗黑模式下显示剩余存活的敌人数量
+  float enemyCountY = wallsY + 25.f;
+  if (ctx.isDarkMode)
+  {
+    int aliveEnemies = 0;
+    for (const auto &enemy : ctx.enemies)
+    {
+      if (!enemy->isDead())
+        aliveEnemies++;
+    }
+    sf::Text enemyCountText(ctx.font);
+    enemyCountText.setString("Enemies: " + std::to_string(aliveEnemies));
+    enemyCountText.setCharacterSize(20);
+    enemyCountText.setFillColor(sf::Color(255, 100, 100)); // 红色
+    enemyCountText.setPosition({barX, enemyCountY});
+    ctx.window.draw(enemyCountText);
+    enemyCountY += 25.f;
+  }
+  
   // 墙壁放置模式提示
   if (ctx.placementMode)
   {
@@ -985,7 +1004,7 @@ void MultiplayerHandler::renderUI(
     bagHint.setString("Press SPACE to place walls");
     bagHint.setCharacterSize(18);
     bagHint.setFillColor(sf::Color(150, 150, 150));
-    bagHint.setPosition({barX, wallsY + 25.f});
+    bagHint.setPosition({barX, enemyCountY});
     ctx.window.draw(bagHint);
   }
 

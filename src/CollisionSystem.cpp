@@ -344,6 +344,18 @@ void CollisionSystem::checkMultiplayerCollisions(
               NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
             }
           }
+          // NPC子弹打NPC：房主端处理伤害
+          else if (bulletTeam != 0 && isHost)
+          {
+            // Battle模式下NPC打NPC，房主端处理伤害
+            npc->takeDamage(bullet->getDamage());
+            NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
+
+            if (npc->isDead())
+            {
+              AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
+            }
+          }
           // 对方玩家的子弹：不处理，伤害由网络消息处理
 
           bullet->setInactive();

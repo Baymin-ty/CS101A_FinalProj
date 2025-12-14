@@ -1469,8 +1469,8 @@ void Game::renderGame()
     m_window.draw(wallsText);
     uiY += 30.f;
 
-    // 暗黑模式下显示剩余存活的敌人数量
-    if (m_darkModeOption && !m_isMultiplayer)
+    // Escape 模式或暗黑模式下显示剩余存活的敌人数量
+    if ((m_gameModeOption == GameModeOption::EscapeMode || m_darkModeOption) && !m_isMultiplayer)
     {
       int aliveEnemies = 0;
       for (const auto &enemy : m_enemies)
