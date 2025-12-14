@@ -412,13 +412,13 @@ void MultiplayerHandler::updateNpcAI(
           sf::Vector2f bulletPos = npc->getGunPosition();
           float bulletAngle = npc->getTurretAngle();
           // NPC子弹颜色：Escape模式全红（敌方），Battle模式根据team判断
-          // 己方NPC（team与本地玩家相同）蓝色，敌方NPC红色
+          // 己方NPC（team与本地玩家相同）浅蓝色，敌方NPC红色
           sf::Color bulletColor;
           if (state.isEscapeMode) {
-            bulletColor = sf::Color::Red;  // Escape模式所有NPC都是敌方
+            bulletColor = GameColors::EnemyNpcBullet;  // Escape模式所有NPC都是敌方
           } else {
             int localTeam = ctx.player ? ctx.player->getTeam() : 1;
-            bulletColor = (npcTeam == localTeam) ? sf::Color::Blue : sf::Color::Red;
+            bulletColor = (npcTeam == localTeam) ? GameColors::AllyNpcBullet : GameColors::EnemyNpcBullet;
           }
           auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, bulletColor);
           bullet->setTeam(npcTeam);
@@ -901,4 +901,119 @@ void MultiplayerHandler::renderUI(
   controlHint.setFillColor(sf::Color(150, 150, 150));
   controlHint.setPosition({barX, static_cast<float>(ctx.screenHeight) - 30.f});
   ctx.window.draw(controlHint);
+
+  // 渲染小地图（左下角）
+  renderMinimap(ctx, state);
+}
+
+void MultiplayerHandler::renderMinimap(
+  MultiplayerContext& ctx,
+  MultiplayerState& state)
+{
+  // 小地图参数
+  const float minimapSize = 150.f;  // 小地图尺寸
+  const float minimapMargin = 20.f;  // 边距
+  const float minimapX = minimapMargin;
+  const float minimapY = static_cast<float>(ctx.screenHeight) - minimapSize - minimapMargin - 35.f;  // 留出操作提示空间
+  
+  // 绘制小地图背景
+  sf::RectangleShape minimapBg({minimapSize, minimapSize});
+  minimapBg.setPosition({minimapX, minimapY});
+  minimapBg.setFillColor(sf::Color(20, 20, 20, 200));
+  minimapBg.setOutlineColor(sf::Color(100, 100, 100, 255));
+  minimapBg.setOutlineThickness(2.f);
+  ctx.window.draw(minimapBg);
+  
+  // 计算地图范围（基于迷宫大小）
+  sf::Vector2f mazeSize = ctx.maze.getSize();
+  float mapWidth = mazeSize.x;
+  float mapHeight = mazeSize.y;
+  float scale = std::min(minimapSize / mapWidth, minimapSize / mapHeight) * 0.9f;
+  
+  // 计算小地图中心偏移（使内容居中）
+  float offsetX = minimapX + (minimapSize - mapWidth * scale) / 2.f;
+  float offsetY = minimapY + (minimapSize - mapHeight * scale) / 2.f;
+  
+  // 将世界坐标转换为小地图坐标的lambda
+  auto worldToMinimap = [&](sf::Vector2f worldPos) -> sf::Vector2f {
+    return sf::Vector2f(
+      offsetX + worldPos.x * scale,
+      offsetY + worldPos.y * scale
+    );
+  };
+  
+  // 绘制NPC
+  for (const auto& npc : ctx.enemies) {
+    if (npc->isDead()) continue;
+    
+    sf::Vector2f npcPos = npc->getPosition();
+    sf::Vector2f npcMiniPos = worldToMinimap(npcPos);
+    
+    sf::CircleShape npcDot(3.f);
+    npcDot.setPosition({npcMiniPos.x - 3.f, npcMiniPos.y - 3.f});
+    
+    if (state.isEscapeMode) {
+      // Escape模式：所有NPC都是敌方（红色）
+      npcDot.setFillColor(GameColors::MinimapEnemyNpc);
+    } else {
+      // Battle模式：根据阵营显示
+      if (npc->isActivated()) {
+        int localTeam = ctx.player ? ctx.player->getTeam() : 1;
+        if (npc->getTeam() == localTeam) {
+          npcDot.setFillColor(GameColors::MinimapAllyNpc);  // 己方NPC浅蓝色
+        } else {
+          npcDot.setFillColor(GameColors::MinimapEnemyNpc);   // 敌方NPC红色
+        }
+      } else {
+        npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活灰色
+      }
+    }
+    ctx.window.draw(npcDot);
+  }
+  
+  // 绘制对方玩家
+  if (ctx.otherPlayer) {
+    sf::Vector2f otherPos = ctx.otherPlayer->getPosition();
+    sf::Vector2f otherMiniPos = worldToMinimap(otherPos);
+    
+    sf::CircleShape otherDot(4.f);
+    otherDot.setPosition({otherMiniPos.x - 4.f, otherMiniPos.y - 4.f});
+    
+    if (state.isEscapeMode) {
+      // Escape模式：队友（青色）
+      if (state.otherPlayerDead) {
+        otherDot.setFillColor(GameColors::MinimapDowned);  // 倒地灰色
+      } else {
+        otherDot.setFillColor(GameColors::MinimapAlly);
+      }
+    } else {
+      // Battle模式：敌方玩家（紫色）
+      otherDot.setFillColor(GameColors::MinimapEnemy);
+    }
+    ctx.window.draw(otherDot);
+  }
+  
+  // 绘制本地玩家（黄色，最后绘制以确保在最上层）
+  if (ctx.player) {
+    sf::Vector2f playerPos = ctx.player->getPosition();
+    sf::Vector2f playerMiniPos = worldToMinimap(playerPos);
+    
+    sf::CircleShape playerDot(4.f);
+    playerDot.setPosition({playerMiniPos.x - 4.f, playerMiniPos.y - 4.f});
+    
+    if (state.isEscapeMode && state.localPlayerDead) {
+      playerDot.setFillColor(GameColors::MinimapDowned);  // 倒地灰色
+    } else {
+      playerDot.setFillColor(GameColors::MinimapPlayer);
+    }
+    ctx.window.draw(playerDot);
+  }
+  
+  // 小地图标签
+  sf::Text minimapLabel(ctx.font);
+  minimapLabel.setString("Minimap");
+  minimapLabel.setCharacterSize(12);
+  minimapLabel.setFillColor(sf::Color(180, 180, 180));
+  minimapLabel.setPosition({minimapX + 5.f, minimapY + 3.f});
+  ctx.window.draw(minimapLabel);
 }

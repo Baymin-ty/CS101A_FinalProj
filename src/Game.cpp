@@ -1857,7 +1857,7 @@ void Game::setupNetworkCallbacks()
   net.setOnPlayerShoot([this](float x, float y, float angle)
                        {
     // 创建另一个玩家的子弹 - 紫色
-    auto bullet = std::make_unique<Bullet>(x, y, angle, false, sf::Color::Magenta);
+    auto bullet = std::make_unique<Bullet>(x, y, angle, false, GameColors::EnemyPlayerBullet);
     bullet->setOwner(BulletOwner::OtherPlayer);  // 标记为对方玩家的子弹
     // 对方玩家的 team 和 otherPlayer 一样
     if (m_otherPlayer) {
@@ -1971,13 +1971,13 @@ void Game::setupNetworkCallbacks()
         npcTeam = m_enemies[npcId]->getTeam();
       }
       // NPC子弹颜色：Escape模式全红（敌方），Battle模式根据team判断
-      // 己方NPC（team与本地玩家相同）蓝色，敌方NPC红色
+      // 己方NPC（team与本地玩家相同）浅蓝色，敌方NPC红色
       sf::Color bulletColor;
       if (m_mpState.isEscapeMode) {
-        bulletColor = sf::Color::Red;  // Escape模式所有NPC都是敌方
+        bulletColor = GameColors::EnemyNpcBullet;  // Escape模式所有NPC都是敌方
       } else {
         int localTeam = m_player ? m_player->getTeam() : 1;
-        bulletColor = (npcTeam == localTeam) ? sf::Color::Blue : sf::Color::Red;
+        bulletColor = (npcTeam == localTeam) ? GameColors::AllyNpcBullet : GameColors::EnemyNpcBullet;
       }
       // NPC子弹使用 BulletOwner::Enemy 标识，并设置阵营
       auto bullet = std::make_unique<Bullet>(x, y, angle, false, bulletColor);

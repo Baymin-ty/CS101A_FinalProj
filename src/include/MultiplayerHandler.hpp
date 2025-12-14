@@ -130,4 +130,9 @@ private:
   static void renderUI(
     MultiplayerContext& ctx,
     MultiplayerState& state);
+
+  // 渲染小地图
+  static void renderMinimap(
+    MultiplayerContext& ctx,
+    MultiplayerState& state);
 };
