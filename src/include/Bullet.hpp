@@ -10,8 +10,9 @@ class Maze;
 
 enum class BulletOwner
 {
-  Player,
-  Enemy
+  Player,      // 本地玩家
+  OtherPlayer, // 对方玩家（多人模式）
+  Enemy        // NPC/敌人
 };
 
 class Bullet
@@ -36,6 +37,7 @@ public:
   // 碰撞检测
   sf::Vector2f getPosition() const;
   BulletOwner getOwner() const { return m_owner; }
+  void setOwner(BulletOwner owner) { m_owner = owner; }
 
   // 获取伤害值
   float getDamage() const { return m_damage; }

@@ -181,9 +181,12 @@ void CollisionSystem::checkMultiplayerCollisions(
         AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
 
         // 判断子弹是谁发射的
-        bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+        // Player = 本地玩家（房主），OtherPlayer = 对方玩家（非房主），Enemy = NPC
+        BulletOwner owner = bullet->getOwner();
         // destroyerId: 0=房主（本地玩家），1=非房主（对方玩家）
-        int destroyerId = isLocalPlayerBullet ? 0 : 1;
+        // NPC 打掉的墙不给玩家奖励，设为 -1
+        int destroyerId = (owner == BulletOwner::Player) ? 0 : 
+                          (owner == BulletOwner::OtherPlayer) ? 1 : -1;
 
         // 同步墙壁伤害给非房主（包含摧毁者ID）
         NetworkManager::getInstance().sendWallDamage(
@@ -197,7 +200,7 @@ void CollisionSystem::checkMultiplayerCollisions(
         if (wallResult.destroyed)
         {
           // 房主端：房主打掉的墙，给房主加效果
-          if (isLocalPlayerBullet)
+          if (owner == BulletOwner::Player)
           {
             handleWallDestroyEffect(wallResult, player, maze);
           }

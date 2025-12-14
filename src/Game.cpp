@@ -1855,8 +1855,8 @@ void Game::setupNetworkCallbacks()
   net.setOnPlayerShoot([this](float x, float y, float angle)
                        {
     // 创建另一个玩家的子弹
-    // 注意：这里 isPlayer=false 表示不是本地玩家，但需要设置正确的 team
     auto bullet = std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan);
+    bullet->setOwner(BulletOwner::OtherPlayer);  // 标记为对方玩家的子弹
     // 对方玩家的 team 和 otherPlayer 一样
     if (m_otherPlayer) {
       bullet->setTeam(m_otherPlayer->getTeam());
