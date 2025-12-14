@@ -42,6 +42,7 @@ mkdir -p "$FRAMEWORKS_DIR"
 # 复制资源文件
 echo ">>> 复制资源文件..."
 cp -r tank_assets "$RESOURCES_DIR/"
+cp -r music_assets "$RESOURCES_DIR/"
 
 # 创建 Info.plist
 echo ">>> 创建 Info.plist..."
