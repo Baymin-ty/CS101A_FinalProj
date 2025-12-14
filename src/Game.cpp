@@ -658,13 +658,14 @@ void Game::processEvents()
 
               // 房主默认准备
               m_mpState.localPlayerReady = true;
-              // 保留对方准备状态（服务器会发送正确状态）
+              // 对方准备状态由服务器同步
             }
             else
             {
               // 非房主按 R：通知服务器返回房间
               NetworkManager::getInstance().sendRestartRequest();
-              // 非房主也保留自己的准备状态
+              // 非房主返回时默认为 NOT READY
+              m_mpState.localPlayerReady = false;
             }
 
             // 进入房间大厅
@@ -1896,21 +1897,11 @@ void Game::setupNetworkCallbacks()
 
   net.setOnRestartRequest([this]()
                           {
-    // 对方请求返回房间（双方都可能发起）
-    // 收到后进入房间大厅等待
-    // 重置游戏状态（保留准备状态）
-    m_mpState.localPlayerReachedExit = false;
-    m_mpState.otherPlayerReachedExit = false;
-    m_mpState.multiplayerWin = false;
-    m_mpState.localPlayerDead = false;
-    m_mpState.otherPlayerDead = false;
-    // 保留 localPlayerReady 状态，不重置
-    m_gameOver = false;
-    m_gameWon = false;
-    m_bullets.clear();
-    
-    // 进入房间大厅
-    m_gameState = GameState::RoomLobby; });
+    // 对方已返回房间大厅
+    // 不强制本地也返回，只是知道对方已经在房间大厅等待
+    // 本地玩家需要自己按 R 返回
+    // 这里不做任何状态改变，让玩家自己决定何时返回
+  });
 
   // NPC同步回调
   net.setOnNpcActivate([this](int npcId, int team, int activatorId)

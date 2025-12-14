@@ -390,11 +390,16 @@ function handleMessage(socket, data) {
       const room = rooms.get(roomCode);
       if (!room) break;
 
-      // 重置房间状态，准备下一轮（保留玩家准备状态）
+      // 重置房间状态，准备下一轮
       room.started = false;
+      
+      // 找到发送请求的玩家，重置其 ready 状态（非房主）
       for (const player of room.players) {
         player.reachedExit = false;
-        // 保留准备状态，不重置
+        // 非房主返回房间时重置为 NOT READY
+        if (player.socket === socket && !player.isHost) {
+          player.ready = false;
+        }
       }
 
       // 转发重新开始请求给其他玩家
