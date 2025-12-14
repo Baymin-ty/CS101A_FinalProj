@@ -1603,9 +1603,8 @@ void Game::setupNetworkCallbacks()
       // 这样在游戏开始时不会错误地覆盖 isEscapeMode
       m_gameModeOption = m_mpState.isEscapeMode ? GameModeOption::EscapeMode : GameModeOption::BattleMode;
       
-      // 保留当前的游戏设置（迷宫数据、模式等）
-      // 这些已经在之前的游戏中设置过了
-      // 确保 mazeWidth, mazeHeight, npcCount 与 generatedMazeData 一致
+      // 保留当前的游戏设置（尺寸、NPC数量、模式）
+      // 新地图会在开始游戏时生成
       if (!m_mpState.generatedMazeData.empty()) {
         m_mpState.mazeHeight = static_cast<int>(m_mpState.generatedMazeData.size());
         m_mpState.mazeWidth = static_cast<int>(m_mpState.generatedMazeData[0].size());
@@ -1618,14 +1617,11 @@ void Game::setupNetworkCallbacks()
           }
         }
         m_mpState.npcCount = npcCount;
-        
-        // 新房主重新发送迷宫数据给服务器，以便更新服务器存储
-        NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
-        std::cout << "[DEBUG] New host resent maze data to server" << std::endl;
       }
       
-      std::cout << "[DEBUG] Became host. Keeping maze: " << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight 
-                << ", NPCs: " << m_mpState.npcCount << ", Mode: " << (m_mpState.isEscapeMode ? "Escape" : "Battle") << std::endl;
+      std::cout << "[DEBUG] Became host. Settings: " << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight 
+                << ", NPCs: " << m_mpState.npcCount << ", Mode: " << (m_mpState.isEscapeMode ? "Escape" : "Battle") 
+                << " (New map will be generated on game start)" << std::endl;
     }
     
     // 返回房间大厅
@@ -2267,6 +2263,26 @@ void Game::processRoomLobbyEvents(const sf::Event &event)
       // 房主开始游戏
       if (m_mpState.isHost && m_mpState.otherPlayerInRoom && m_mpState.otherPlayerReady)
       {
+        // 每局游戏开始前，房主生成新的随机地图
+        m_mpState.isEscapeMode = (m_gameModeOption == GameModeOption::EscapeMode);
+        int npcCount = m_mpState.npcCount;
+        
+        // 设置迷宫生成器模式
+        m_mazeGenerator.setEscapeMode(m_mpState.isEscapeMode);
+        
+        // 生成新地图
+        m_maze.generateRandomMaze(m_mpState.mazeWidth, m_mpState.mazeHeight, 0, npcCount, true, m_mpState.isEscapeMode);
+        m_mpState.generatedMazeData = m_maze.getMazeData();
+        
+        // 发送新地图给服务器和对方玩家
+        NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
+        
+        std::cout << "[DEBUG] Host generated new maze before game start: " 
+                  << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight 
+                  << ", NPCs: " << npcCount 
+                  << ", Mode: " << (m_mpState.isEscapeMode ? "Escape" : "Battle") << std::endl;
+        
+        // 发送开始游戏信号
         NetworkManager::getInstance().sendHostStartGame();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
       }
