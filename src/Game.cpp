@@ -928,7 +928,9 @@ void Game::update(float dt)
     {
       sf::Vector2f bulletPos = enemy->getGunPosition();
       float bulletAngle = enemy->getTurretAngle();
-      m_bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, sf::Color::Red));
+      auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, sf::Color::Red);
+      bullet->setDamage(12.5f);  // NPC子弹伤害12.5%
+      m_bullets.push_back(std::move(bullet));
 
       // 播放射击音效（基于玩家位置的距离衰减）
       AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, m_player->getPosition());
@@ -1854,8 +1856,8 @@ void Game::setupNetworkCallbacks()
 
   net.setOnPlayerShoot([this](float x, float y, float angle)
                        {
-    // 创建另一个玩家的子弹
-    auto bullet = std::make_unique<Bullet>(x, y, angle, false, sf::Color::Cyan);
+    // 创建另一个玩家的子弹 - 紫色
+    auto bullet = std::make_unique<Bullet>(x, y, angle, false, sf::Color::Magenta);
     bullet->setOwner(BulletOwner::OtherPlayer);  // 标记为对方玩家的子弹
     // 对方玩家的 team 和 otherPlayer 一样
     if (m_otherPlayer) {
@@ -1964,14 +1966,23 @@ void Game::setupNetworkCallbacks()
                     {
     // NPC射击（创建子弹）- 非房主接收
     if (!m_mpState.isHost) {
-      int team = 0;
+      int npcTeam = 0;
       if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
-        team = m_enemies[npcId]->getTeam();
+        npcTeam = m_enemies[npcId]->getTeam();
       }
-      sf::Color bulletColor = (team == 1) ? sf::Color::Yellow : sf::Color::Magenta;
+      // NPC子弹颜色：Escape模式全红（敌方），Battle模式根据team判断
+      // 己方NPC（team与本地玩家相同）蓝色，敌方NPC红色
+      sf::Color bulletColor;
+      if (m_mpState.isEscapeMode) {
+        bulletColor = sf::Color::Red;  // Escape模式所有NPC都是敌方
+      } else {
+        int localTeam = m_player ? m_player->getTeam() : 1;
+        bulletColor = (npcTeam == localTeam) ? sf::Color::Blue : sf::Color::Red;
+      }
       // NPC子弹使用 BulletOwner::Enemy 标识，并设置阵营
       auto bullet = std::make_unique<Bullet>(x, y, angle, false, bulletColor);
-      bullet->setTeam(team);
+      bullet->setTeam(npcTeam);
+      bullet->setDamage(12.5f);  // NPC子弹伤害12.5%
       m_bullets.push_back(std::move(bullet));
       
       // 播放NPC射击音效（基于本地玩家位置的距离衰减）

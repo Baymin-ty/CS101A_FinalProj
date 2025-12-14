@@ -411,9 +411,18 @@ void MultiplayerHandler::updateNpcAI(
         if (npc->shouldShoot()) {
           sf::Vector2f bulletPos = npc->getGunPosition();
           float bulletAngle = npc->getTurretAngle();
-          sf::Color bulletColor = (npcTeam == 1) ? sf::Color::Yellow : sf::Color::Magenta;
+          // NPC子弹颜色：Escape模式全红（敌方），Battle模式根据team判断
+          // 己方NPC（team与本地玩家相同）蓝色，敌方NPC红色
+          sf::Color bulletColor;
+          if (state.isEscapeMode) {
+            bulletColor = sf::Color::Red;  // Escape模式所有NPC都是敌方
+          } else {
+            int localTeam = ctx.player ? ctx.player->getTeam() : 1;
+            bulletColor = (npcTeam == localTeam) ? sf::Color::Blue : sf::Color::Red;
+          }
           auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, bulletColor);
           bullet->setTeam(npcTeam);
+          bullet->setDamage(12.5f);  // NPC子弹伤害12.5%
           ctx.bullets.push_back(std::move(bullet));
           net.sendNpcShoot(static_cast<int>(i), bulletPos.x, bulletPos.y, bulletAngle);
           
