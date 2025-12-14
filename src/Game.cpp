@@ -2017,14 +2017,15 @@ void Game::setupNetworkCallbacks()
         if (destroyerId == 1) {
           switch (attr) {
             case WallAttribute::Gold:
-              m_player->addCoins(20);
+              m_player->addCoins(2);  // 金色墙：获得2金币
               AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
               break;
             case WallAttribute::Heal:
-              m_player->heal(10.f);
+              m_player->heal(0.25f);  // 治疗墙：恢复25%血量
               AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
               break;
             case WallAttribute::None:
+              m_player->addWallToBag();  // 棕色墙：收集到背包
               AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
               break;
             default:
