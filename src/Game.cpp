@@ -117,7 +117,7 @@ void Game::generateRandomMaze()
   int enemyCount = m_enemyOptions[m_enemyIndex];
   m_mazeGenerator.setEnemyCount(enemyCount);
   m_mazeGenerator.setDestructibleRatio(0.15f);
-  
+
   // 设置 Escape 模式（单人 Escape 也生成治疗墙）
   bool isEscape = (m_gameModeOption == GameModeOption::EscapeMode);
   m_mazeGenerator.setEscapeMode(isEscape);
@@ -198,7 +198,7 @@ void Game::resetGame()
   m_inputText.clear();
   m_inputMode = InputMode::None;
   m_mpState.generatedMazeData.clear();
-  
+
   // 重置 Escape 模式相关状态
   m_mpState.isEscapeMode = false;
   m_mpState.localPlayerDead = false;
@@ -522,7 +522,13 @@ void Game::processEvents()
     case GameState::Playing:
       if (m_player)
       {
-        m_player->handleInput(*event);
+        // 放置模式下不处理鼠标事件（避免放置墙壁时同时发射子弹）
+        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() || 
+                            event->getIf<sf::Event::MouseButtonReleased>();
+        if (!m_placementMode || !isMouseEvent)
+        {
+          m_player->handleInput(*event);
+        }
       }
       // 按 ESC 返回菜单，按 P 暂停，按 空格 切换放置模式
       if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
@@ -704,7 +710,7 @@ void Game::processEvents()
         }
       }
       break;
-      
+
     case GameState::RoomLobby:
       processRoomLobbyEvents(*event);
       break;
@@ -712,7 +718,13 @@ void Game::processEvents()
     case GameState::Multiplayer:
       if (m_player)
       {
-        m_player->handleInput(*event);
+        // 放置模式下不处理鼠标事件（避免放置墙壁时同时发射子弹）
+        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() || 
+                            event->getIf<sf::Event::MouseButtonReleased>();
+        if (!m_placementMode || !isMouseEvent)
+        {
+          m_player->handleInput(*event);
+        }
       }
       if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
       {
@@ -923,7 +935,7 @@ void Game::update(float dt)
       sf::Vector2f bulletPos = enemy->getGunPosition();
       float bulletAngle = enemy->getTurretAngle();
       auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, sf::Color::Red);
-      bullet->setDamage(12.5f);  // NPC子弹伤害12.5%
+      bullet->setDamage(12.5f); // NPC子弹伤害12.5%
       m_bullets.push_back(std::move(bullet));
 
       // 播放射击音效（基于玩家位置的距离衰减）
@@ -1985,6 +1997,13 @@ void Game::setupNetworkCallbacks()
       // 只有 NPC 还活着时才处理伤害
       if (!npc->isDead()) {
         npc->takeDamage(damage);
+        
+        // 房主收到非房主的伤害消息后，需要再同步给非房主
+        // 因为服务器只转发给"其他玩家"，非房主收不到自己发的消息
+        if (m_mpState.isHost) {
+          NetworkManager::getInstance().sendNpcDamage(npcId, damage);
+        }
+        
         // 如果 NPC 死亡，播放爆炸音效
         if (npc->isDead() && m_player) {
           AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), m_player->getPosition());
@@ -2082,7 +2101,7 @@ void Game::setupNetworkCallbacks()
     m_mpState.otherPlayerReady = isReady;
     std::cout << "[DEBUG] Other player ready: " << isReady << std::endl; });
 
-  net.setOnRoomInfo([this](const std::string& hostIP, const std::string& guestIP, bool guestReady)
+  net.setOnRoomInfo([this](const std::string &hostIP, const std::string &guestIP, bool guestReady)
                     {
     // 收到房间信息
     if (m_mpState.isHost) {
@@ -2151,7 +2170,7 @@ void Game::processConnectingEvents(const sf::Event &event)
     {
       AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
       m_gameState = GameState::CreatingRoom;
-      m_gameModeOption = GameModeOption::EscapeMode;  // 默认选中 Escape
+      m_gameModeOption = GameModeOption::EscapeMode; // 默认选中 Escape
     }
 
     // 退格键
@@ -2242,7 +2261,7 @@ void Game::processRoomLobbyEvents(const sf::Event &event)
       resetGame();
       return;
     }
-    
+
     if (keyPressed->code == sf::Keyboard::Key::R)
     {
       // 切换准备状态（非房主）
@@ -2253,7 +2272,7 @@ void Game::processRoomLobbyEvents(const sf::Event &event)
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       }
     }
-    
+
     if (keyPressed->code == sf::Keyboard::Key::Enter)
     {
       // 房主开始游戏
@@ -2262,22 +2281,22 @@ void Game::processRoomLobbyEvents(const sf::Event &event)
         // 每局游戏开始前，房主生成新的随机地图
         m_mpState.isEscapeMode = (m_gameModeOption == GameModeOption::EscapeMode);
         int npcCount = m_mpState.npcCount;
-        
+
         // 设置迷宫生成器模式
         m_mazeGenerator.setEscapeMode(m_mpState.isEscapeMode);
-        
+
         // 生成新地图
         m_maze.generateRandomMaze(m_mpState.mazeWidth, m_mpState.mazeHeight, 0, npcCount, true, m_mpState.isEscapeMode);
         m_mpState.generatedMazeData = m_maze.getMazeData();
-        
+
         // 发送新地图给服务器和对方玩家
         NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
-        
-        std::cout << "[DEBUG] Host generated new maze before game start: " 
-                  << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight 
-                  << ", NPCs: " << npcCount 
+
+        std::cout << "[DEBUG] Host generated new maze before game start: "
+                  << m_mpState.mazeWidth << "x" << m_mpState.mazeHeight
+                  << ", NPCs: " << npcCount
                   << ", Mode: " << (m_mpState.isEscapeMode ? "Escape" : "Battle") << std::endl;
-        
+
         // 发送开始游戏信号
         NetworkManager::getInstance().sendHostStartGame();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
@@ -2290,10 +2309,10 @@ void Game::renderRoomLobby()
 {
   m_window.clear(sf::Color(30, 30, 30));
   m_window.setView(m_uiView);
-  
+
   float centerX = LOGICAL_WIDTH / 2.f;
   float startY = 80.f;
-  
+
   // 标题
   sf::Text title(m_font);
   title.setString("ROOM LOBBY");
@@ -2303,24 +2322,24 @@ void Game::renderRoomLobby()
   sf::FloatRect titleBounds = title.getLocalBounds();
   title.setPosition({centerX - titleBounds.size.x / 2.f, startY});
   m_window.draw(title);
-  
+
   // 房间信息框
   float boxY = startY + 100.f;
   float boxWidth = 700.f;
   float boxHeight = 500.f;
   float boxX = centerX - boxWidth / 2.f;
-  
+
   sf::RectangleShape infoBox({boxWidth, boxHeight});
   infoBox.setPosition({boxX, boxY});
   infoBox.setFillColor(sf::Color(50, 50, 50, 200));
   infoBox.setOutlineColor(sf::Color::White);
   infoBox.setOutlineThickness(2.f);
   m_window.draw(infoBox);
-  
+
   float textX = boxX + 30.f;
   float textY = boxY + 20.f;
   float lineHeight = 45.f;
-  
+
   // 房间号
   sf::Text roomCodeText(m_font);
   roomCodeText.setString("Room Code: " + m_mpState.roomCode);
@@ -2329,14 +2348,14 @@ void Game::renderRoomLobby()
   roomCodeText.setPosition({textX, textY});
   m_window.draw(roomCodeText);
   textY += lineHeight;
-  
+
   // 分隔线
   sf::RectangleShape separator({boxWidth - 60.f, 2.f});
   separator.setPosition({textX, textY});
   separator.setFillColor(sf::Color(100, 100, 100));
   m_window.draw(separator);
   textY += 20.f;
-  
+
   // 游戏模式
   sf::Text modeText(m_font);
   modeText.setString(std::string("Game Mode: ") + (m_mpState.isEscapeMode ? "Escape (Co-op)" : "Battle (PvP)"));
@@ -2345,7 +2364,7 @@ void Game::renderRoomLobby()
   modeText.setPosition({textX, textY});
   m_window.draw(modeText);
   textY += lineHeight;
-  
+
   // 迷宫尺寸
   sf::Text mazeText(m_font);
   mazeText.setString("Maze Size: " + std::to_string(m_mpState.mazeWidth) + " x " + std::to_string(m_mpState.mazeHeight));
@@ -2354,7 +2373,7 @@ void Game::renderRoomLobby()
   mazeText.setPosition({textX, textY});
   m_window.draw(mazeText);
   textY += lineHeight;
-  
+
   // NPC数量
   sf::Text npcText(m_font);
   npcText.setString("NPCs: " + std::to_string(m_mpState.npcCount));
@@ -2363,12 +2382,12 @@ void Game::renderRoomLobby()
   npcText.setPosition({textX, textY});
   m_window.draw(npcText);
   textY += lineHeight + 10.f;
-  
+
   // 分隔线
   separator.setPosition({textX, textY});
   m_window.draw(separator);
   textY += 20.f;
-  
+
   // 玩家列表标题
   sf::Text playersTitle(m_font);
   playersTitle.setString("Players:");
@@ -2377,11 +2396,12 @@ void Game::renderRoomLobby()
   playersTitle.setPosition({textX, textY});
   m_window.draw(playersTitle);
   textY += lineHeight;
-  
+
   // 玩家1（房主或本地）
   sf::Text player1Text(m_font);
   std::string p1Status = m_mpState.isHost ? "[HOST] You" : ("[HOST] " + (m_mpState.otherPlayerIP.empty() ? "Unknown" : m_mpState.otherPlayerIP));
-  if (m_mpState.isHost) {
+  if (m_mpState.isHost)
+  {
     p1Status += " - " + m_mpState.localPlayerIP;
   }
   player1Text.setString(p1Status);
@@ -2389,9 +2409,9 @@ void Game::renderRoomLobby()
   player1Text.setFillColor(m_mpState.isHost ? sf::Color::Yellow : sf::Color::White);
   player1Text.setPosition({textX + 20.f, textY});
   m_window.draw(player1Text);
-  
+
   // 准备状态（房主默认准备）- 右对齐
-  float readyRightEdge = boxX + boxWidth - 30.f;  // 准备状态右边界
+  float readyRightEdge = boxX + boxWidth - 30.f; // 准备状态右边界
   sf::Text p1Ready(m_font);
   p1Ready.setString("READY");
   p1Ready.setCharacterSize(24);
@@ -2400,23 +2420,27 @@ void Game::renderRoomLobby()
   p1Ready.setPosition({readyRightEdge - p1ReadyBounds.size.x, textY});
   m_window.draw(p1Ready);
   textY += lineHeight;
-  
+
   // 玩家2
   sf::Text player2Text(m_font);
-  if (m_mpState.otherPlayerInRoom) {
+  if (m_mpState.otherPlayerInRoom)
+  {
     std::string p2Status = m_mpState.isHost ? ("Player 2: " + m_mpState.otherPlayerIP) : ("[YOU] " + m_mpState.localPlayerIP);
     player2Text.setString(p2Status);
     player2Text.setFillColor(m_mpState.isHost ? sf::Color::White : sf::Color::Yellow);
-  } else {
+  }
+  else
+  {
     player2Text.setString("Waiting for player to join...");
     player2Text.setFillColor(sf::Color(150, 150, 150));
   }
   player2Text.setCharacterSize(26);
   player2Text.setPosition({textX + 20.f, textY});
   m_window.draw(player2Text);
-  
+
   // 玩家2准备状态 - 右对齐
-  if (m_mpState.otherPlayerInRoom) {
+  if (m_mpState.otherPlayerInRoom)
+  {
     sf::Text p2Ready(m_font);
     bool isP2Ready = m_mpState.isHost ? m_mpState.otherPlayerReady : m_mpState.localPlayerReady;
     p2Ready.setString(isP2Ready ? "READY" : "NOT READY");
@@ -2427,25 +2451,36 @@ void Game::renderRoomLobby()
     m_window.draw(p2Ready);
   }
   textY += lineHeight + 30.f;
-  
+
   // 操作提示
   sf::Text hintText(m_font);
-  if (m_mpState.isHost) {
-    if (m_mpState.otherPlayerInRoom && m_mpState.otherPlayerReady) {
+  if (m_mpState.isHost)
+  {
+    if (m_mpState.otherPlayerInRoom && m_mpState.otherPlayerReady)
+    {
       hintText.setString("Press ENTER to start game");
       hintText.setFillColor(sf::Color::Green);
-    } else if (m_mpState.otherPlayerInRoom) {
+    }
+    else if (m_mpState.otherPlayerInRoom)
+    {
       hintText.setString("Waiting for player to ready...");
       hintText.setFillColor(sf::Color::Yellow);
-    } else {
+    }
+    else
+    {
       hintText.setString("Waiting for player to join...");
       hintText.setFillColor(sf::Color(150, 150, 150));
     }
-  } else {
-    if (m_mpState.localPlayerReady) {
+  }
+  else
+  {
+    if (m_mpState.localPlayerReady)
+    {
       hintText.setString("Waiting for host to start... (Press R to cancel ready)");
       hintText.setFillColor(sf::Color::Yellow);
-    } else {
+    }
+    else
+    {
       hintText.setString("Press R to ready up");
       hintText.setFillColor(sf::Color::Cyan);
     }
@@ -2454,7 +2489,7 @@ void Game::renderRoomLobby()
   sf::FloatRect hintBounds = hintText.getLocalBounds();
   hintText.setPosition({centerX - hintBounds.size.x / 2.f, textY});
   m_window.draw(hintText);
-  
+
   // ESC退出提示
   sf::Text escText(m_font);
   escText.setString("Press ESC to leave room");
@@ -2463,7 +2498,7 @@ void Game::renderRoomLobby()
   sf::FloatRect escBounds = escText.getLocalBounds();
   escText.setPosition({centerX - escBounds.size.x / 2.f, boxY + boxHeight + 20.f});
   m_window.draw(escText);
-  
+
   m_window.display();
 }
 
@@ -2480,7 +2515,7 @@ void Game::processCreatingRoomEvents(const sf::Event &event)
     {
       // 在 Escape 和 Battle 之间切换
       int current = static_cast<int>(m_gameModeOption);
-      int maxOption = 1;  // 只有两个选项: EscapeMode(0) 和 BattleMode(1)
+      int maxOption = 1; // 只有两个选项: EscapeMode(0) 和 BattleMode(1)
       if (keyPressed->code == sf::Keyboard::Key::Up || keyPressed->code == sf::Keyboard::Key::W)
         current = (current - 1 + maxOption + 1) % (maxOption + 1);
       else

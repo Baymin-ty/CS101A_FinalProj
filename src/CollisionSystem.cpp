@@ -324,10 +324,12 @@ void CollisionSystem::checkMultiplayerCollisions(
           // 播放子弹击中坦克音效
           AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bulletPos, listenerPos);
 
-          // 本地玩家子弹：本地处理伤害并同步
-          if (isLocalPlayerBullet)
+          // NPC伤害统一由房主处理
+          if (isHost)
           {
+            // 房主端：直接处理伤害（包括房主自己的子弹和非房主的子弹）
             npc->takeDamage(bullet->getDamage());
+            // 同步给非房主
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
 
             // 如果NPC死亡，播放爆炸音效
@@ -336,18 +338,13 @@ void CollisionSystem::checkMultiplayerCollisions(
               AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
             }
           }
-          // NPC子弹伤害NPC：只有房主处理
-          else if (bulletTeam != 0 && isHost)
+          else if (isLocalPlayerBullet)
           {
-            npc->takeDamage(bullet->getDamage());
+            // 非房主端且是本地玩家子弹：发送伤害请求给房主，由房主处理
+            // 不在本地处理伤害，避免双倍伤害
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
-
-            // 如果NPC死亡，播放爆炸音效
-            if (npc->isDead())
-            {
-              AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
-            }
           }
+          // 非房主端收到的对方子弹（房主的子弹）：不处理，等待房主同步
 
           bullet->setInactive();
           break;
