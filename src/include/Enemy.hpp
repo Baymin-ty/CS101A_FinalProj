@@ -82,11 +82,7 @@ public:
   float getHealth() const { return m_healthBar.getHealth(); }
   void setHealth(float health) { m_healthBar.setHealth(health); }
   
-  // 网络插值相关
-  void setNetworkTarget(sf::Vector2f pos, float rotation, float turretAngle);
-  void updateInterpolation(float dt);
-  void setIsRemote(bool remote) { m_isRemote = remote; }
-  bool isRemoteControlled() const { return m_isRemote; }
+  // （已移除）网络插值相关 - 未在工程中使用
 
 private:
   sf::Texture m_hullTexture;
@@ -137,10 +133,5 @@ private:
   const float m_directionChangeInterval = 2.0f;
   const float m_activationRange = 60.f; // 激活距离（需要接近才能激活）
   
-  // 网络插值相关
-  bool m_isRemote = false;  // 是否是远程控制的NPC
-  sf::Vector2f m_networkTargetPos = {0.f, 0.f};
-  float m_networkTargetRotation = 0.f;
-  float m_networkTargetTurretAngle = 0.f;
-  float m_interpSpeed = 20.f;  // 插值速度（每秒插值因子，越大越快跟上目标）
+  // （已移除）网络插值相关字段 - 未在工程中使用
 };
