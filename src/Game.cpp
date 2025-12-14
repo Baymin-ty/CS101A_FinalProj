@@ -1913,7 +1913,7 @@ void Game::setupNetworkCallbacks()
 
   net.setOnNpcUpdate([this](const NpcState &state)
                      {
-    // 更新NPC状态（仅非房主接收）- 使用插值平滑移动
+    // 更新NPC状态（仅非房主接收）- 直接设置位置，不使用插值
     if (!m_mpState.isHost && state.id >= 0 && state.id < static_cast<int>(m_enemies.size())) {
       auto& npc = m_enemies[state.id];
       
@@ -1922,26 +1922,17 @@ void Game::setupNetworkCallbacks()
         return;
       }
       
-      // 第一次收到更新时：用当前位置初始化网络目标，然后直接设置到远程位置
-      // 避免从 {0,0} 插值导致 NPC 消失
-      if (!npc->isRemoteControlled()) {
-        // 先用当前位置初始化目标（防止插值到 {0,0}）
-        npc->setNetworkTarget(npc->getPosition(), npc->getRotation(), npc->getTurretRotation());
-        // 直接设置到远程位置
-        npc->setPosition({state.x, state.y});
-        npc->setRotation(state.rotation);
-        npc->setTurretRotation(state.turretAngle);
-      }
+      // 直接设置NPC位置、旋转、炮塔角度
+      npc->setPosition({state.x, state.y});
+      npc->setRotation(state.rotation);
+      npc->setTurretRotation(state.turretAngle);
       
-      // 设置为远程控制模式并更新目标状态
-      npc->setIsRemote(true);
-      npc->setNetworkTarget({state.x, state.y}, state.rotation, state.turretAngle);
-      
-      // 只有当远程血量更低时才更新（避免复活已死亡的 NPC）
+      // 更新血量（只有当远程血量更低时才更新）
       if (state.health < npc->getHealth()) {
         npc->setHealth(state.health);
       }
       
+      // 更新激活状态
       if (state.activated && !npc->isActivated()) {
         npc->activate(state.team);
       }

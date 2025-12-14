@@ -196,16 +196,10 @@ void MultiplayerHandler::update(
     }
   }
 
-  // 更新NPC AI（仅房主）或插值更新（非房主）
+  // 更新NPC AI（仅房主执行）
+  // 非房主的NPC位置通过网络回调直接设置，不需要本地更新
   if (state.isHost) {
     updateNpcAI(ctx, state, dt);
-  } else {
-    // 非房主：更新NPC插值
-    for (auto& npc : ctx.enemies) {
-      if (!npc->isDead()) {
-        npc->updateInterpolation(dt);
-      }
-    }
   }
 
   // 发送位置到服务器
@@ -440,20 +434,17 @@ void MultiplayerHandler::updateNpcAI(
           AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
         }
 
-        // 定期同步NPC状态（每2帧同步一次，提高流畅度）
-        state.npcSyncCounter++;
-        if ((state.npcSyncCounter + static_cast<int>(i)) % 2 == 0) {
-          NpcState npcState;
-          npcState.id = static_cast<int>(i);
-          npcState.x = npc->getPosition().x;
-          npcState.y = npc->getPosition().y;
-          npcState.rotation = npc->getRotation();
-          npcState.turretAngle = npc->getTurretAngle();
-          npcState.health = npc->getHealth();
-          npcState.team = npc->getTeam();
-          npcState.activated = npc->isActivated();
-          net.sendNpcUpdate(npcState);
-        }
+        // 每帧同步NPC状态
+        NpcState npcState;
+        npcState.id = static_cast<int>(i);
+        npcState.x = npc->getPosition().x;
+        npcState.y = npc->getPosition().y;
+        npcState.rotation = npc->getRotation();
+        npcState.turretAngle = npc->getTurretAngle();
+        npcState.health = npc->getHealth();
+        npcState.team = npc->getTeam();
+        npcState.activated = npc->isActivated();
+        net.sendNpcUpdate(npcState);
       }
     }
   }
