@@ -885,7 +885,7 @@ void MultiplayerHandler::renderUI(
   if (ctx.placementMode)
   {
     sf::Text placeHint(ctx.font);
-    placeHint.setString("[PLACEMENT MODE] Click to place wall, B to cancel");
+    placeHint.setString("[PLACEMENT MODE] Click to place wall, Space to cancel");
     placeHint.setCharacterSize(20);
     placeHint.setFillColor(sf::Color::Yellow);
     sf::FloatRect hintBounds = placeHint.getLocalBounds();
@@ -896,7 +896,7 @@ void MultiplayerHandler::renderUI(
   {
     // 提示可以按B进入放置模式
     sf::Text bagHint(ctx.font);
-    bagHint.setString("Press B to place walls");
+    bagHint.setString("Press SPACE to place walls");
     bagHint.setCharacterSize(18);
     bagHint.setFillColor(sf::Color(150, 150, 150));
     bagHint.setPosition({barX, wallsY + 25.f});

@@ -524,7 +524,7 @@ void Game::processEvents()
       {
         m_player->handleInput(*event);
       }
-      // 按 ESC 返回菜单，按 P 暂停，按 B 切换放置模式
+      // 按 ESC 返回菜单，按 P 暂停，按 空格 切换放置模式
       if (const auto *keyPressed = event->getIf<sf::Event::KeyPressed>())
       {
         if (keyPressed->code == sf::Keyboard::Key::Escape)
@@ -542,7 +542,7 @@ void Game::processEvents()
         {
           m_gameState = GameState::Paused;
         }
-        else if (keyPressed->code == sf::Keyboard::Key::B)
+        else if (keyPressed->code == sf::Keyboard::Key::Space)
         {
           // 切换放置模式
           if (m_player && m_player->getWallsInBag() > 0)
@@ -745,8 +745,8 @@ void Game::processEvents()
         {
           m_mpState.fKeyHeld = true;
         }
-        // B键切换放置模式
-        if (keyPressed->code == sf::Keyboard::Key::B)
+        // 空格键切换放置模式
+        if (keyPressed->code == sf::Keyboard::Key::Space)
         {
           if (m_player && m_player->getWallsInBag() > 0)
           {
@@ -1429,7 +1429,7 @@ void Game::renderGame()
     if (m_placementMode)
     {
       sf::Text placeHint(m_font);
-      placeHint.setString("[PLACEMENT MODE] Click to place wall, B to cancel");
+      placeHint.setString("[PLACEMENT MODE] Click to place wall, Space to cancel");
       placeHint.setCharacterSize(20);
       placeHint.setFillColor(sf::Color::Yellow);
       sf::FloatRect hintBounds = placeHint.getLocalBounds();
@@ -1440,7 +1440,7 @@ void Game::renderGame()
     {
       // 提示可以按B进入放置模式
       sf::Text bagHint(m_font);
-      bagHint.setString("Press B to place walls");
+      bagHint.setString("Press SPACE to place walls");
       bagHint.setCharacterSize(18);
       bagHint.setFillColor(sf::Color(150, 150, 150));
       bagHint.setPosition({20.f, uiY});
