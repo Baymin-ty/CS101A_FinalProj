@@ -333,6 +333,11 @@ void Game::run()
 
     render();
   }
+  
+  // 在窗口关闭后清理静态资源（避免 OpenGL 上下文销毁后释放纹理）
+  MultiplayerHandler::cleanup();
+  m_darkModeTexture.reset();
+  m_darkModeSprite.reset();
 }
 
 void Game::processMainMenuEvents(const sf::Event &event)
@@ -1027,13 +1032,7 @@ void Game::updateCamera()
   float zoomedWidth = LOGICAL_WIDTH * VIEW_ZOOM;
   float zoomedHeight = LOGICAL_HEIGHT * VIEW_ZOOM;
 
-  // 限制视角不超出迷宫边界（使用缩放后的视野范围）
-  sf::Vector2f mazeSize = m_maze.getSize();
-  float halfWidth = zoomedWidth / 2.f;
-  float halfHeight = zoomedHeight / 2.f;
-
-  cameraTarget.x = std::max(halfWidth, std::min(cameraTarget.x, mazeSize.x - halfWidth));
-  cameraTarget.y = std::max(halfHeight, std::min(cameraTarget.y, mazeSize.y - halfHeight));
+  // 不限制相机边界，允许看到迷宫外的区域（与联机模式保持一致）
 
   // 平滑插值到目标位置（减少晃动感）
   float dt = 1.f / 60.f; // 假设60fps
@@ -1469,6 +1468,24 @@ void Game::renderGame()
     wallsText.setPosition({20.f, uiY});
     m_window.draw(wallsText);
     uiY += 30.f;
+
+    // 暗黑模式下显示剩余存活的敌人数量
+    if (m_darkModeOption && !m_isMultiplayer)
+    {
+      int aliveEnemies = 0;
+      for (const auto &enemy : m_enemies)
+      {
+        if (!enemy->isDead())
+          aliveEnemies++;
+      }
+      sf::Text enemyCountText(m_font);
+      enemyCountText.setString("Enemies: " + std::to_string(aliveEnemies));
+      enemyCountText.setCharacterSize(24);
+      enemyCountText.setFillColor(sf::Color(255, 100, 100)); // 红色
+      enemyCountText.setPosition({20.f, uiY});
+      m_window.draw(enemyCountText);
+      uiY += 30.f;
+    }
 
     // 如果处于放置模式，显示提示
     if (m_placementMode)
@@ -2776,24 +2793,18 @@ void Game::renderDarkModeOverlay()
   sf::Vector2f playerPos = m_player->getPosition();
   sf::Vector2f viewSize = m_gameView.getSize();
   
-  // 使用本地静态纹理
-  unsigned int texWidth = static_cast<unsigned int>(viewSize.x);
-  unsigned int texHeight = static_cast<unsigned int>(viewSize.y);
+  // 使用类成员纹理（非静态，确保在窗口销毁前释放）
+  // 纹理尺寸为视图的2倍，以覆盖更大区域
+  unsigned int texWidth = static_cast<unsigned int>(viewSize.x * 2);
+  unsigned int texHeight = static_cast<unsigned int>(viewSize.y * 2);
   
-  // Game 自己的静态纹理
-  static std::unique_ptr<sf::Texture> s_darkModeTexture;
-  static std::unique_ptr<sf::Sprite> s_darkModeSprite;
-  static bool s_initialized = false;
-  static unsigned int s_lastWidth = 0;
-  static unsigned int s_lastHeight = 0;
-  
-  if (!s_initialized || s_lastWidth != texWidth || s_lastHeight != texHeight) {
+  if (!m_darkModeTexture || m_darkModeTexWidth != texWidth || m_darkModeTexHeight != texHeight) {
     // 创建图像
     sf::Image image({texWidth, texHeight}, sf::Color::Transparent);
     
-    // 椭圆参数
-    float ellipseB = texHeight * 0.28f;
-    float ellipseA = texWidth * 0.22f;
+    // 椭圆参数（基于原始视图尺寸，不是纹理尺寸）
+    float ellipseB = viewSize.y * 0.28f;
+    float ellipseA = viewSize.x * 0.22f;
     float fadeScale = 0.3f;
     float fadeA = ellipseA * fadeScale;
     float fadeB = ellipseB * fadeScale;
@@ -2829,18 +2840,16 @@ void Game::renderDarkModeOverlay()
       }
     }
     
-    s_darkModeTexture = std::make_unique<sf::Texture>();
-    (void)s_darkModeTexture->loadFromImage(image);
-    s_darkModeSprite = std::make_unique<sf::Sprite>(*s_darkModeTexture);
-    s_initialized = true;
-    s_lastWidth = texWidth;
-    s_lastHeight = texHeight;
+    m_darkModeTexture = std::make_unique<sf::Texture>(image);
+    m_darkModeSprite = std::make_unique<sf::Sprite>(*m_darkModeTexture);
+    m_darkModeTexWidth = texWidth;
+    m_darkModeTexHeight = texHeight;
   }
   
-  // 绘制遮罩
-  if (s_darkModeSprite) {
-    s_darkModeSprite->setPosition({playerPos.x - viewSize.x / 2.f, playerPos.y - viewSize.y / 2.f});
-    m_window.draw(*s_darkModeSprite);
+  // 绘制遮罩（纹理是2倍大小，所以偏移也要相应调整）
+  if (m_darkModeSprite) {
+    m_darkModeSprite->setPosition({playerPos.x - viewSize.x, playerPos.y - viewSize.y});
+    m_window.draw(*m_darkModeSprite);
   }
   
   // 恢复之前的视图

@@ -106,6 +106,9 @@ public:
     MultiplayerContext& ctx,
     MultiplayerState& state);
 
+  // 清理静态资源（在程序退出前调用）
+  static void cleanup();
+
 private:
   // 更新NPC AI逻辑（仅房主执行）
   static void updateNpcAI(

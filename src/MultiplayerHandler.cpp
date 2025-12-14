@@ -16,17 +16,21 @@ unsigned int MultiplayerHandler::s_lastTextureHeight = 0;
 
 void MultiplayerHandler::initDarkModeTexture(unsigned int width, unsigned int height)
 {
+  // width/height 是原始视图尺寸，纹理实际为2倍大小
+  unsigned int texWidth = width * 2;
+  unsigned int texHeight = height * 2;
+  
   // 如果尺寸没变且已初始化，直接返回
   if (s_darkModeTextureInitialized && 
-      s_lastTextureWidth == width && 
-      s_lastTextureHeight == height) {
+      s_lastTextureWidth == texWidth && 
+      s_lastTextureHeight == texHeight) {
     return;
   }
   
-  // 创建图像
-  sf::Image image({width, height}, sf::Color::Transparent);
+  // 创建图像（2倍尺寸）
+  sf::Image image({texWidth, texHeight}, sf::Color::Transparent);
   
-  // 椭圆参数：基于视图尺寸
+  // 椭圆参数：基于原始视图尺寸（不是纹理尺寸）
   float ellipseB = height * 0.28f;  // 椭圆短半轴（垂直方向）
   float ellipseA = width * 0.22f;   // 椭圆长半轴（水平方向）
   
@@ -35,12 +39,12 @@ void MultiplayerHandler::initDarkModeTexture(unsigned int width, unsigned int he
   float fadeA = ellipseA * fadeScale;
   float fadeB = ellipseB * fadeScale;
   
-  float centerX = width / 2.f;
-  float centerY = height / 2.f;
+  float centerX = texWidth / 2.f;
+  float centerY = texHeight / 2.f;
   
   // 遍历每个像素
-  for (unsigned int y = 0; y < height; y++) {
-    for (unsigned int x = 0; x < width; x++) {
+  for (unsigned int y = 0; y < texHeight; y++) {
+    for (unsigned int x = 0; x < texWidth; x++) {
       float dx = x - centerX;
       float dy = y - centerY;
       
@@ -82,10 +86,20 @@ void MultiplayerHandler::initDarkModeTexture(unsigned int width, unsigned int he
   // 使用纹理创建 Sprite
   s_darkModeSprite = std::make_unique<sf::Sprite>(*s_darkModeTexture);
   s_darkModeTextureInitialized = true;
-  s_lastTextureWidth = width;
-  s_lastTextureHeight = height;
+  s_lastTextureWidth = texWidth;
+  s_lastTextureHeight = texHeight;
   
-  std::cout << "[DEBUG] Dark mode texture initialized: " << width << "x" << height << std::endl;
+  std::cout << "[DEBUG] Dark mode texture initialized: " << texWidth << "x" << texHeight << std::endl;
+}
+
+void MultiplayerHandler::cleanup()
+{
+  // 释放静态资源（在窗口关闭前调用）
+  s_darkModeSprite.reset();
+  s_darkModeTexture.reset();
+  s_darkModeTextureInitialized = false;
+  s_lastTextureWidth = 0;
+  s_lastTextureHeight = 0;
 }
 
 void MultiplayerHandler::update(
@@ -1129,8 +1143,8 @@ void MultiplayerHandler::renderDarkModeOverlay(MultiplayerContext& ctx)
   initDarkModeTexture(texWidth, texHeight);
   
   if (s_darkModeTextureInitialized && s_darkModeSprite) {
-    // 将遮罩sprite定位到玩家位置（中心对齐）
-    s_darkModeSprite->setPosition({playerPos.x - viewSize.x / 2.f, playerPos.y - viewSize.y / 2.f});
+    // 将遮罩sprite定位到玩家位置（中心对齐，纹理是2倍大小）
+    s_darkModeSprite->setPosition({playerPos.x - viewSize.x, playerPos.y - viewSize.y});
     ctx.window.draw(*s_darkModeSprite);
   }
   
