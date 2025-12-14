@@ -7,6 +7,87 @@
 #include <iostream>
 #include <limits>
 
+// 静态成员定义
+std::unique_ptr<sf::Texture> MultiplayerHandler::s_darkModeTexture;
+std::unique_ptr<sf::Sprite> MultiplayerHandler::s_darkModeSprite;
+bool MultiplayerHandler::s_darkModeTextureInitialized = false;
+unsigned int MultiplayerHandler::s_lastTextureWidth = 0;
+unsigned int MultiplayerHandler::s_lastTextureHeight = 0;
+
+void MultiplayerHandler::initDarkModeTexture(unsigned int width, unsigned int height)
+{
+  // 如果尺寸没变且已初始化，直接返回
+  if (s_darkModeTextureInitialized && 
+      s_lastTextureWidth == width && 
+      s_lastTextureHeight == height) {
+    return;
+  }
+  
+  // 创建图像
+  sf::Image image({width, height}, sf::Color::Transparent);
+  
+  // 椭圆参数：基于视图尺寸
+  float ellipseB = height * 0.28f;  // 椭圆短半轴（垂直方向）
+  float ellipseA = width * 0.22f;   // 椭圆长半轴（水平方向）
+  
+  // 渐变区域
+  float fadeScale = 0.3f;
+  float fadeA = ellipseA * fadeScale;
+  float fadeB = ellipseB * fadeScale;
+  
+  float centerX = width / 2.f;
+  float centerY = height / 2.f;
+  
+  // 遍历每个像素
+  for (unsigned int y = 0; y < height; y++) {
+    for (unsigned int x = 0; x < width; x++) {
+      float dx = x - centerX;
+      float dy = y - centerY;
+      
+      // 计算归一化椭圆距离
+      float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
+      
+      uint8_t alpha;
+      if (ellipseDist <= 1.0f) {
+        // 在椭圆内部，完全透明
+        alpha = 0;
+      } else {
+        // 计算外圈椭圆的归一化距离
+        float outerA = ellipseA + fadeA;
+        float outerB = ellipseB + fadeB;
+        float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
+        
+        if (outerDist >= 1.0f) {
+          // 在渐变区域外，完全黑色
+          alpha = 255;
+        } else {
+          // 在渐变区域内，计算渐变
+          float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
+          fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
+          alpha = static_cast<uint8_t>(255 * fadeProgress);
+        }
+      }
+      
+      image.setPixel({x, y}, sf::Color(0, 0, 0, alpha));
+    }
+  }
+  
+  // 创建纹理
+  s_darkModeTexture = std::make_unique<sf::Texture>(image);
+  if (!s_darkModeTexture) {
+    std::cerr << "Failed to create dark mode texture!" << std::endl;
+    return;
+  }
+  
+  // 使用纹理创建 Sprite
+  s_darkModeSprite = std::make_unique<sf::Sprite>(*s_darkModeTexture);
+  s_darkModeTextureInitialized = true;
+  s_lastTextureWidth = width;
+  s_lastTextureHeight = height;
+  
+  std::cout << "[DEBUG] Dark mode texture initialized: " << width << "x" << height << std::endl;
+}
+
 void MultiplayerHandler::update(
   MultiplayerContext& ctx,
   MultiplayerState& state,
@@ -1041,71 +1122,16 @@ void MultiplayerHandler::renderDarkModeOverlay(MultiplayerContext& ctx)
   // 获取玩家位置和视图尺寸
   sf::Vector2f playerPos = ctx.player->getPosition();
   sf::Vector2f viewSize = ctx.gameView.getSize();
-  sf::Vector2f viewCenter = ctx.gameView.getCenter();
   
-  // 椭圆参数：短半轴保持屏幕高度的30%，长半轴稍短
-  float ellipseB = viewSize.y * 0.28f;  // 椭圆短半轴（垂直方向）
-  float ellipseA = viewSize.x * 0.22f;  // 椭圆长半轴（水平方向）- 稍短
+  // 确保纹理已初始化（使用视图尺寸）
+  unsigned int texWidth = static_cast<unsigned int>(viewSize.x);
+  unsigned int texHeight = static_cast<unsigned int>(viewSize.y);
+  initDarkModeTexture(texWidth, texHeight);
   
-  // 渐变区域（椭圆外扩展）
-  float fadeScale = 0.3f;  // 渐变区域为椭圆尺寸的30%
-  float fadeA = ellipseA * fadeScale;
-  float fadeB = ellipseB * fadeScale;
-  
-  // 使用像素级绘制：创建一个覆盖整个视图的网格
-  // 为了性能，使用较大的格子
-  const int gridSize = 8;  // 每个格子的像素大小
-  
-  float startX = viewCenter.x - viewSize.x / 2.f;
-  float startY = viewCenter.y - viewSize.y / 2.f;
-  
-  int cols = static_cast<int>(viewSize.x / gridSize) + 1;
-  int rows = static_cast<int>(viewSize.y / gridSize) + 1;
-  
-  for (int row = 0; row < rows; row++) {
-    for (int col = 0; col < cols; col++) {
-      float x = startX + col * gridSize + gridSize / 2.f;
-      float y = startY + row * gridSize + gridSize / 2.f;
-      
-      // 计算点到玩家的椭圆距离
-      float dx = x - playerPos.x;
-      float dy = y - playerPos.y;
-      
-      // 椭圆方程: (dx/a)^2 + (dy/b)^2 = 1
-      // 计算归一化椭圆距离
-      float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
-      
-      uint8_t alpha;
-      if (ellipseDist <= 1.0f) {
-        // 在椭圆内部，完全透明
-        alpha = 0;
-      } else {
-        // 计算外圈椭圆的归一化距离
-        float outerA = ellipseA + fadeA;
-        float outerB = ellipseB + fadeB;
-        float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
-        
-        if (outerDist >= 1.0f) {
-          // 在渐变区域外，完全黑色
-          alpha = 255;
-        } else {
-          // 在渐变区域内，计算渐变
-          // ellipseDist 从 1.0 到 outerDist 对应的内椭圆距离
-          float t = (ellipseDist - 1.0f) / (1.0f / outerDist * ellipseDist - 1.0f);
-          // 简化：线性插值
-          float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
-          fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
-          alpha = static_cast<uint8_t>(255 * fadeProgress);
-        }
-      }
-      
-      if (alpha > 0) {
-        sf::RectangleShape cell({static_cast<float>(gridSize), static_cast<float>(gridSize)});
-        cell.setPosition({startX + col * gridSize, startY + row * gridSize});
-        cell.setFillColor(sf::Color(0, 0, 0, alpha));
-        ctx.window.draw(cell);
-      }
-    }
+  if (s_darkModeTextureInitialized && s_darkModeSprite) {
+    // 将遮罩sprite定位到玩家位置（中心对齐）
+    s_darkModeSprite->setPosition({playerPos.x - viewSize.x / 2.f, playerPos.y - viewSize.y / 2.f});
+    ctx.window.draw(*s_darkModeSprite);
   }
   
   // 恢复之前的视图

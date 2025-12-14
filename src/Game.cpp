@@ -2775,71 +2775,72 @@ void Game::renderDarkModeOverlay()
   // 获取玩家位置和视图尺寸
   sf::Vector2f playerPos = m_player->getPosition();
   sf::Vector2f viewSize = m_gameView.getSize();
-  sf::Vector2f viewCenter = m_gameView.getCenter();
   
-  // 椭圆参数：短半轴保持屏幕高度的30%，长半轴稍短
-  float ellipseB = viewSize.y * 0.28f;  // 椭圆短半轴（垂直方向）
-  float ellipseA = viewSize.x * 0.22f;  // 椭圆长半轴（水平方向）- 稍短
+  // 使用本地静态纹理
+  unsigned int texWidth = static_cast<unsigned int>(viewSize.x);
+  unsigned int texHeight = static_cast<unsigned int>(viewSize.y);
   
-  // 渐变区域（椭圆外扩展）
-  float fadeScale = 0.3f;  // 渐变区域为椭圆尺寸的30%
-  float fadeA = ellipseA * fadeScale;
-  float fadeB = ellipseB * fadeScale;
+  // Game 自己的静态纹理
+  static std::unique_ptr<sf::Texture> s_darkModeTexture;
+  static std::unique_ptr<sf::Sprite> s_darkModeSprite;
+  static bool s_initialized = false;
+  static unsigned int s_lastWidth = 0;
+  static unsigned int s_lastHeight = 0;
   
-  // 使用像素级绘制：创建一个覆盖整个视图的网格
-  // 为了性能，使用较大的格子
-  const int gridSize = 8;  // 每个格子的像素大小
-  
-  float startX = viewCenter.x - viewSize.x / 2.f;
-  float startY = viewCenter.y - viewSize.y / 2.f;
-  
-  int cols = static_cast<int>(viewSize.x / gridSize) + 1;
-  int rows = static_cast<int>(viewSize.y / gridSize) + 1;
-  
-  for (int row = 0; row < rows; row++) {
-    for (int col = 0; col < cols; col++) {
-      float x = startX + col * gridSize + gridSize / 2.f;
-      float y = startY + row * gridSize + gridSize / 2.f;
-      
-      // 计算点到玩家的椭圆距离
-      float dx = x - playerPos.x;
-      float dy = y - playerPos.y;
-      
-      // 椭圆方程: (dx/a)^2 + (dy/b)^2 = 1
-      // 计算归一化椭圆距离
-      float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
-      
-      uint8_t alpha;
-      if (ellipseDist <= 1.0f) {
-        // 在椭圆内部，完全透明
-        alpha = 0;
-      } else {
-        // 计算外圈椭圆的归一化距离
-        float outerA = ellipseA + fadeA;
-        float outerB = ellipseB + fadeB;
-        float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
+  if (!s_initialized || s_lastWidth != texWidth || s_lastHeight != texHeight) {
+    // 创建图像
+    sf::Image image({texWidth, texHeight}, sf::Color::Transparent);
+    
+    // 椭圆参数
+    float ellipseB = texHeight * 0.28f;
+    float ellipseA = texWidth * 0.22f;
+    float fadeScale = 0.3f;
+    float fadeA = ellipseA * fadeScale;
+    float fadeB = ellipseB * fadeScale;
+    
+    float centerX = texWidth / 2.f;
+    float centerY = texHeight / 2.f;
+    
+    for (unsigned int y = 0; y < texHeight; y++) {
+      for (unsigned int x = 0; x < texWidth; x++) {
+        float dx = x - centerX;
+        float dy = y - centerY;
         
-        if (outerDist >= 1.0f) {
-          // 在渐变区域外，完全黑色
-          alpha = 255;
+        float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
+        
+        uint8_t alpha;
+        if (ellipseDist <= 1.0f) {
+          alpha = 0;
         } else {
-          // 在渐变区域内，计算渐变
-          // ellipseDist 从 1.0 到 outerDist 对应的内椭圆距离
-          float t = (ellipseDist - 1.0f) / (1.0f / outerDist * ellipseDist - 1.0f);
-          // 简化：线性插值
-          float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
-          fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
-          alpha = static_cast<uint8_t>(255 * fadeProgress);
+          float outerA = ellipseA + fadeA;
+          float outerB = ellipseB + fadeB;
+          float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
+          
+          if (outerDist >= 1.0f) {
+            alpha = 255;
+          } else {
+            float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
+            fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
+            alpha = static_cast<uint8_t>(255 * fadeProgress);
+          }
         }
-      }
-      
-      if (alpha > 0) {
-        sf::RectangleShape cell({static_cast<float>(gridSize), static_cast<float>(gridSize)});
-        cell.setPosition({startX + col * gridSize, startY + row * gridSize});
-        cell.setFillColor(sf::Color(0, 0, 0, alpha));
-        m_window.draw(cell);
+        
+        image.setPixel({x, y}, sf::Color(0, 0, 0, alpha));
       }
     }
+    
+    s_darkModeTexture = std::make_unique<sf::Texture>();
+    (void)s_darkModeTexture->loadFromImage(image);
+    s_darkModeSprite = std::make_unique<sf::Sprite>(*s_darkModeTexture);
+    s_initialized = true;
+    s_lastWidth = texWidth;
+    s_lastHeight = texHeight;
+  }
+  
+  // 绘制遮罩
+  if (s_darkModeSprite) {
+    s_darkModeSprite->setPosition({playerPos.x - viewSize.x / 2.f, playerPos.y - viewSize.y / 2.f});
+    m_window.draw(*s_darkModeSprite);
   }
   
   // 恢复之前的视图

@@ -141,4 +141,14 @@ private:
   // 渲染暗黑模式遮罩
   static void renderDarkModeOverlay(
     MultiplayerContext& ctx);
+
+  // 暗黑模式遮罩纹理（静态成员）
+  static std::unique_ptr<sf::Texture> s_darkModeTexture;
+  static std::unique_ptr<sf::Sprite> s_darkModeSprite;
+  static bool s_darkModeTextureInitialized;
+  static unsigned int s_lastTextureWidth;
+  static unsigned int s_lastTextureHeight;
+  
+  // 初始化/更新暗黑模式遮罩纹理
+  static void initDarkModeTexture(unsigned int width, unsigned int height);
 };
