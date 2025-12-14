@@ -1599,6 +1599,10 @@ void Game::setupNetworkCallbacks()
       m_mpState.isHost = true;
       m_mpState.localPlayerReady = true;  // 新房主默认准备
       
+      // 同步 m_gameModeOption 与 m_mpState.isEscapeMode
+      // 这样在游戏开始时不会错误地覆盖 isEscapeMode
+      m_gameModeOption = m_mpState.isEscapeMode ? GameModeOption::EscapeMode : GameModeOption::BattleMode;
+      
       // 保留当前的游戏设置（迷宫数据、模式等）
       // 这些已经在之前的游戏中设置过了
       // 确保 mazeWidth, mazeHeight, npcCount 与 generatedMazeData 一致
