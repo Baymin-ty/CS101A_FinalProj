@@ -47,6 +47,7 @@ enum class MapSizePreset
   Small,   // 31x21, 10 NPCs
   Medium,  // 41x31, 20 NPCs
   Large,   // 61x51, 30 NPCs
+  Ultra,   // 121x101, 80 NPCs
   Custom,  // 自定义
   Count
 };
@@ -168,7 +169,7 @@ private:
 
   // 敌人数量选项
   std::vector<int> m_enemyOptions = {3, 5, 8, 10, 15, 20, 30, 50, 80, 100};
-  int m_enemyIndex = 4; // 默认 15
+  int m_enemyIndex = 5; // 默认 20
 
   // 多人模式：R键状态跟踪（事件驱动）
   bool m_rKeyWasPressed = false;

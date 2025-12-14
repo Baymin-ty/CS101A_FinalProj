@@ -351,17 +351,22 @@ void Game::processMainMenuEvents(const sf::Event &event)
         case MapSizePreset::Small:
           m_mazeWidth = 31; m_mazeHeight = 21;
           m_widthIndex = 1; m_heightIndex = 1;
-          m_enemyIndex = 2; // 10 NPCs
+          m_enemyIndex = 3; // 10 NPCs
           break;
         case MapSizePreset::Medium:
           m_mazeWidth = 41; m_mazeHeight = 31;
           m_widthIndex = 2; m_heightIndex = 2;
-          m_enemyIndex = 4; // 20 NPCs
+          m_enemyIndex = 5; // 20 NPCs
           break;
         case MapSizePreset::Large:
           m_mazeWidth = 61; m_mazeHeight = 51;
           m_widthIndex = 4; m_heightIndex = 4;
           m_enemyIndex = 6; // 30 NPCs
+          break;
+        case MapSizePreset::Ultra:
+          m_mazeWidth = 121; m_mazeHeight = 101;
+          m_widthIndex = 8; m_heightIndex = 8;
+          m_enemyIndex = 8; // 80 NPCs
           break;
         case MapSizePreset::Custom:
           // 保持当前自定义值
@@ -1195,6 +1200,7 @@ void Game::renderMainMenu()
     case MapSizePreset::Small:  mapSizeStr = "Small (31x21, 10 NPCs)"; break;
     case MapSizePreset::Medium: mapSizeStr = "Medium (41x31, 20 NPCs)"; break;
     case MapSizePreset::Large:  mapSizeStr = "Large (61x51, 30 NPCs)"; break;
+    case MapSizePreset::Ultra:  mapSizeStr = "Ultra (121x101, 80 NPCs)"; break;
     case MapSizePreset::Custom: mapSizeStr = "Custom"; break;
     default: mapSizeStr = "Medium"; break;
   }
