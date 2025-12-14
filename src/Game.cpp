@@ -638,9 +638,10 @@ void Game::processEvents()
         {
           if (m_mpState.isMultiplayer)
           {
+            // 多人模式：返回房间大厅
             if (m_mpState.isHost)
             {
-              // 房主按 R：回到房间大厅，通知对方准备重新开始
+              // 房主按 R：通知对方返回房间，并生成新地图
               NetworkManager::getInstance().sendRestartRequest();
 
               // 重新生成迷宫（使用菜单选择的NPC数量，联机模式，根据游戏模式决定墙体类型）
@@ -649,36 +650,29 @@ void Game::processEvents()
               m_mpState.generatedMazeData = m_maze.getMazeData();
               NetworkManager::getInstance().sendMazeData(m_mpState.generatedMazeData, m_mpState.isEscapeMode);
 
-              // 进入房间大厅
-              m_gameState = GameState::RoomLobby;
-              m_mpState.localPlayerReady = true;  // 房主默认准备
-              m_mpState.otherPlayerReady = false; // 等待对方准备
-
-              // 重置状态
-              m_mpState.localPlayerReachedExit = false;
-              m_mpState.otherPlayerReachedExit = false;
-              m_mpState.multiplayerWin = false;
-              m_mpState.localPlayerDead = false;
-              m_mpState.otherPlayerDead = false;
-              m_gameOver = false;
-              m_gameWon = false;
-              m_bullets.clear();
+              // 房主默认准备
+              m_mpState.localPlayerReady = true;
+              // 保留对方准备状态（服务器会发送正确状态）
             }
             else
             {
-              // 非房主按 R：自动重新加入上次的房间
-              if (!m_mpState.roomCode.empty())
-              {
-                NetworkManager::getInstance().joinRoom(m_mpState.roomCode);
-                // 进入房间大厅等待（会在 setOnRoomJoined 回调中设置正确状态）
-                m_gameState = GameState::RoomLobby;
-                m_mpState.localPlayerReady = false;  // 非房主需要重新准备
-              }
-              else
-              {
-                resetGame(); // 没有房间码，返回主菜单
-              }
+              // 非房主按 R：通知服务器返回房间
+              NetworkManager::getInstance().sendRestartRequest();
+              // 非房主也保留自己的准备状态
             }
+
+            // 进入房间大厅
+            m_gameState = GameState::RoomLobby;
+
+            // 重置游戏状态（不重置准备状态）
+            m_mpState.localPlayerReachedExit = false;
+            m_mpState.otherPlayerReachedExit = false;
+            m_mpState.multiplayerWin = false;
+            m_mpState.localPlayerDead = false;
+            m_mpState.otherPlayerDead = false;
+            m_gameOver = false;
+            m_gameWon = false;
+            m_bullets.clear();
           }
           else
           {
@@ -1530,14 +1524,7 @@ void Game::renderGameOver()
   // 多人模式显示不同的提示
   if (m_mpState.isMultiplayer)
   {
-    if (m_mpState.isHost)
-    {
-      hint.setString("Press R to restart match, ESC for menu");
-    }
-    else
-    {
-      hint.setString("Press R to rejoin room, ESC for menu");
-    }
+    hint.setString("Press R to return to room, ESC for menu");
   }
   else
   {
@@ -1897,23 +1884,21 @@ void Game::setupNetworkCallbacks()
 
   net.setOnRestartRequest([this]()
                           {
-    // 对方请求重新开始（房主发起）
-    // 非房主收到后进入房间大厅等待
-    if (!m_mpState.isHost) {
-      // 重置状态
-      m_mpState.localPlayerReachedExit = false;
-      m_mpState.otherPlayerReachedExit = false;
-      m_mpState.multiplayerWin = false;
-      m_mpState.localPlayerDead = false;
-      m_mpState.otherPlayerDead = false;
-      m_mpState.localPlayerReady = false;  // 非房主需要重新准备
-      m_gameOver = false;
-      m_gameWon = false;
-      m_bullets.clear();
-      
-      // 进入房间大厅
-      m_gameState = GameState::RoomLobby;
-    } });
+    // 对方请求返回房间（双方都可能发起）
+    // 收到后进入房间大厅等待
+    // 重置游戏状态（保留准备状态）
+    m_mpState.localPlayerReachedExit = false;
+    m_mpState.otherPlayerReachedExit = false;
+    m_mpState.multiplayerWin = false;
+    m_mpState.localPlayerDead = false;
+    m_mpState.otherPlayerDead = false;
+    // 保留 localPlayerReady 状态，不重置
+    m_gameOver = false;
+    m_gameWon = false;
+    m_bullets.clear();
+    
+    // 进入房间大厅
+    m_gameState = GameState::RoomLobby; });
 
   // NPC同步回调
   net.setOnNpcActivate([this](int npcId, int team, int activatorId)
@@ -2405,12 +2390,14 @@ void Game::renderRoomLobby()
   player1Text.setPosition({textX + 20.f, textY});
   m_window.draw(player1Text);
   
-  // 准备状态（房主默认准备）
+  // 准备状态（房主默认准备）- 右对齐
+  float readyRightEdge = boxX + boxWidth - 30.f;  // 准备状态右边界
   sf::Text p1Ready(m_font);
   p1Ready.setString("READY");
   p1Ready.setCharacterSize(24);
   p1Ready.setFillColor(sf::Color::Green);
-  p1Ready.setPosition({boxX + boxWidth - 120.f, textY});
+  sf::FloatRect p1ReadyBounds = p1Ready.getLocalBounds();
+  p1Ready.setPosition({readyRightEdge - p1ReadyBounds.size.x, textY});
   m_window.draw(p1Ready);
   textY += lineHeight;
   
@@ -2428,14 +2415,15 @@ void Game::renderRoomLobby()
   player2Text.setPosition({textX + 20.f, textY});
   m_window.draw(player2Text);
   
-  // 玩家2准备状态
+  // 玩家2准备状态 - 右对齐
   if (m_mpState.otherPlayerInRoom) {
     sf::Text p2Ready(m_font);
     bool isP2Ready = m_mpState.isHost ? m_mpState.otherPlayerReady : m_mpState.localPlayerReady;
     p2Ready.setString(isP2Ready ? "READY" : "NOT READY");
     p2Ready.setCharacterSize(24);
     p2Ready.setFillColor(isP2Ready ? sf::Color::Green : sf::Color::Red);
-    p2Ready.setPosition({boxX + boxWidth - 150.f, textY});
+    sf::FloatRect p2ReadyBounds = p2Ready.getLocalBounds();
+    p2Ready.setPosition({readyRightEdge - p2ReadyBounds.size.x, textY});
     m_window.draw(p2Ready);
   }
   textY += lineHeight + 30.f;

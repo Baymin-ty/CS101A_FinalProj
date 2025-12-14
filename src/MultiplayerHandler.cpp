@@ -953,8 +953,12 @@ void MultiplayerHandler::renderMinimap(
     npcDot.setPosition({npcMiniPos.x - 3.f, npcMiniPos.y - 3.f});
     
     if (state.isEscapeMode) {
-      // Escape模式：所有NPC都是敌方（红色）
-      npcDot.setFillColor(GameColors::MinimapEnemyNpc);
+      // Escape模式：未激活灰色，已激活是敌方（红色）
+      if (npc->isActivated()) {
+        npcDot.setFillColor(GameColors::MinimapEnemyNpc);
+      } else {
+        npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活灰色
+      }
     } else {
       // Battle模式：根据阵营显示
       if (npc->isActivated()) {
