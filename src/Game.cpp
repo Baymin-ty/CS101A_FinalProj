@@ -1896,9 +1896,19 @@ void Game::setupNetworkCallbacks()
                        {
     // 对方激活了NPC
     if (npcId >= 0 && npcId < static_cast<int>(m_enemies.size())) {
-      m_enemies[npcId]->activate(team, activatorId);
-      std::cout << "[DEBUG] Remote NPC " << npcId << " activated with team " << team 
-                << ", activatorId " << activatorId << std::endl;
+      // 检查 NPC 是否已经被激活（避免重复激活）
+      if (!m_enemies[npcId]->isActivated()) {
+        m_enemies[npcId]->activate(team, activatorId);
+        std::cout << "[DEBUG] Remote NPC " << npcId << " activated with team " << team 
+                  << ", activatorId " << activatorId << std::endl;
+        
+        // 如果是房主收到激活请求，需要转发给所有客户端（包括原发送者）
+        // 确保双方同步
+        if (m_mpState.isHost) {
+          NetworkManager::getInstance().sendNpcActivate(npcId, team, activatorId);
+          std::cout << "[DEBUG] Host forwarding NPC activation to all clients" << std::endl;
+        }
+      }
     } });
 
   net.setOnNpcUpdate([this](const NpcState &state)
@@ -1912,9 +1922,12 @@ void Game::setupNetworkCallbacks()
         return;
       }
       
-      // 第一次收到更新时直接设置位置（避免从错误位置插值）
-      bool wasRemote = npc->getPosition().x > 0.1f || npc->getPosition().y > 0.1f;
-      if (!wasRemote) {
+      // 第一次收到更新时：用当前位置初始化网络目标，然后直接设置到远程位置
+      // 避免从 {0,0} 插值导致 NPC 消失
+      if (!npc->isRemoteControlled()) {
+        // 先用当前位置初始化目标（防止插值到 {0,0}）
+        npc->setNetworkTarget(npc->getPosition(), npc->getRotation(), npc->getTurretRotation());
+        // 直接设置到远程位置
         npc->setPosition({state.x, state.y});
         npc->setRotation(state.rotation);
         npc->setTurretRotation(state.turretAngle);

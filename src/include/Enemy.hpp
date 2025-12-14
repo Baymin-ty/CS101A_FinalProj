@@ -85,6 +85,7 @@ public:
   void setNetworkTarget(sf::Vector2f pos, float rotation, float turretAngle);
   void updateInterpolation(float dt);
   void setIsRemote(bool remote) { m_isRemote = remote; }
+  bool isRemoteControlled() const { return m_isRemote; }
 
 private:
   sf::Texture m_hullTexture;
@@ -140,5 +141,5 @@ private:
   sf::Vector2f m_networkTargetPos = {0.f, 0.f};
   float m_networkTargetRotation = 0.f;
   float m_networkTargetTurretAngle = 0.f;
-  float m_interpSpeed = 12.f;  // 插值速度（每秒插值因子，越大越快跟上目标）
+  float m_interpSpeed = 20.f;  // 插值速度（每秒插值因子，越大越快跟上目标）
 };

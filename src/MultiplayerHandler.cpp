@@ -440,9 +440,9 @@ void MultiplayerHandler::updateNpcAI(
           AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, ctx.player->getPosition());
         }
 
-        // 定期同步NPC状态（每3帧同步一次，提高流畅度）
+        // 定期同步NPC状态（每2帧同步一次，提高流畅度）
         state.npcSyncCounter++;
-        if ((state.npcSyncCounter + static_cast<int>(i)) % 3 == 0) {
+        if ((state.npcSyncCounter + static_cast<int>(i)) % 2 == 0) {
           NpcState npcState;
           npcState.id = static_cast<int>(i);
           npcState.x = npc->getPosition().x;

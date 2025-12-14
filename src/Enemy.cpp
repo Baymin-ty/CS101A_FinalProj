@@ -526,7 +526,7 @@ void Enemy::updateInterpolation(float dt)
     return;
 
   // 使用线性插值（lerp）平滑过渡到目标位置
-  // 插值因子：越大越快跟上，0.1-0.3之间比较平滑
+  // 插值因子：越大越快跟上
   float lerpFactor = std::min(1.0f, m_interpSpeed * dt);
 
   // 位置插值
@@ -534,16 +534,16 @@ void Enemy::updateInterpolation(float dt)
   sf::Vector2f diff = m_networkTargetPos - currentPos;
   float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y);
 
-  if (dist > 1.f)
+  if (dist > 0.5f)
   {
-    // 如果距离太远（瞬移情况），直接设置位置
-    if (dist > 500.f)
+    // 如果距离超过阈值，直接瞬移到目标位置（避免明显的追赶效果）
+    if (dist > 100.f)
     {
       setPosition(m_networkTargetPos);
     }
     else
     {
-      // 线性插值
+      // 线性插值，使用更激进的插值让NPC快速跟上
       sf::Vector2f newPos = currentPos + diff * lerpFactor;
       setPosition(newPos);
     }
