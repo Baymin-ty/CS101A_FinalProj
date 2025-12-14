@@ -1429,6 +1429,7 @@ void Game::renderGame()
     if (!enemy->isDead())
     {
       enemy->draw(m_window);
+      enemy->drawHealthBar(m_window);
     }
   }
 
@@ -1436,15 +1437,6 @@ void Game::renderGame()
   if (m_darkModeOption && !m_isMultiplayer)
   {
     renderDarkModeOverlay();
-  }
-
-  // 在遮罩上方绘制敌人血条（暗黑模式下也可见）
-  for (const auto &enemy : m_enemies)
-  {
-    if (!enemy->isDead())
-    {
-      enemy->drawHealthBar(m_window);
-    }
   }
 
   // 切换到 UI 视图绘制 UI

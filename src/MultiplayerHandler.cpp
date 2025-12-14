@@ -736,10 +736,20 @@ void MultiplayerHandler::renderMultiplayer(
     renderDarkModeOverlay(ctx);
   }
 
-  // 在遮罩上方绘制NPC血条和阵营标记（暗黑模式下也可见）
+  // 渲染UI
+  renderUI(ctx, state);
+
+  ctx.window.display();
+}
+
+void MultiplayerHandler::renderNpcs(
+  MultiplayerContext& ctx,
+  MultiplayerState& state)
+{
   for (const auto& npc : ctx.enemies) {
     if (npc->isDead()) continue;
-    
+
+    npc->draw(ctx.window);
     npc->drawHealthBar(ctx.window);
     
     sf::Vector2f npcPos = npc->getPosition();
@@ -755,23 +765,6 @@ void MultiplayerHandler::renderMultiplayer(
         UIHelper::drawTeamMarker(ctx.window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
       }
     }
-  }
-
-  // 渲染UI
-  renderUI(ctx, state);
-
-  ctx.window.display();
-}
-
-void MultiplayerHandler::renderNpcs(
-  MultiplayerContext& ctx,
-  MultiplayerState& state)
-{
-  for (const auto& npc : ctx.enemies) {
-    if (npc->isDead()) continue;
-
-    npc->draw(ctx.window);
-    // 血条和阵营标记在遮罩之后单独绘制
   }
 }
 
