@@ -109,9 +109,8 @@ bool Game::init()
 
 void Game::generateRandomMaze()
 {
-  int width = m_widthOptions[m_widthIndex];
-  int height = m_heightOptions[m_heightIndex];
-  m_mazeGenerator = MazeGenerator(width, height);
+  // 使用已设置的迷宫尺寸（来自预设或自定义）
+  m_mazeGenerator = MazeGenerator(m_mazeWidth, m_mazeHeight);
 
   // 使用菜单中选择的敌人数量
   int enemyCount = m_enemyOptions[m_enemyIndex];
@@ -346,6 +345,34 @@ void Game::processMainMenuEvents(const sf::Event &event)
   {
     int optionCount = static_cast<int>(MainMenuOption::Count);
 
+    // 辅助函数：应用地图预设
+    auto applyMapPreset = [this]() {
+      switch (m_mapSizePreset) {
+        case MapSizePreset::Small:
+          m_mazeWidth = 31; m_mazeHeight = 21;
+          m_widthIndex = 1; m_heightIndex = 1;
+          m_enemyIndex = 2; // 10 NPCs
+          break;
+        case MapSizePreset::Medium:
+          m_mazeWidth = 41; m_mazeHeight = 31;
+          m_widthIndex = 2; m_heightIndex = 2;
+          m_enemyIndex = 4; // 20 NPCs
+          break;
+        case MapSizePreset::Large:
+          m_mazeWidth = 61; m_mazeHeight = 51;
+          m_widthIndex = 4; m_heightIndex = 4;
+          m_enemyIndex = 6; // 30 NPCs
+          break;
+        case MapSizePreset::Custom:
+          // 保持当前自定义值
+          m_mazeWidth = m_widthOptions[m_widthIndex];
+          m_mazeHeight = m_heightOptions[m_heightIndex];
+          break;
+        default:
+          break;
+      }
+    };
+
     switch (keyPressed->code)
     {
     case sf::Keyboard::Key::Up:
@@ -384,6 +411,7 @@ void Game::processMainMenuEvents(const sf::Event &event)
         m_inputText = m_serverIP;
         m_inputMode = InputMode::ServerIP;
         break;
+      case MainMenuOption::MapSize:
       case MainMenuOption::MapWidth:
       case MainMenuOption::MapHeight:
       case MainMenuOption::EnemyCount:
@@ -401,17 +429,34 @@ void Game::processMainMenuEvents(const sf::Event &event)
     case sf::Keyboard::Key::A:
       switch (m_mainMenuOption)
       {
-      case MainMenuOption::MapWidth:
-        m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+      case MainMenuOption::MapSize:
+      {
+        int current = static_cast<int>(m_mapSizePreset);
+        current = (current - 1 + static_cast<int>(MapSizePreset::Count)) % static_cast<int>(MapSizePreset::Count);
+        m_mapSizePreset = static_cast<MapSizePreset>(current);
+        applyMapPreset();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        break;
+      }
+      case MainMenuOption::MapWidth:
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+          m_mazeWidth = m_widthOptions[m_widthIndex];
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       case MainMenuOption::MapHeight:
-        m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
-        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
+          m_mazeHeight = m_heightOptions[m_heightIndex];
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       case MainMenuOption::EnemyCount:
-        m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
-        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       default:
         break;
@@ -421,17 +466,34 @@ void Game::processMainMenuEvents(const sf::Event &event)
     case sf::Keyboard::Key::D:
       switch (m_mainMenuOption)
       {
-      case MainMenuOption::MapWidth:
-        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+      case MainMenuOption::MapSize:
+      {
+        int current = static_cast<int>(m_mapSizePreset);
+        current = (current + 1) % static_cast<int>(MapSizePreset::Count);
+        m_mapSizePreset = static_cast<MapSizePreset>(current);
+        applyMapPreset();
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        break;
+      }
+      case MainMenuOption::MapWidth:
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+          m_mazeWidth = m_widthOptions[m_widthIndex];
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       case MainMenuOption::MapHeight:
-        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
-        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+          m_mazeHeight = m_heightOptions[m_heightIndex];
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       case MainMenuOption::EnemyCount:
-        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
-        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        if (m_mapSizePreset == MapSizePreset::Custom) {
+          m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        }
         break;
       default:
         break;
@@ -1125,11 +1187,22 @@ void Game::renderMainMenu()
 
   // 菜单选项
   float startY = 220.f;
-  float spacing = 50.f;
+  float spacing = 45.f;
+
+  // 获取地图大小预设字符串
+  std::string mapSizeStr;
+  switch (m_mapSizePreset) {
+    case MapSizePreset::Small:  mapSizeStr = "Small (31x21, 10 NPCs)"; break;
+    case MapSizePreset::Medium: mapSizeStr = "Medium (41x31, 20 NPCs)"; break;
+    case MapSizePreset::Large:  mapSizeStr = "Large (61x51, 30 NPCs)"; break;
+    case MapSizePreset::Custom: mapSizeStr = "Custom"; break;
+    default: mapSizeStr = "Medium"; break;
+  }
 
   std::vector<std::string> options = {
       "Single Player",
       "Multi Player",
+      std::string("Map Size: < ") + mapSizeStr + " >",
       std::string("Map Width: < ") + std::to_string(m_widthOptions[m_widthIndex]) + " >",
       std::string("Map Height: < ") + std::to_string(m_heightOptions[m_heightIndex]) + " >",
       std::string("NPCs: < ") + std::to_string(m_enemyOptions[m_enemyIndex]) + " >",
@@ -1141,14 +1214,26 @@ void Game::renderMainMenu()
     optionText.setString(options[i]);
     optionText.setCharacterSize(32);
 
+    // 自定义选项在非 Custom 模式下变灰
+    bool isCustomOption = (i == 3 || i == 4 || i == 5); // MapWidth, MapHeight, NPCs
+    bool isDisabled = isCustomOption && (m_mapSizePreset != MapSizePreset::Custom);
+
     if (static_cast<int>(i) == static_cast<int>(m_mainMenuOption))
     {
-      optionText.setFillColor(sf::Color::Yellow);
+      if (isDisabled) {
+        optionText.setFillColor(sf::Color(180, 180, 100)); // 禁用但选中：暗黄色
+      } else {
+        optionText.setFillColor(sf::Color::Yellow);
+      }
       optionText.setString("> " + options[i] + " <");
     }
     else
     {
-      optionText.setFillColor(sf::Color(180, 180, 180));
+      if (isDisabled) {
+        optionText.setFillColor(sf::Color(100, 100, 100)); // 禁用：深灰色
+      } else {
+        optionText.setFillColor(sf::Color(180, 180, 180));
+      }
     }
 
     sf::FloatRect bounds = optionText.getLocalBounds();
@@ -1158,9 +1243,9 @@ void Game::renderMainMenu()
 
   // 地图预览信息
   sf::Text mapInfo(m_font);
-  int totalCells = m_widthOptions[m_widthIndex] * m_heightOptions[m_heightIndex];
-  mapInfo.setString("Map: " + std::to_string(m_widthOptions[m_widthIndex]) + " x " +
-                    std::to_string(m_heightOptions[m_heightIndex]) + " = " +
+  int totalCells = m_mazeWidth * m_mazeHeight;
+  mapInfo.setString("Map: " + std::to_string(m_mazeWidth) + " x " +
+                    std::to_string(m_mazeHeight) + " = " +
                     std::to_string(totalCells) + " cells");
   mapInfo.setCharacterSize(20);
   mapInfo.setFillColor(sf::Color(100, 180, 100));
