@@ -300,6 +300,7 @@ void CollisionSystem::checkMultiplayerCollisions(
 
       // 判断子弹是否能击中这个NPC
       bool canHitNpc = false;
+      bool isNpcBullet = (bullet->getOwner() == BulletOwner::Enemy);
 
       if (isLocalPlayerBullet)
       {
@@ -345,9 +346,9 @@ void CollisionSystem::checkMultiplayerCollisions(
             }
           }
           // NPC子弹打NPC：房主端处理伤害
-          else if (bulletTeam != 0 && isHost)
+          else if (isNpcBullet && isHost)
           {
-            // Battle模式下NPC打NPC，房主端处理伤害
+            // 房主端处理NPC打NPC的伤害（包括team=0的NPC和已激活的NPC）
             npc->takeDamage(bullet->getDamage());
             NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
 
