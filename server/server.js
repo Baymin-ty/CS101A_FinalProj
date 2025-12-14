@@ -393,11 +393,11 @@ function handleMessage(socket, data) {
       // 重置房间状态，准备下一轮
       room.started = false;
       
-      // 找到发送请求的玩家，重置其 ready 状态（非房主）
+      // 重置所有非房主玩家的 ready 状态
+      // 无论是谁返回房间，非房主都需要重新手动 ready
       for (const player of room.players) {
         player.reachedExit = false;
-        // 非房主返回房间时重置为 NOT READY
-        if (player.socket === socket && !player.isHost) {
+        if (!player.isHost) {
           player.ready = false;
         }
       }
