@@ -34,7 +34,9 @@ bool Tank::loadTextures(const std::string &hullPath, const std::string &turretPa
 
   // 创建并设置炮塔
   m_turret = std::make_unique<sf::Sprite>(m_turretTexture);
-  m_turret->setOrigin(sf::Vector2f(m_turretTexture.getSize()) / 2.f);
+  // 炮塔旋转中心在底部中心（炮塔底座位置）
+  auto turretSize = sf::Vector2f(m_turretTexture.getSize());
+  m_turret->setOrigin({turretSize.x / 2.f, turretSize.y * 0.75f});
   m_turret->setScale({m_scale, m_scale});
 
   m_position = m_hull->getPosition();

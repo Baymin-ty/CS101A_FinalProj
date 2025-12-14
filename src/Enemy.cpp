@@ -27,7 +27,9 @@ bool Enemy::loadTextures(const std::string &hullPath, const std::string &turretP
   m_hull->setScale({m_scale, m_scale});
 
   m_turret = std::make_unique<sf::Sprite>(m_turretTexture);
-  m_turret->setOrigin(sf::Vector2f(m_turretTexture.getSize()) / 2.f);
+  // 炮塔旋转中心在底部中心（炮塔底座位置）
+  auto turretSize1 = sf::Vector2f(m_turretTexture.getSize());
+  m_turret->setOrigin({turretSize1.x / 2.f, turretSize1.y * 0.75f});
   m_turret->setScale({m_scale, m_scale});
 
   return true;
@@ -54,7 +56,9 @@ bool Enemy::loadActivatedTextures()
   m_hull->setRotation(sf::degrees(hullRot));
 
   m_turret = std::make_unique<sf::Sprite>(m_turretTexture);
-  m_turret->setOrigin(sf::Vector2f(m_turretTexture.getSize()) / 2.f);
+  // 炮塔旋转中心在底部中心（炮塔底座位置）
+  auto turretSize2 = sf::Vector2f(m_turretTexture.getSize());
+  m_turret->setOrigin({turretSize2.x / 2.f, turretSize2.y * 0.75f});
   m_turret->setScale({m_scale, m_scale});
   m_turret->setPosition(pos);
   m_turret->setRotation(sf::degrees(turretRot));
