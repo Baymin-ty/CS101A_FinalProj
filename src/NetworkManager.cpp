@@ -200,7 +200,7 @@ void NetworkManager::sendWallPlace(float x, float y)
   sendPacket(data);
 }
 
-void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroyed, int attribute)
+void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)
 {
   if (!m_connected) return;
 
@@ -224,6 +224,7 @@ void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroy
   addFloat(damage);
   data.push_back(destroyed ? 1 : 0);
   addInt(attribute);
+  addInt(destroyerId);
 
   sendPacket(data);
 }
@@ -724,9 +725,9 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
   case NetMessageType::WallDamage:
   {
     // 墙壁受到伤害同步
-    if (data.size() >= 18 && m_onWallDamage)
+    if (data.size() >= 22 && m_onWallDamage)
     {
-      int row, col, attribute;
+      int row, col, attribute, destroyerId;
       float damage;
       bool destroyed;
       std::memcpy(&row, &data[1], sizeof(int));
@@ -734,7 +735,8 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       std::memcpy(&damage, &data[9], sizeof(float));
       destroyed = (data[13] != 0);
       std::memcpy(&attribute, &data[14], sizeof(int));
-      m_onWallDamage(row, col, damage, destroyed, attribute);
+      std::memcpy(&destroyerId, &data[18], sizeof(int));
+      m_onWallDamage(row, col, damage, destroyed, attribute, destroyerId);
     }
     break;
   }

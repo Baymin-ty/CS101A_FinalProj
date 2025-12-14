@@ -2001,31 +2001,50 @@ void Game::setupNetworkCallbacks()
     // 对方放置了墙壁
     m_maze.placeWall({x, y}); });
 
-  net.setOnWallDamage([this](int row, int col, float damage, bool destroyed, int attribute)
+  net.setOnWallDamage([this](int row, int col, float damage, bool destroyed, int attribute, int destroyerId)
                       {
     // 非房主接收墙壁伤害同步
     if (!m_mpState.isHost) {
       WallDestroyResult result = m_maze.applyWallDamage(row, col, damage, destroyed);
       
-      // 如果墙被摧毁且是本地玩家的子弹造成的，给本地玩家加效果
-      // 注意：这里无法判断是谁的子弹，增益效果需要另外同步
-      // 目前简化处理：墙壁摧毁时不给非房主加增益，增益由房主处理
+      // 如果墙被摧毁，检查是否是本地玩家（非房主）的子弹造成的
+      // destroyerId: 0=房主, 1=非房主（本地玩家）
       if (destroyed && result.destroyed && m_player) {
-        // 播放对应的音效
         sf::Vector2f listenerPos = m_player->getPosition();
         WallAttribute attr = static_cast<WallAttribute>(attribute);
-        switch (attr) {
-          case WallAttribute::Gold:
-            AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
-            break;
-          case WallAttribute::Heal:
-            AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
-            break;
-          case WallAttribute::None:
-            AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
-            break;
-          default:
-            break;
+        
+        // 如果是非房主（本地玩家）打掉的墙，给本地玩家加增益
+        if (destroyerId == 1) {
+          switch (attr) {
+            case WallAttribute::Gold:
+              m_player->addCoins(20);
+              AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
+              break;
+            case WallAttribute::Heal:
+              m_player->heal(10.f);
+              AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
+              break;
+            case WallAttribute::None:
+              AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
+              break;
+            default:
+              break;
+          }
+        } else {
+          // 房主打掉的墙，只播放音效，不给本地玩家加增益
+          switch (attr) {
+            case WallAttribute::Gold:
+              AudioManager::getInstance().playSFX(SFXType::CollectCoins, result.position, listenerPos);
+              break;
+            case WallAttribute::Heal:
+              AudioManager::getInstance().playSFX(SFXType::Bingo, result.position, listenerPos);
+              break;
+            case WallAttribute::None:
+              AudioManager::getInstance().playSFX(SFXType::WallBroken, result.position, listenerPos);
+              break;
+            default:
+              break;
+          }
         }
       }
     } });

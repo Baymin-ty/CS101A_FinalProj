@@ -350,48 +350,35 @@ void MultiplayerHandler::updateNpcAI(
         // 收集敌对目标
         std::vector<sf::Vector2f> targets;
 
-        // Escape 模式：NPC (team=0) 攻击所有活着的玩家
+        // Escape 模式：NPC (team=0) 攻击距离最近的活着的玩家
         if (state.isEscapeMode && npcTeam == 0) {
-          // NPC 的激活者 ID: 0=本地玩家, 1=其他玩家
-          int activatorId = npc->getActivatorId();
+          sf::Vector2f npcPos = npc->getPosition();
+          float closestDist = std::numeric_limits<float>::max();
+          Tank* closestTarget = nullptr;
           
-          // 确定主目标和副目标
-          Tank* primaryTarget = nullptr;
-          Tank* secondaryTarget = nullptr;
-          bool primaryDowned = false;
-          bool secondaryDowned = false;
-          
-          if (activatorId == 0) {
-            // 本地玩家激活的 -> 优先攻击本地玩家
-            primaryTarget = ctx.player;
-            primaryDowned = state.localPlayerDead;
-            secondaryTarget = ctx.otherPlayer;
-            secondaryDowned = state.otherPlayerDead;
-          } else {
-            // 其他玩家激活的 (activatorId == 1) -> 优先攻击其他玩家
-            primaryTarget = ctx.otherPlayer;
-            primaryDowned = state.otherPlayerDead;
-            secondaryTarget = ctx.player;
-            secondaryDowned = state.localPlayerDead;
+          // 检查本地玩家
+          if (ctx.player && !state.localPlayerDead) {
+            sf::Vector2f diff = ctx.player->getPosition() - npcPos;
+            float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestTarget = ctx.player;
+            }
           }
           
-          // 更新主目标倒地状态
-          if (primaryDowned && !npc->isPrimaryTargetDowned()) {
-            // 主目标刚刚倒地，切换到副目标
-            npc->setPrimaryTargetDowned(true);
+          // 检查其他玩家
+          if (ctx.otherPlayer && !state.otherPlayerDead) {
+            sf::Vector2f diff = ctx.otherPlayer->getPosition() - npcPos;
+            float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestTarget = ctx.otherPlayer;
+            }
           }
           
-          // 选择攻击目标
-          if (npc->isPrimaryTargetDowned()) {
-            // 主目标已倒地，攻击副目标（如果活着）
-            if (secondaryTarget && !secondaryDowned) {
-              targets.push_back(secondaryTarget->getPosition());
-            }
-          } else {
-            // 主目标还活着，攻击主目标
-            if (primaryTarget) {
-              targets.push_back(primaryTarget->getPosition());
-            }
+          // 设置最近的活着的玩家为攻击目标
+          if (closestTarget) {
+            targets.push_back(closestTarget->getPosition());
           }
         } else {
           // Battle 模式或其他情况：原有逻辑

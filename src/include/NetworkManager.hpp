@@ -114,7 +114,7 @@ using OnRescueCancelCallback = std::function<void()>;
 using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
 using OnPlayerReadyCallback = std::function<void(bool isReady)>;
 using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady)>;
-using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute)>;
+using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)>;
 
 class NetworkManager
 {
@@ -153,7 +153,7 @@ public:
   
   // 墙壁放置同步
   void sendWallPlace(float x, float y);  // 发送墙壁放置
-  void sendWallDamage(int row, int col, float damage, bool destroyed, int attribute);  // 发送墙壁伤害
+  void sendWallDamage(int row, int col, float damage, bool destroyed, int attribute, int destroyerId);  // 发送墙壁伤害，destroyerId: 0=房主, 1=非房主
   
   // 救援同步
   void sendRescueStart();    // 开始救援

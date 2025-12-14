@@ -180,23 +180,28 @@ void CollisionSystem::checkMultiplayerCollisions(
         // 播放子弹击中墙壁音效
         AudioManager::getInstance().playSFX(SFXType::BulletHitWall, bulletPos, listenerPos);
 
-        // 同步墙壁伤害给非房主
+        // 判断子弹是谁发射的
+        bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+        // destroyerId: 0=房主（本地玩家），1=非房主（对方玩家）
+        int destroyerId = isLocalPlayerBullet ? 0 : 1;
+
+        // 同步墙壁伤害给非房主（包含摧毁者ID）
         NetworkManager::getInstance().sendWallDamage(
             wallResult.gridY, wallResult.gridX,
             bullet->getDamage(),
             wallResult.destroyed,
-            static_cast<int>(wallResult.attribute));
+            static_cast<int>(wallResult.attribute),
+            destroyerId);
 
         // 如果墙被摧毁且有属性效果，处理增益
         if (wallResult.destroyed)
         {
-          // 判断子弹是谁发射的，给对应玩家加效果
-          bool isLocalPlayerBullet = bullet->getOwner() == BulletOwner::Player;
+          // 房主端：房主打掉的墙，给房主加效果
           if (isLocalPlayerBullet)
           {
             handleWallDestroyEffect(wallResult, player, maze);
           }
-          // 对方玩家的增益效果由网络同步触发
+          // 非房主打掉的墙，增益效果由非房主端的回调处理
         }
 
         bullet->setInactive();
