@@ -72,7 +72,7 @@ void Enemy::activate(int team, int activatorId)
   {
     m_activated = true;
     m_team = team;
-    m_activatorId = activatorId;  // 记录激活者 (-1=自动激活, 0=本地玩家, 1=另一玩家)
+    m_activatorId = activatorId; // 记录激活者 (-1=自动激活, 0=本地玩家, 1=另一玩家)
     m_primaryTargetDowned = false;
     // 切换到激活状态贴图
     loadActivatedTextures();
@@ -130,7 +130,7 @@ void Enemy::update(float dt, const Maze &maze)
     auto normalPath = maze.findPath(oldPos, m_targetPos);
 
     // 然后尝试穿过可破坏墙的路径
-    auto smartPathResult = maze.findPathThroughDestructible(oldPos, m_targetPos, 3.0f);
+    auto smartPathResult = maze.findPathThroughDestructible(oldPos, m_targetPos, 10.0f);
 
     // 比较两条路径，选择更优的
     // 如果智能路径明显更短（考虑到可破坏墙的额外代价），则使用智能路径
@@ -308,12 +308,12 @@ void Enemy::update(float dt, const Maze &maze)
   {
     sf::Vector2f toTarget = target - m_hull->getPosition();
     float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y);
-    
+
     // 先让炮塔朝向目标，计算枪口位置
     float angle = Utils::getAngle(m_hull->getPosition(), target);
     float angleRad = (angle - 90.f) * Utils::PI / 180.f;
     sf::Vector2f testGunPos = m_hull->getPosition() + sf::Vector2f{std::cos(angleRad) * m_gunLength, std::sin(angleRad) * m_gunLength};
-    
+
     // 使用精确的子弹路径检测
     int bulletPath = maze.checkBulletPath(testGunPos, target);
 
@@ -362,7 +362,7 @@ void Enemy::update(float dt, const Maze &maze)
       float wallAngle = Utils::getAngle(m_hull->getPosition(), m_destructibleWallTarget);
       float wallAngleRad = (wallAngle - 90.f) * Utils::PI / 180.f;
       sf::Vector2f wallGunPos = m_hull->getPosition() + sf::Vector2f{std::cos(wallAngleRad) * m_gunLength, std::sin(wallAngleRad) * m_gunLength};
-      
+
       // 检查子弹是否能打到智能路径上的可破坏墙
       int bulletToWall = maze.checkBulletPath(wallGunPos, m_destructibleWallTarget);
       if (bulletToWall != 2) // 不会被不可破坏墙挡住
