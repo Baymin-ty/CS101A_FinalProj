@@ -400,11 +400,9 @@ void Game::processMainMenuEvents(const sf::Event &event)
         {
           current = (current - 1 + optionCount) % optionCount;
           MainMenuOption cand = static_cast<MainMenuOption>(current);
-          if (m_mapSizePreset == MapSizePreset::Custom || (cand != MainMenuOption::MapWidth && cand != MainMenuOption::MapHeight && cand != MainMenuOption::EnemyCount))
-          {
-            m_mainMenuOption = cand;
-            break;
-          }
+          // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
+          m_mainMenuOption = cand;
+          break;
         }
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       }
@@ -420,15 +418,13 @@ void Game::processMainMenuEvents(const sf::Event &event)
         {
           current = (current + 1) % optionCount;
           MainMenuOption cand = static_cast<MainMenuOption>(current);
-          if (m_mapSizePreset == MapSizePreset::Custom || (cand != MainMenuOption::MapWidth && cand != MainMenuOption::MapHeight && cand != MainMenuOption::EnemyCount))
-          {
-            m_mainMenuOption = cand;
-            break;
-          }
+          // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
+          m_mainMenuOption = cand;
+          break;
         }
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       }
-      break;
+      break; 
     }
     case sf::Keyboard::Key::Enter:
     case sf::Keyboard::Key::Space:
@@ -460,7 +456,7 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       default:
         break;
-      }
+      }                       
       break;
     case sf::Keyboard::Key::Left:
     case sf::Keyboard::Key::A:
@@ -476,27 +472,31 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        // 只要用户按左右改变宽度，就将预设切换为 Custom
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
-          m_mazeWidth = m_widthOptions[m_widthIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+        m_mazeWidth = m_widthOptions[m_widthIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
-          m_mazeHeight = m_heightOptions[m_heightIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
+        m_mazeHeight = m_heightOptions[m_heightIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
@@ -516,27 +516,31 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        // 只要用户按左右改变宽度，就将预设切换为 Custom
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
-          m_mazeWidth = m_widthOptions[m_widthIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+        m_mazeWidth = m_widthOptions[m_widthIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
-          m_mazeHeight = m_heightOptions[m_heightIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+        m_mazeHeight = m_heightOptions[m_heightIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
