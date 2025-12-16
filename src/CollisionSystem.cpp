@@ -204,7 +204,12 @@ void CollisionSystem::checkMultiplayerCollisions(
           {
             handleWallDestroyEffect(wallResult, player, maze);
           }
-          // 非房主打掉的墙，增益效果由非房主端的回调处理
+          // AI玩家（OtherPlayer）打掉的墙，给AI加效果
+          else if (owner == BulletOwner::OtherPlayer)
+          {
+            handleWallDestroyEffect(wallResult, otherPlayer, maze);
+          }
+          // NPC打掉的墙不给奖励
         }
 
         bullet->setInactive();
@@ -283,8 +288,18 @@ void CollisionSystem::checkMultiplayerCollisions(
     {
       if (checkBulletTankCollision(bullet.get(), otherPlayer))
       {
+        // 对方玩家受到伤害
+        otherPlayer->takeDamage(bullet->getDamage());
+        
         // 播放子弹击中坦克音效
         AudioManager::getInstance().playSFX(SFXType::BulletHitTank, bulletPos, listenerPos);
+        
+        // 如果对方玩家死亡，播放爆炸音效
+        if (otherPlayer->isDead())
+        {
+          AudioManager::getInstance().playSFX(SFXType::Explode, otherPlayer->getPosition(), listenerPos);
+        }
+        
         bullet->setInactive();
         continue;
       }
@@ -306,6 +321,12 @@ void CollisionSystem::checkMultiplayerCollisions(
       {
         // 玩家子弹：可以打不同阵营的 NPC，或者 team=0 的 NPC（Escape 模式敌人）
         canHitNpc = (npcTeam != localTeam) || (npcTeam == 0);
+      }
+      else if (bullet->getOwner() == BulletOwner::OtherPlayer)
+      {
+        // AI玩家（OtherPlayer）的子弹：可以打不同阵营的 NPC
+        int otherPlayerTeam = otherPlayer->getTeam();
+        canHitNpc = (npcTeam != otherPlayerTeam);
       }
       else if (bulletTeam == 0)
       {
@@ -345,6 +366,15 @@ void CollisionSystem::checkMultiplayerCollisions(
               NetworkManager::getInstance().sendNpcDamage(npc->getId(), bullet->getDamage());
             }
           }
+          // AI玩家（OtherPlayer）的子弹打NPC：本地直接处理伤害（AI Battle模式没有网络）
+          else if (bullet->getOwner() == BulletOwner::OtherPlayer)
+          {
+            npc->takeDamage(bullet->getDamage());
+            if (npc->isDead())
+            {
+              AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
+            }
+          }
           // NPC子弹打NPC：房主端处理伤害
           else if (isNpcBullet && isHost)
           {
@@ -357,7 +387,6 @@ void CollisionSystem::checkMultiplayerCollisions(
               AudioManager::getInstance().playSFX(SFXType::Explode, npc->getPosition(), listenerPos);
             }
           }
-          // 对方玩家的子弹：不处理，伤害由网络消息处理
 
           bullet->setInactive();
           break;

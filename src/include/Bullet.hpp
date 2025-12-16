@@ -46,6 +46,9 @@ public:
   // 阵营信息（用于多人模式NPC）
   void setTeam(int team) { m_team = team; }
   int getTeam() const { return m_team; }
+  
+  // 获取速度向量
+  sf::Vector2f getVelocity() const { return m_velocity; }
 
 private:
   std::unique_ptr<sf::Sprite> m_sprite;

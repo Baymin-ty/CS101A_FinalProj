@@ -37,8 +37,19 @@ Game::Game()
   m_uiView = sf::View(sf::FloatRect({0.f, 0.f}, {static_cast<float>(LOGICAL_WIDTH), static_cast<float>(LOGICAL_HEIGHT)}));
 }
 
-bool Game::init()
+bool Game::init(bool trainingMode)
 {
+  // 设置训练模式
+  m_isTrainingMode = trainingMode;
+  
+  if (m_isTrainingMode) {
+    std::cout << "[Training] Initializing training environment..." << std::endl;
+    m_trainingManager = std::make_unique<TrainingManager>();
+    // 训练模式直接进入游戏
+    m_gameState = GameState::Playing;
+    m_isAIBattle = false;  // 训练模式控制玩家对抗AI
+  }
+  
   // 加载字体 - 跨平台支持
   bool fontLoaded = false;
 
@@ -103,6 +114,21 @@ bool Game::init()
 
   // 设置网络回调
   setupNetworkCallbacks();
+  
+  // 训练模式：直接开始游戏
+  if (m_isTrainingMode) {
+    std::cout << "[Training] Starting training environment..." << std::endl;
+    startGame();  // 开始Battle模式游戏
+    m_isAIBattle = false;  // 训练时玩家由Python控制
+    
+    // 发送初始观察
+    if (m_aiPlayer) {
+      AIObservation obs = m_aiPlayer->getObservation();
+      m_lastObservation = obs;
+      m_trainingManager->sendObservation(obs, 0.0f, false, "reset");
+      m_waitingForAction = true;
+    }
+  }
 
   return true;
 }
@@ -131,7 +157,14 @@ void Game::startGame()
   AudioManager::getInstance().stopAllSFX();
 
   // 生成随机地图
-  generateRandomMaze();
+  // AI Battle模式使用Battle地图生成（有spawn点、特殊墙体）
+  if (m_isAIBattle) {
+    // Battle模式地图：生成特殊墙体和spawn点，墙体可破坏
+    m_maze.generateRandomMaze(m_mazeWidth, m_mazeHeight, 0, m_enemyOptions[m_enemyIndex], true, false);
+  } else {
+    // 普通单人模式
+    generateRandomMaze();
+  }
 
   // 创建玩家
   m_player = std::make_unique<Tank>();
@@ -140,14 +173,69 @@ void Game::startGame()
   m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
                          "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
 
-  // 设置玩家到起点
-  m_player->setPosition(m_maze.getStartPosition());
+  // AI对战模式：创建AI对手
+  if (m_isAIBattle) {
+    // 获取两个spawn点位置
+    sf::Vector2f spawn1Pos = m_maze.getSpawn1Position();
+    sf::Vector2f spawn2Pos = m_maze.getSpawn2Position();
+    
+    // 如果没有spawn点，使用起点
+    if (spawn1Pos.x == 0 && spawn1Pos.y == 0) {
+      spawn1Pos = m_maze.getStartPosition();
+    }
+    if (spawn2Pos.x == 0 && spawn2Pos.y == 0) {
+      spawn2Pos = m_maze.getStartPosition();
+    }
+    
+    // 玩家使用spawn1，AI使用spawn2
+    m_player->setPosition(spawn1Pos);
+    
+    // 创建AI坦克
+    m_otherPlayer = std::make_unique<Tank>();
+    m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
+                                "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+    m_otherPlayer->setPosition(spawn2Pos);
+    m_otherPlayer->setScale(m_tankScale);
+    
+    // 创建AI策略
+    m_aiStrategy = std::make_unique<RuleBasedAI>();
+    
+    // 创建AI玩家控制器（使用shared_ptr包装）
+    std::shared_ptr<Tank> aiTankPtr = std::shared_ptr<Tank>(m_otherPlayer.get(), [](Tank*){});
+    m_aiPlayer = std::make_unique<AIPlayer>(aiTankPtr, m_aiStrategy.get());
+    m_aiPlayer->setEnvironment(&m_maze, m_player.get(), &m_enemies, &m_bullets);
+    m_aiPlayer->setVisionRange(400.f);  // 设置视野范围
+    
+    // 设置阵营（Battle模式）
+    m_player->setTeam(1);
+    m_otherPlayer->setTeam(2);
+    m_player->setCoins(10);  // 初始10个金币
+    
+    std::cout << "[AI] AI Battle mode initialized, Player spawn: (" << spawn1Pos.x << ", " << spawn1Pos.y 
+              << "), AI spawn: (" << spawn2Pos.x << ", " << spawn2Pos.y << ")" << std::endl;
+  } else {
+    // 设置玩家到起点
+    m_player->setPosition(m_maze.getStartPosition());
+  }
 
   // 清空子弹
   m_bullets.clear();
 
   // 在指定位置生成敌人
   spawnEnemies();
+  
+  // AI Battle模式：设置NPC为中立状态
+  if (m_isAIBattle) {
+    int npcId = 0;
+    for (auto& enemy : m_enemies) {
+      enemy->setId(npcId++);
+      enemy->setTeam(0);  // 中立阵营
+      // 注意：不要调用activate()，保持未激活状态
+    }
+    // 重置AI射击计时器
+    m_aiShootTimer = 0.f;
+    std::cout << "[AI] Spawned " << m_enemies.size() << " neutral NPCs" << std::endl;
+  }
 
   m_gameState = GameState::Playing;
   m_gameOver = false;
@@ -266,6 +354,35 @@ void Game::restartMultiplayer()
 
 void Game::run()
 {
+  // 训练模式：简化循环
+  if (m_isTrainingMode) {
+    std::cout << "[Training] Entering training loop..." << std::endl;
+    while (m_window.isOpen())
+    {
+      float dt = m_clock.restart().asSeconds();
+      
+      // 限制FPS避免占用过多CPU
+      if (dt < 0.016f) {  // ~60 FPS
+        sf::sleep(sf::seconds(0.016f - dt));
+        dt = 0.016f;
+      }
+      
+      processEvents();
+      
+      if (m_gameState == GameState::Playing) {
+        update(dt);
+        updateMultiplayer(dt);
+        updateCamera();
+      }
+      
+      // 最小化渲染（只清屏）
+      m_window.clear(sf::Color::Black);
+      m_window.display();
+    }
+    return;
+  }
+  
+  // 正常模式：完整循环
   // 开始播放菜单BGM
   AudioManager::getInstance().playBGM(BGMType::Menu);
 
@@ -597,7 +714,12 @@ void Game::processModeSelectEvents(const sf::Event &event)
         startGame();
         break;
       case GameModeOption::BattleMode:
-        // Single Player Battle Mode - 还在开发中，不播放确认音效
+        // Battle Mode - 单人模式为AI对战，多人模式为玩家对战
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuConfirm);
+        if (!m_isMultiplayer) {
+          m_isAIBattle = true;
+        }
+        startGame();
         break;
       case GameModeOption::Back:
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
@@ -677,6 +799,34 @@ void Game::processEvents()
           else if (m_placementMode)
           {
             m_placementMode = false;
+          }
+        }
+        // R键激活NPC（AI Battle模式）
+        else if (keyPressed->code == sf::Keyboard::Key::R && m_isAIBattle)
+        {
+          // 检查是否有附近未激活的NPC
+          if (m_player) {
+            sf::Vector2f playerPos = m_player->getPosition();
+            const float ACTIVATION_RANGE = 80.f;
+            
+            for (auto& enemy : m_enemies) {
+              if (!enemy->isActivated() && !enemy->isDead()) {
+                sf::Vector2f npcPos = enemy->getPosition();
+                float dist = std::hypot(playerPos.x - npcPos.x, playerPos.y - npcPos.y);
+                
+                if (dist < ACTIVATION_RANGE) {
+                  // 检查金币
+                  if (m_player->getCoins() >= 3) {
+                    m_player->spendCoins(3);
+                    enemy->activate(m_player->getTeam());
+                    std::cout << "[AI] Activated NPC, coins left: " << m_player->getCoins() << std::endl;
+                    break;  // 一次只激活一个NPC
+                  } else {
+                    std::cout << "[AI] Not enough coins to activate NPC (need 3, have " << m_player->getCoins() << ")" << std::endl;
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -967,6 +1117,41 @@ void Game::update(float dt)
 {
   if (!m_player)
     return;
+  
+  // 训练模式：与Python通信
+  if (m_isTrainingMode && m_trainingManager) {
+    // 检查Python命令
+    std::string command;
+    if (m_trainingManager->checkForCommand(command)) {
+      if (command == "reset") {
+        // 重置游戏
+        std::cout << "[Training] Resetting episode..." << std::endl;
+        startGame();
+        
+        // 发送初始观察
+        if (m_aiPlayer) {
+          AIObservation obs = m_aiPlayer->getObservation();
+          m_lastObservation = obs;
+          m_trainingManager->sendObservation(obs, 0.0f, false, "reset");
+        }
+        m_waitingForAction = true;
+        return;
+      }
+    }
+    
+    // 如果等待动作，读取Python发送的动作
+    if (m_waitingForAction) {
+      AIAction action;
+      if (m_trainingManager->readAction(action)) {
+        // 应用动作到玩家
+        m_aiPlayer->applyAction(action, dt);
+        m_waitingForAction = false;
+      } else {
+        // 还在等待，跳过此帧
+        return;
+      }
+    }
+  }
 
   // 获取鼠标在世界坐标中的位置
   sf::Vector2i mousePixelPos = sf::Mouse::getPosition(m_window);
@@ -1017,8 +1202,59 @@ void Game::update(float dt)
       m_player->setPosition(oldPos);
     }
   }
+  
+  // AI对战模式：更新AI
+  if (m_isAIBattle && m_aiPlayer && m_otherPlayer && !m_otherPlayer->isDead()) {
+    m_aiPlayer->update(dt);
+    
+    // 更新AI射击冷却计时器
+    m_aiShootTimer += dt;
+    
+    // 检查AI是否想射击（需要等待冷却时间）
+    AIObservation obs = m_aiPlayer->getObservation();
+    AIAction lastAction = m_aiPlayer->getStrategy()->decide(obs);
+    
+    if (lastAction.shoot && m_aiShootTimer >= m_aiShootCooldown) {
+      sf::Vector2f bulletPos = m_otherPlayer->getBulletSpawnPosition();
+      float bulletAngle = m_otherPlayer->getTurretRotation();
+      auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, GameColors::EnemyPlayerBullet);
+      bullet->setOwner(BulletOwner::OtherPlayer);
+      bullet->setTeam(m_otherPlayer->getTeam());
+      bullet->setDamage(25.f);  // AI子弹伤害25%
+      m_bullets.push_back(std::move(bullet));
+      
+      // 重置冷却计时器
+      m_aiShootTimer = 0.f;
+      
+      // 播放射击音效
+      AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, m_player->getPosition());
+    }
+    
+    // AI激活NPC逻辑
+    if (lastAction.activateNPC && m_otherPlayer->getCoins() >= 3) {
+      sf::Vector2f aiPos = m_otherPlayer->getPosition();
+      const float ACTIVATION_RANGE = 80.f;
+      
+      for (auto& enemy : m_enemies) {
+        if (!enemy->isActivated() && !enemy->isDead()) {
+          sf::Vector2f npcPos = enemy->getPosition();
+          float dist = std::hypot(aiPos.x - npcPos.x, aiPos.y - npcPos.y);
+          
+          if (dist < ACTIVATION_RANGE) {
+            m_otherPlayer->spendCoins(3);
+            enemy->activate(m_otherPlayer->getTeam());
+            std::cout << "[AI] AI activated NPC, coins left: " << m_otherPlayer->getCoins() << std::endl;
+            break;  // 一次只激活一个NPC
+          }
+        }
+      }
+    }
+    
+    // AI不会通过到达出口获胜，只能击败玩家
+    // （AI的行为逻辑会避免接近终点）
+  }
 
-  // 检查是否到达出口
+  // 检查玩家是否到达出口（AI Battle模式下玩家到达出口即获胜）
   if (m_maze.isAtExit(m_player->getPosition(), m_player->getCollisionRadius()))
   {
     m_gameWon = true;
@@ -1034,7 +1270,10 @@ void Game::update(float dt)
   {
     sf::Vector2f bulletPos = m_player->getBulletSpawnPosition();
     float bulletAngle = m_player->getTurretRotation();
-    m_bullets.push_back(std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true));
+    auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, true);
+    bullet->setTeam(m_player->getTeam());
+    bullet->setDamage(25.f);  // 玩家子弹伤害25%
+    m_bullets.push_back(std::move(bullet));
 
     // 播放射击音效
     AudioManager::getInstance().playSFX(SFXType::Shoot, bulletPos, m_player->getPosition());
@@ -1043,18 +1282,61 @@ void Game::update(float dt)
   // 更新敌人
   for (auto &enemy : m_enemies)
   {
-    // 单人模式：自动激活检测
-    enemy->checkAutoActivation(m_player->getPosition());
-
-    enemy->setTarget(m_player->getPosition());
-    enemy->update(dt, m_maze);
+    // AI Battle模式：需要手动激活，已激活的NPC根据阵营选择目标
+    if (m_isAIBattle) {
+      if (enemy->isActivated()) {
+        int npcTeam = enemy->getTeam();
+        std::vector<sf::Vector2f> targets;
+        
+        // 收集敌对目标
+        if (m_player && m_player->getTeam() != npcTeam && npcTeam != 0) {
+          targets.push_back(m_player->getPosition());
+        }
+        if (m_otherPlayer && !m_otherPlayer->isDead() && m_otherPlayer->getTeam() != npcTeam && npcTeam != 0) {
+          targets.push_back(m_otherPlayer->getPosition());
+        }
+        
+        // 攻击其他敌对NPC
+        for (const auto& otherNpc : m_enemies) {
+          if (otherNpc.get() != enemy.get() &&
+              otherNpc->isActivated() &&
+              !otherNpc->isDead() &&
+              otherNpc->getTeam() != npcTeam &&
+              otherNpc->getTeam() != 0) {
+            targets.push_back(otherNpc->getPosition());
+          }
+        }
+        
+        if (!targets.empty()) {
+          enemy->setTargets(targets);
+        }
+        enemy->update(dt, m_maze);
+      }
+    } else {
+      // 普通单人模式：自动激活检测
+      enemy->checkAutoActivation(m_player->getPosition());
+      enemy->setTarget(m_player->getPosition());
+      enemy->update(dt, m_maze);
+    }
 
     // 只有激活的敌人才射击
     if (enemy->shouldShoot())
     {
       sf::Vector2f bulletPos = enemy->getGunPosition();
       float bulletAngle = enemy->getTurretAngle();
-      auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, sf::Color::Red);
+      
+      // 根据阵营确定子弹颜色
+      sf::Color bulletColor;
+      if (m_isAIBattle) {
+        int npcTeam = enemy->getTeam();
+        int localTeam = m_player->getTeam();
+        bulletColor = (npcTeam == localTeam) ? GameColors::AllyNpcBullet : GameColors::EnemyNpcBullet;
+      } else {
+        bulletColor = sf::Color::Red;
+      }
+      
+      auto bullet = std::make_unique<Bullet>(bulletPos.x, bulletPos.y, bulletAngle, false, bulletColor);
+      bullet->setTeam(enemy->getTeam());
       bullet->setDamage(12.5f); // NPC子弹伤害12.5%
       m_bullets.push_back(std::move(bullet));
 
@@ -1101,6 +1383,24 @@ void Game::update(float dt)
   {
     m_gameOver = true;
     m_gameState = GameState::GameOver;
+    m_gameWon = false;  // 玩家死亡 = 失败
+  }
+  
+  // AI Battle模式：检查AI是否死亡
+  if (m_isAIBattle && m_otherPlayer && m_otherPlayer->isDead())
+  {
+    m_gameOver = true;
+    m_gameState = GameState::Victory;
+    m_gameWon = true;  // AI死亡 = 玩家获胜
+  }
+  
+  // 训练模式：发送观察和奖励
+  if (m_isTrainingMode && m_trainingManager && m_aiPlayer) {
+    AIObservation currentObs = m_aiPlayer->getObservation();
+    float reward = m_trainingManager->calculateReward(m_lastObservation, currentObs, m_gameOver, m_gameWon);
+    m_trainingManager->sendObservation(currentObs, reward, m_gameOver, m_gameWon ? "won" : "");
+    m_lastObservation = currentObs;
+    m_waitingForAction = true;
   }
 }
 
@@ -1165,13 +1465,22 @@ void Game::updateCamera()
 
 void Game::checkCollisions()
 {
-  CollisionSystem::checkSinglePlayerCollisions(m_player.get(), m_enemies, m_bullets, m_maze);
+  // AI对战模式使用多人碰撞检测逻辑
+  if (m_isAIBattle && m_otherPlayer) {
+    checkMultiplayerCollisions();
+  } else {
+    CollisionSystem::checkSinglePlayerCollisions(m_player.get(), m_enemies, m_bullets, m_maze);
+  }
 }
 
 void Game::checkMultiplayerCollisions()
 {
+  // AI Battle模式始终作为"房主"处理碰撞（isHost=true）
+  // 联机模式使用实际的isHost状态
+  bool shouldActAsHost = m_isAIBattle ? true : m_mpState.isHost;
+  
   CollisionSystem::checkMultiplayerCollisions(
-      m_player.get(), m_otherPlayer.get(), m_enemies, m_bullets, m_maze, m_mpState.isHost);
+      m_player.get(), m_otherPlayer.get(), m_enemies, m_bullets, m_maze, shouldActAsHost);
 }
 
 void Game::render()
@@ -1384,21 +1693,21 @@ void Game::renderModeSelect()
   {
     sf::Text optionText(m_font);
     std::string modeStr = "Battle Mode";
-    // Single Player Battle Mode 还在开发中
+    // 单人模式为AI对战，多人模式为玩家对战
     if (!m_isMultiplayer)
     {
-      modeStr += " [Coming Soon]";
+      modeStr += " (vs AI)";
     }
     optionText.setCharacterSize(36);
 
     if (m_gameModeOption == GameModeOption::BattleMode)
     {
-      optionText.setFillColor(!m_isMultiplayer ? sf::Color(180, 180, 100) : sf::Color::Yellow);
+      optionText.setFillColor(sf::Color::Yellow);
       optionText.setString("> " + modeStr + " <");
     }
     else
     {
-      optionText.setFillColor(!m_isMultiplayer ? sf::Color(120, 120, 120) : sf::Color(180, 180, 180));
+      optionText.setFillColor(sf::Color(180, 180, 180));
       optionText.setString(modeStr);
     }
 
@@ -1408,7 +1717,11 @@ void Game::renderModeSelect()
 
     // 模式描述
     sf::Text desc(m_font);
-    desc.setString("Defeat your opponent or reach the exit first!");
+    if (m_isMultiplayer) {
+      desc.setString("Defeat your opponent or reach the exit first!");
+    } else {
+      desc.setString("Battle against AI with limited vision!");
+    }
     desc.setCharacterSize(20);
     desc.setFillColor(sf::Color(180, 100, 100));
     sf::FloatRect descBounds = desc.getLocalBounds();
@@ -1552,11 +1865,49 @@ void Game::renderGame()
   {
     bullet->draw(m_window);
   }
+  
+  // AI Battle模式：在NPC头顶显示激活提示
+  if (m_isAIBattle && m_player) {
+    sf::Vector2f playerPos = m_player->getPosition();
+    const float ACTIVATION_RANGE = 80.f;
+    
+    for (const auto& enemy : m_enemies) {
+      if (!enemy->isActivated() && !enemy->isDead()) {
+        float dist = std::hypot(playerPos.x - enemy->getPosition().x, 
+                               playerPos.y - enemy->getPosition().y);
+        
+        if (dist < ACTIVATION_RANGE) {
+          sf::Vector2f npcPos = enemy->getPosition();
+          sf::Text activateHint(m_font);
+          
+          if (m_player->getCoins() >= 3) {
+            activateHint.setString("Press R (3 coins)");
+            activateHint.setFillColor(sf::Color::Yellow);
+          } else {
+            activateHint.setString("Need 3 coins!");
+            activateHint.setFillColor(sf::Color::Red);
+          }
+          
+          activateHint.setCharacterSize(14);
+          sf::FloatRect hintBounds = activateHint.getLocalBounds();
+          activateHint.setPosition({npcPos.x - hintBounds.size.x / 2.f, npcPos.y - 55.f});
+          m_window.draw(activateHint);
+          break;  // 只显示最近的一个
+        }
+      }
+    }
+  }
 
   // 绘制玩家
   if (m_player)
   {
     m_player->draw(m_window);
+  }
+  
+  // 绘制AI/对方玩家
+  if (m_otherPlayer && !m_mpState.otherPlayerDead)
+  {
+    m_otherPlayer->draw(m_window);
   }
 
   // 绘制敌人（跳过死亡的）
@@ -1566,6 +1917,20 @@ void Game::renderGame()
     {
       enemy->draw(m_window);
       enemy->drawHealthBar(m_window);
+      
+      // AI Battle模式：显示NPC阵营标记
+      if (m_isAIBattle) {
+        sf::Vector2f npcPos = enemy->getPosition();
+        if (enemy->isActivated()) {
+          sf::Color markerColor = (enemy->getTeam() == m_player->getTeam()) 
+            ? sf::Color(0, 255, 0, 200)   // 己方：绿色
+            : sf::Color(255, 0, 0, 200);  // 敌方：红色
+          UIHelper::drawTeamMarker(m_window, {npcPos.x, npcPos.y - 27.f}, 8.f, markerColor);
+        } else {
+          // 未激活：灰色
+          UIHelper::drawTeamMarker(m_window, {npcPos.x, npcPos.y - 27.f}, 8.f, sf::Color(150, 150, 150, 200));
+        }
+      }
     }
   }
 
@@ -1581,15 +1946,95 @@ void Game::renderGame()
   // 切换到 UI 视图绘制 UI
   m_window.setView(m_uiView);
 
-  // 绘制玩家 UI（血条）
-  if (m_player)
+  // AI Battle 模式：使用联机模式风格的 UI
+  if (m_isAIBattle && m_player && m_otherPlayer)
   {
+    float barWidth = 150.f;
+    float barHeight = 20.f;
+    float barX = 20.f;
+    float barY = 20.f;
+
+    // Self 标签和血条
+    sf::Text selfLabel(m_font);
+    selfLabel.setString("Self");
+    selfLabel.setFillColor(sf::Color::White);
+    selfLabel.setCharacterSize(18);
+    selfLabel.setPosition({barX, barY - 2.f});
+    m_window.draw(selfLabel);
+
+    float selfHealthPercent = m_player->getHealth() / 100.f;
+    UIHelper::drawHealthBar(m_window, barX + 50.f, barY, barWidth, barHeight,
+                            selfHealthPercent, sf::Color::Green);
+
+    // Other (AI) 标签和血条
+    sf::Text otherLabel(m_font);
+    otherLabel.setString("AI");
+    otherLabel.setFillColor(sf::Color::White);
+    otherLabel.setCharacterSize(18);
+    otherLabel.setPosition({barX, barY + 30.f - 2.f});
+    m_window.draw(otherLabel);
+
+    float otherHealthPercent = m_otherPlayer->getHealth() / 100.f;
+    UIHelper::drawHealthBar(m_window, barX + 50.f, barY + 30.f, barWidth, barHeight,
+                            otherHealthPercent, sf::Color::Cyan);
+
+    // Battle 模式：金币显示
+    sf::Text coinsText(m_font);
+    coinsText.setString("Coins: " + std::to_string(m_player->getCoins()));
+    coinsText.setCharacterSize(20);
+    coinsText.setFillColor(sf::Color::Yellow);
+    coinsText.setPosition({barX, barY + 60.f});
+    m_window.draw(coinsText);
+
+    // 墙壁背包显示
+    float wallsY = barY + 85.f;
+    sf::Text wallsText(m_font);
+    wallsText.setString("Walls: " + std::to_string(m_player->getWallsInBag()));
+    wallsText.setCharacterSize(20);
+    wallsText.setFillColor(sf::Color(139, 90, 43));  // 棕色
+    wallsText.setPosition({barX, wallsY});
+    m_window.draw(wallsText);
+
+    float uiY = wallsY + 25.f;
+
+    // 墙壁放置模式提示
+    if (m_placementMode)
+    {
+      sf::Text placeHint(m_font);
+      placeHint.setString("[PLACEMENT MODE] Click to place wall, Space to cancel");
+      placeHint.setCharacterSize(20);
+      placeHint.setFillColor(sf::Color::Yellow);
+      sf::FloatRect hintBounds = placeHint.getLocalBounds();
+      placeHint.setPosition({(LOGICAL_WIDTH - hintBounds.size.x) / 2.f, 20.f});
+      m_window.draw(placeHint);
+    }
+    else if (m_player->getWallsInBag() > 0)
+    {
+      sf::Text bagHint(m_font);
+      bagHint.setString("Press SPACE to place walls");
+      bagHint.setCharacterSize(18);
+      bagHint.setFillColor(sf::Color(150, 150, 150));
+      bagHint.setPosition({barX, uiY});
+      m_window.draw(bagHint);
+    }
+
+    // 显示操作提示（底部）
+    sf::Text controlHint(m_font);
+    controlHint.setString("WASD: Move | Mouse: Aim | Click: Shoot | R: Activate NPC");
+    controlHint.setCharacterSize(14);
+    controlHint.setFillColor(sf::Color(150, 150, 150));
+    controlHint.setPosition({barX, LOGICAL_HEIGHT - 30.f});
+    m_window.draw(controlHint);
+  }
+  else if (m_player)
+  {
+    // 非 AI Battle 模式：使用原有的UI
     m_player->drawUI(m_window);
 
     float uiY = 50.f; // UI 起始 Y 位置
 
-    // Battle 模式显示金币数量
-    if (m_gameModeOption == GameModeOption::BattleMode)
+    // Battle 模式显示金币数量（但不是AI Battle）
+    if (m_gameModeOption == GameModeOption::BattleMode && !m_isAIBattle)
     {
       sf::Text coinsText(m_font);
       coinsText.setString("Coins: " + std::to_string(m_player->getCoins()));
@@ -3057,11 +3502,30 @@ void Game::renderMinimap()
     sf::CircleShape npcDot(3.f);
     npcDot.setPosition({npcMiniPos.x - 3.f, npcMiniPos.y - 3.f});
     
-    // 根据激活状态显示不同颜色
-    if (enemy->isActivated()) {
-      npcDot.setFillColor(GameColors::MinimapEnemyNpc);  // 已激活：红色
+    // AI Battle模式：根据阵营显示颜色
+    if (m_isAIBattle) {
+      if (!enemy->isActivated()) {
+        // 未激活：灰色
+        npcDot.setFillColor(GameColors::MinimapInactiveNpc);
+      } else {
+        // 已激活：根据阵营判断
+        int npcTeam = enemy->getTeam();
+        int localTeam = m_player->getTeam();
+        if (npcTeam == localTeam) {
+          // 己方NPC：青色
+          npcDot.setFillColor(sf::Color(100, 200, 255));
+        } else {
+          // 敌方NPC：红色
+          npcDot.setFillColor(GameColors::MinimapEnemyNpc);
+        }
+      }
     } else {
-      npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活：灰色
+      // 普通单人模式：根据激活状态显示
+      if (enemy->isActivated()) {
+        npcDot.setFillColor(GameColors::MinimapEnemyNpc);  // 已激活：红色
+      } else {
+        npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活：灰色
+      }
     }
     m_window.draw(npcDot);
   }
@@ -3075,6 +3539,18 @@ void Game::renderMinimap()
     playerDot.setPosition({playerMiniPos.x - 4.f, playerMiniPos.y - 4.f});
     playerDot.setFillColor(GameColors::MinimapPlayer);
     m_window.draw(playerDot);
+  }
+  
+  // 绘制AI/对方玩家（紫色或青色）
+  if (m_otherPlayer) {
+    sf::Vector2f otherPos = m_otherPlayer->getPosition();
+    sf::Vector2f otherMiniPos = worldToMinimap(otherPos);
+    
+    sf::CircleShape otherDot(4.f);
+    otherDot.setPosition({otherMiniPos.x - 4.f, otherMiniPos.y - 4.f});
+    // AI Battle或Battle模式：紫色表示敌方玩家
+    otherDot.setFillColor(sf::Color(200, 100, 255));
+    m_window.draw(otherDot);
   }
   
   // 小地图标签

@@ -35,6 +35,8 @@ set(SOURCES
   src/CollisionSystem.cpp
   src/MultiplayerHandler.cpp
   src/AudioManager.cpp
+  src/AIPlayer.cpp
+  src/TrainingManager.cpp
 )
 
 # 头文件
@@ -52,6 +54,8 @@ set(HEADERS
   src/include/UIHelper.hpp
   src/include/MultiplayerHandler.hpp
   src/include/AudioManager.hpp
+  src/include/AIPlayer.hpp
+  src/include/TrainingManager.hpp
 )
 
 add_executable(CS101AFinalProj ${SOURCES} ${HEADERS})

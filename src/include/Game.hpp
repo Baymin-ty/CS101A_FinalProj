@@ -11,6 +11,8 @@
 #include "NetworkManager.hpp"
 #include "MultiplayerHandler.hpp"
 #include "AudioManager.hpp"
+#include "AIPlayer.hpp"
+#include "TrainingManager.hpp"
 
 // 游戏状态枚举
 enum class GameState
@@ -74,7 +76,7 @@ class Game
 public:
   Game();
 
-  bool init();
+  bool init(bool trainingMode = false);
   void run();
 
 private:
@@ -97,6 +99,7 @@ private:
   void renderWaitingForPlayer();
   void renderRoomLobby();    // 房间大厅渲染
   void renderMultiplayer();
+  void renderAIBattle();
   void checkCollisions();
   void checkMultiplayerCollisions();
   void spawnEnemies();
@@ -135,6 +138,20 @@ private:
   std::vector<std::unique_ptr<Enemy>> m_enemies;
   std::vector<std::unique_ptr<Bullet>> m_bullets;
   Maze m_maze;
+  
+  // AI系统
+  std::unique_ptr<AIPlayer> m_aiPlayer;
+  std::unique_ptr<RuleBasedAI> m_aiStrategy;
+  bool m_isAIBattle = false;  // 是否是AI对战模式
+  float m_aiShootTimer = 0.f;  // AI射击冷却计时器
+  float m_aiShootCooldown = 0.5f;  // AI射击冷却时间（秒）
+  
+  // 训练模式
+  std::unique_ptr<TrainingManager> m_trainingManager;
+  bool m_isTrainingMode = false;  // 是否是训练模式
+  AIObservation m_lastObservation;  // 上一帧的观察
+  bool m_waitingForAction = false;  // 是否等待Python发送动作
+  
   MazeGenerator m_mazeGenerator;
 
   sf::Font m_font;
