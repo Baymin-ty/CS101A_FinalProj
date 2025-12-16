@@ -1275,32 +1275,17 @@ void Game::renderMainMenu()
     optionText.setString(options[i]);
     optionText.setCharacterSize(32);
 
-    // 自定义选项在非 Custom 模式下变灰
+    // MapWidth/MapHeight/NPCs 在任何预设下都使用相同视觉样式
     bool isCustomOption = (i == 3 || i == 4 || i == 5); // MapWidth, MapHeight, NPCs
-    bool isDisabled = isCustomOption && (m_mapSizePreset != MapSizePreset::Custom);
 
     if (static_cast<int>(i) == static_cast<int>(m_mainMenuOption))
     {
-      if (isDisabled)
-      {
-        optionText.setFillColor(sf::Color(180, 180, 100)); // 禁用但选中：暗黄色
-      }
-      else
-      {
-        optionText.setFillColor(sf::Color::Yellow);
-      }
+      optionText.setFillColor(sf::Color::Yellow);
       optionText.setString("> " + options[i] + " <");
     }
     else
     {
-      if (isDisabled)
-      {
-        optionText.setFillColor(sf::Color(100, 100, 100)); // 禁用：深灰色
-      }
-      else
-      {
-        optionText.setFillColor(sf::Color(180, 180, 180));
-      }
+      optionText.setFillColor(sf::Color(180, 180, 180));
     }
 
     sf::FloatRect bounds = optionText.getLocalBounds();
