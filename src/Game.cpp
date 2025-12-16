@@ -393,19 +393,41 @@ void Game::processMainMenuEvents(const sf::Event &event)
     case sf::Keyboard::Key::Up:
     case sf::Keyboard::Key::W:
     {
-      int current = static_cast<int>(m_mainMenuOption);
-      current = (current - 1 + optionCount) % optionCount;
-      m_mainMenuOption = static_cast<MainMenuOption>(current);
-      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      // 向上移动，跳过无意义的子选项（MapWidth, MapHeight, EnemyCount）
+      {
+        int current = static_cast<int>(m_mainMenuOption);
+        for (int i = 0; i < optionCount; ++i)
+        {
+          current = (current - 1 + optionCount) % optionCount;
+          MainMenuOption cand = static_cast<MainMenuOption>(current);
+          if (m_mapSizePreset == MapSizePreset::Custom || (cand != MainMenuOption::MapWidth && cand != MainMenuOption::MapHeight && cand != MainMenuOption::EnemyCount))
+          {
+            m_mainMenuOption = cand;
+            break;
+          }
+        }
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      }
       break;
     }
     case sf::Keyboard::Key::Down:
     case sf::Keyboard::Key::S:
     {
-      int current = static_cast<int>(m_mainMenuOption);
-      current = (current + 1) % optionCount;
-      m_mainMenuOption = static_cast<MainMenuOption>(current);
-      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      // 向下移动，跳过无意义的子选项（MapWidth, MapHeight, EnemyCount）
+      {
+        int current = static_cast<int>(m_mainMenuOption);
+        for (int i = 0; i < optionCount; ++i)
+        {
+          current = (current + 1) % optionCount;
+          MainMenuOption cand = static_cast<MainMenuOption>(current);
+          if (m_mapSizePreset == MapSizePreset::Custom || (cand != MainMenuOption::MapWidth && cand != MainMenuOption::MapHeight && cand != MainMenuOption::EnemyCount))
+          {
+            m_mainMenuOption = cand;
+            break;
+          }
+        }
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      }
       break;
     }
     case sf::Keyboard::Key::Enter:
