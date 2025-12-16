@@ -620,7 +620,7 @@ void MultiplayerHandler::renderMultiplayer(
     
     // 检查是否有坦克在该位置
     bool hasTankAtPos = false;
-    float checkRadius = ctx.maze.getTileSize() * 0.7f;
+    float checkRadius = ctx.maze.getTileSize() * 1.0f;
     
     // 检查玩家
     if (ctx.player)
