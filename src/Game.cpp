@@ -393,20 +393,38 @@ void Game::processMainMenuEvents(const sf::Event &event)
     case sf::Keyboard::Key::Up:
     case sf::Keyboard::Key::W:
     {
-      int current = static_cast<int>(m_mainMenuOption);
-      current = (current - 1 + optionCount) % optionCount;
-      m_mainMenuOption = static_cast<MainMenuOption>(current);
-      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      // 向上移动，跳过无意义的子选项（MapWidth, MapHeight, EnemyCount）
+      {
+        int current = static_cast<int>(m_mainMenuOption);
+        for (int i = 0; i < optionCount; ++i)
+        {
+          current = (current - 1 + optionCount) % optionCount;
+          MainMenuOption cand = static_cast<MainMenuOption>(current);
+          // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
+          m_mainMenuOption = cand;
+          break;
+        }
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      }
       break;
     }
     case sf::Keyboard::Key::Down:
     case sf::Keyboard::Key::S:
     {
-      int current = static_cast<int>(m_mainMenuOption);
-      current = (current + 1) % optionCount;
-      m_mainMenuOption = static_cast<MainMenuOption>(current);
-      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
-      break;
+      // 向下移动，跳过无意义的子选项（MapWidth, MapHeight, EnemyCount）
+      {
+        int current = static_cast<int>(m_mainMenuOption);
+        for (int i = 0; i < optionCount; ++i)
+        {
+          current = (current + 1) % optionCount;
+          MainMenuOption cand = static_cast<MainMenuOption>(current);
+          // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
+          m_mainMenuOption = cand;
+          break;
+        }
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+      }
+      break; 
     }
     case sf::Keyboard::Key::Enter:
     case sf::Keyboard::Key::Space:
@@ -438,7 +456,7 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       default:
         break;
-      }
+      }                       
       break;
     case sf::Keyboard::Key::Left:
     case sf::Keyboard::Key::A:
@@ -454,27 +472,31 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        // 只要用户按左右改变宽度，就将预设切换为 Custom
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
-          m_mazeWidth = m_widthOptions[m_widthIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
+        m_mazeWidth = m_widthOptions[m_widthIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
-          m_mazeHeight = m_heightOptions[m_heightIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
+        m_mazeHeight = m_heightOptions[m_heightIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
@@ -494,27 +516,31 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        // 只要用户按左右改变宽度，就将预设切换为 Custom
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
-          m_mazeWidth = m_widthOptions[m_widthIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
+        m_mazeWidth = m_widthOptions[m_widthIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
-          m_mazeHeight = m_heightOptions[m_heightIndex];
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
+        m_mazeHeight = m_heightOptions[m_heightIndex];
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom)
+        if (m_mapSizePreset != MapSizePreset::Custom)
         {
-          m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
-          AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+          m_mapSizePreset = MapSizePreset::Custom;
         }
+        m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
+        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         break;
       default:
         break;
