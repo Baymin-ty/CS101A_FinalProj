@@ -145,9 +145,9 @@ void MazeGenerator::placeStartAndEnd()
             [](const auto &a, const auto &b)
             { return a.first > b.first; });
 
-  // 从距离最远的前 10% 中随机选一个作为终点
+  // 从距离最远的前 40% 中随机选一个作为终点
   // 确保起点离终点足够远
-  int topCount = std::max(1, static_cast<int>(distancePoints.size() * 0.1));
+  int topCount = std::max(1, static_cast<int>(distancePoints.size() * 0.4));
   int selectedIdx = m_rng() % topCount;
 
   m_startX = sx;

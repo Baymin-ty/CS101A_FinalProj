@@ -195,6 +195,9 @@ private:
   // 渲染暗黑模式遮罩
   void renderDarkModeOverlay();
   
+  // 渲染小地图（单人模式）
+  void renderMinimap();
+  
   // 暗黑模式遮罩纹理（非静态，确保在窗口销毁前释放）
   std::unique_ptr<sf::Texture> m_darkModeTexture;
   std::unique_ptr<sf::Sprite> m_darkModeSprite;

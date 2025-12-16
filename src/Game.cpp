@@ -332,7 +332,7 @@ void Game::run()
 
     render();
   }
-  
+
   // 在窗口关闭后清理静态资源（避免 OpenGL 上下文销毁后释放纹理）
   MultiplayerHandler::cleanup();
   m_darkModeTexture.reset();
@@ -346,35 +346,45 @@ void Game::processMainMenuEvents(const sf::Event &event)
     int optionCount = static_cast<int>(MainMenuOption::Count);
 
     // 辅助函数：应用地图预设
-    auto applyMapPreset = [this]() {
-      switch (m_mapSizePreset) {
-        case MapSizePreset::Small:
-          m_mazeWidth = 31; m_mazeHeight = 21;
-          m_widthIndex = 1; m_heightIndex = 1;
-          m_enemyIndex = 3; // 10 NPCs
-          break;
-        case MapSizePreset::Medium:
-          m_mazeWidth = 41; m_mazeHeight = 31;
-          m_widthIndex = 2; m_heightIndex = 2;
-          m_enemyIndex = 5; // 20 NPCs
-          break;
-        case MapSizePreset::Large:
-          m_mazeWidth = 61; m_mazeHeight = 51;
-          m_widthIndex = 4; m_heightIndex = 4;
-          m_enemyIndex = 6; // 30 NPCs
-          break;
-        case MapSizePreset::Ultra:
-          m_mazeWidth = 121; m_mazeHeight = 101;
-          m_widthIndex = 8; m_heightIndex = 8;
-          m_enemyIndex = 8; // 80 NPCs
-          break;
-        case MapSizePreset::Custom:
-          // 保持当前自定义值
-          m_mazeWidth = m_widthOptions[m_widthIndex];
-          m_mazeHeight = m_heightOptions[m_heightIndex];
-          break;
-        default:
-          break;
+    auto applyMapPreset = [this]()
+    {
+      switch (m_mapSizePreset)
+      {
+      case MapSizePreset::Small:
+        m_mazeWidth = 31;
+        m_mazeHeight = 21;
+        m_widthIndex = 1;
+        m_heightIndex = 1;
+        m_enemyIndex = 3; // 10 NPCs
+        break;
+      case MapSizePreset::Medium:
+        m_mazeWidth = 41;
+        m_mazeHeight = 31;
+        m_widthIndex = 2;
+        m_heightIndex = 2;
+        m_enemyIndex = 5; // 20 NPCs
+        break;
+      case MapSizePreset::Large:
+        m_mazeWidth = 61;
+        m_mazeHeight = 51;
+        m_widthIndex = 4;
+        m_heightIndex = 4;
+        m_enemyIndex = 6; // 30 NPCs
+        break;
+      case MapSizePreset::Ultra:
+        m_mazeWidth = 121;
+        m_mazeHeight = 101;
+        m_widthIndex = 8;
+        m_heightIndex = 8;
+        m_enemyIndex = 8; // 80 NPCs
+        break;
+      case MapSizePreset::Custom:
+        // 保持当前自定义值
+        m_mazeWidth = m_widthOptions[m_widthIndex];
+        m_mazeHeight = m_heightOptions[m_heightIndex];
+        break;
+      default:
+        break;
       }
     };
 
@@ -444,21 +454,24 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_widthIndex = (m_widthIndex - 1 + m_widthOptions.size()) % m_widthOptions.size();
           m_mazeWidth = m_widthOptions[m_widthIndex];
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_heightIndex = (m_heightIndex - 1 + m_heightOptions.size()) % m_heightOptions.size();
           m_mazeHeight = m_heightOptions[m_heightIndex];
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_enemyIndex = (m_enemyIndex - 1 + m_enemyOptions.size()) % m_enemyOptions.size();
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
@@ -481,21 +494,24 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       }
       case MainMenuOption::MapWidth:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_widthIndex = (m_widthIndex + 1) % m_widthOptions.size();
           m_mazeWidth = m_widthOptions[m_widthIndex];
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
         break;
       case MainMenuOption::MapHeight:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_heightIndex = (m_heightIndex + 1) % m_heightOptions.size();
           m_mazeHeight = m_heightOptions[m_heightIndex];
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
         break;
       case MainMenuOption::EnemyCount:
-        if (m_mapSizePreset == MapSizePreset::Custom) {
+        if (m_mapSizePreset == MapSizePreset::Custom)
+        {
           m_enemyIndex = (m_enemyIndex + 1) % m_enemyOptions.size();
           AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
         }
@@ -600,7 +616,7 @@ void Game::processEvents()
       if (m_player)
       {
         // 放置模式下不处理鼠标事件（避免放置墙壁时同时发射子弹）
-        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() || 
+        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() ||
                             event->getIf<sf::Event::MouseButtonReleased>();
         if (!m_placementMode || !isMouseEvent)
         {
@@ -797,7 +813,7 @@ void Game::processEvents()
       if (m_player)
       {
         // 放置模式下不处理鼠标事件（避免放置墙壁时同时发射子弹）
-        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() || 
+        bool isMouseEvent = event->getIf<sf::Event::MouseButtonPressed>() ||
                             event->getIf<sf::Event::MouseButtonReleased>();
         if (!m_placementMode || !isMouseEvent)
         {
@@ -1196,13 +1212,26 @@ void Game::renderMainMenu()
 
   // 获取地图大小预设字符串
   std::string mapSizeStr;
-  switch (m_mapSizePreset) {
-    case MapSizePreset::Small:  mapSizeStr = "Small (31x21, 10 NPCs)"; break;
-    case MapSizePreset::Medium: mapSizeStr = "Medium (41x31, 20 NPCs)"; break;
-    case MapSizePreset::Large:  mapSizeStr = "Large (61x51, 30 NPCs)"; break;
-    case MapSizePreset::Ultra:  mapSizeStr = "Ultra (121x101, 80 NPCs)"; break;
-    case MapSizePreset::Custom: mapSizeStr = "Custom"; break;
-    default: mapSizeStr = "Medium"; break;
+  switch (m_mapSizePreset)
+  {
+  case MapSizePreset::Small:
+    mapSizeStr = "Small (31x21, 10 NPCs)";
+    break;
+  case MapSizePreset::Medium:
+    mapSizeStr = "Medium (41x31, 20 NPCs)";
+    break;
+  case MapSizePreset::Large:
+    mapSizeStr = "Large (61x51, 30 NPCs)";
+    break;
+  case MapSizePreset::Ultra:
+    mapSizeStr = "Ultra (121x101, 80 NPCs)";
+    break;
+  case MapSizePreset::Custom:
+    mapSizeStr = "Custom";
+    break;
+  default:
+    mapSizeStr = "Medium";
+    break;
   }
 
   std::vector<std::string> options = {
@@ -1226,18 +1255,24 @@ void Game::renderMainMenu()
 
     if (static_cast<int>(i) == static_cast<int>(m_mainMenuOption))
     {
-      if (isDisabled) {
+      if (isDisabled)
+      {
         optionText.setFillColor(sf::Color(180, 180, 100)); // 禁用但选中：暗黄色
-      } else {
+      }
+      else
+      {
         optionText.setFillColor(sf::Color::Yellow);
       }
       optionText.setString("> " + options[i] + " <");
     }
     else
     {
-      if (isDisabled) {
+      if (isDisabled)
+      {
         optionText.setFillColor(sf::Color(100, 100, 100)); // 禁用：深灰色
-      } else {
+      }
+      else
+      {
         optionText.setFillColor(sf::Color(180, 180, 180));
       }
     }
@@ -1381,7 +1416,7 @@ void Game::renderModeSelect()
     sf::FloatRect darkBounds = darkModeText.getLocalBounds();
     darkModeText.setPosition({(LOGICAL_WIDTH - darkBounds.size.x) / 2.f, startY + spacing * 2 + 20.f});
     m_window.draw(darkModeText);
-    
+
     // 暗黑模式描述
     sf::Text darkDesc(m_font);
     darkDesc.setString("Limited vision with fog of war (D to toggle)");
@@ -1524,9 +1559,12 @@ void Game::renderGame()
   }
 
   // 单人模式暗黑模式遮罩（在游戏世界上方，UI下方）
-  if (m_darkModeOption && !m_isMultiplayer)
+  if (!m_isMultiplayer)
   {
-    renderDarkModeOverlay();
+    if (m_darkModeOption)
+      renderDarkModeOverlay();
+    else
+      renderMinimap();
   }
 
   // 切换到 UI 视图绘制 UI
@@ -2042,11 +2080,11 @@ void Game::setupNetworkCallbacks()
 
   net.setOnRestartRequest([this]()
                           {
-    // 对方已返回房间大厅
-    // 不强制本地也返回，只是知道对方已经在房间大厅等待
-    // 本地玩家需要自己按 R 返回
-    // 这里不做任何状态改变，让玩家自己决定何时返回
-  });
+                            // 对方已返回房间大厅
+                            // 不强制本地也返回，只是知道对方已经在房间大厅等待
+                            // 本地玩家需要自己按 R 返回
+                            // 这里不做任何状态改变，让玩家自己决定何时返回
+                          });
 
   // NPC同步回调
   net.setOnNpcActivate([this](int npcId, int team, int activatorId)
@@ -2872,76 +2910,169 @@ bool Game::isExitInView() const
 
 void Game::renderDarkModeOverlay()
 {
-  if (!m_player) return;
-  
+  if (!m_player)
+    return;
+
   // 保存当前视图
   sf::View currentView = m_window.getView();
-  
+
   // 切换到游戏视图来绘制遮罩
   m_window.setView(m_gameView);
-  
+
   // 获取玩家位置和视图尺寸
   sf::Vector2f playerPos = m_player->getPosition();
   sf::Vector2f viewSize = m_gameView.getSize();
-  
+
   // 使用类成员纹理（非静态，确保在窗口销毁前释放）
   // 纹理尺寸为视图的2倍，以覆盖更大区域
   unsigned int texWidth = static_cast<unsigned int>(viewSize.x * 2);
   unsigned int texHeight = static_cast<unsigned int>(viewSize.y * 2);
-  
-  if (!m_darkModeTexture || m_darkModeTexWidth != texWidth || m_darkModeTexHeight != texHeight) {
+
+  if (!m_darkModeTexture || m_darkModeTexWidth != texWidth || m_darkModeTexHeight != texHeight)
+  {
     // 创建图像
     sf::Image image({texWidth, texHeight}, sf::Color::Transparent);
-    
+
     // 椭圆参数（基于原始视图尺寸，不是纹理尺寸）
     float ellipseB = viewSize.y * 0.28f;
     float ellipseA = viewSize.x * 0.22f;
     float fadeScale = 0.3f;
     float fadeA = ellipseA * fadeScale;
     float fadeB = ellipseB * fadeScale;
-    
+
     float centerX = texWidth / 2.f;
     float centerY = texHeight / 2.f;
-    
-    for (unsigned int y = 0; y < texHeight; y++) {
-      for (unsigned int x = 0; x < texWidth; x++) {
+
+    for (unsigned int y = 0; y < texHeight; y++)
+    {
+      for (unsigned int x = 0; x < texWidth; x++)
+      {
         float dx = x - centerX;
         float dy = y - centerY;
-        
+
         float ellipseDist = std::sqrt((dx * dx) / (ellipseA * ellipseA) + (dy * dy) / (ellipseB * ellipseB));
-        
+
         uint8_t alpha;
-        if (ellipseDist <= 1.0f) {
+        if (ellipseDist <= 1.0f)
+        {
           alpha = 0;
-        } else {
+        }
+        else
+        {
           float outerA = ellipseA + fadeA;
           float outerB = ellipseB + fadeB;
           float outerDist = std::sqrt((dx * dx) / (outerA * outerA) + (dy * dy) / (outerB * outerB));
-          
-          if (outerDist >= 1.0f) {
+
+          if (outerDist >= 1.0f)
+          {
             alpha = 255;
-          } else {
+          }
+          else
+          {
             float fadeProgress = (ellipseDist - 1.0f) / ((outerA / ellipseA) - 1.0f);
             fadeProgress = std::min(1.0f, std::max(0.0f, fadeProgress));
             alpha = static_cast<uint8_t>(255 * fadeProgress);
           }
         }
-        
+
         image.setPixel({x, y}, sf::Color(0, 0, 0, alpha));
       }
     }
-    
+
     m_darkModeTexture = std::make_unique<sf::Texture>(image);
     m_darkModeSprite = std::make_unique<sf::Sprite>(*m_darkModeTexture);
     m_darkModeTexWidth = texWidth;
     m_darkModeTexHeight = texHeight;
   }
-  
+
   // 绘制遮罩（纹理是2倍大小，所以偏移也要相应调整）
-  if (m_darkModeSprite) {
+  if (m_darkModeSprite)
+  {
     m_darkModeSprite->setPosition({playerPos.x - viewSize.x, playerPos.y - viewSize.y});
     m_window.draw(*m_darkModeSprite);
   }
+
+  // 恢复之前的视图
+  m_window.setView(currentView);
+}
+
+void Game::renderMinimap()
+{
+  // 保存当前视图
+  sf::View currentView = m_window.getView();
+  
+  // 切换到UI视图绘制小地图
+  m_window.setView(m_uiView);
+  
+  // 小地图参数
+  const float minimapSize = 150.f;
+  const float minimapMargin = 20.f;
+  const float minimapX = minimapMargin;
+  const float minimapY = static_cast<float>(LOGICAL_HEIGHT) - minimapSize - minimapMargin - 35.f;
+  
+  // 绘制小地图背景
+  sf::RectangleShape minimapBg({minimapSize, minimapSize});
+  minimapBg.setPosition({minimapX, minimapY});
+  minimapBg.setFillColor(sf::Color(20, 20, 20, 200));
+  minimapBg.setOutlineColor(sf::Color(100, 100, 100, 255));
+  minimapBg.setOutlineThickness(2.f);
+  m_window.draw(minimapBg);
+  
+  // 计算地图范围（基于迷宫大小）
+  sf::Vector2f mazeSize = m_maze.getSize();
+  float mapWidth = mazeSize.x;
+  float mapHeight = mazeSize.y;
+  float scale = std::min(minimapSize / mapWidth, minimapSize / mapHeight) * 0.9f;
+  
+  // 计算小地图中心偏移（使内容居中）
+  float offsetX = minimapX + (minimapSize - mapWidth * scale) / 2.f;
+  float offsetY = minimapY + (minimapSize - mapHeight * scale) / 2.f;
+  
+  // 将世界坐标转换为小地图坐标的lambda
+  auto worldToMinimap = [&](sf::Vector2f worldPos) -> sf::Vector2f {
+    return sf::Vector2f(
+      offsetX + worldPos.x * scale,
+      offsetY + worldPos.y * scale
+    );
+  };
+  
+  // 绘制NPC
+  for (const auto& enemy : m_enemies) {
+    if (enemy->isDead()) continue;
+    
+    sf::Vector2f npcPos = enemy->getPosition();
+    sf::Vector2f npcMiniPos = worldToMinimap(npcPos);
+    
+    sf::CircleShape npcDot(3.f);
+    npcDot.setPosition({npcMiniPos.x - 3.f, npcMiniPos.y - 3.f});
+    
+    // 根据激活状态显示不同颜色
+    if (enemy->isActivated()) {
+      npcDot.setFillColor(GameColors::MinimapEnemyNpc);  // 已激活：红色
+    } else {
+      npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活：灰色
+    }
+    m_window.draw(npcDot);
+  }
+  
+  // 绘制玩家（黄色，最后绘制以确保在最上层）
+  if (m_player) {
+    sf::Vector2f playerPos = m_player->getPosition();
+    sf::Vector2f playerMiniPos = worldToMinimap(playerPos);
+    
+    sf::CircleShape playerDot(4.f);
+    playerDot.setPosition({playerMiniPos.x - 4.f, playerMiniPos.y - 4.f});
+    playerDot.setFillColor(GameColors::MinimapPlayer);
+    m_window.draw(playerDot);
+  }
+  
+  // 小地图标签
+  sf::Text minimapLabel(m_font);
+  minimapLabel.setString("Minimap");
+  minimapLabel.setCharacterSize(12);
+  minimapLabel.setFillColor(sf::Color(180, 180, 180));
+  minimapLabel.setPosition({minimapX + 5.f, minimapY + 3.f});
+  m_window.draw(minimapLabel);
   
   // 恢复之前的视图
   m_window.setView(currentView);
