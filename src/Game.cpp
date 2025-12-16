@@ -668,7 +668,7 @@ void Game::processEvents()
             bool hasTankAtPos = false;
             GridPos grid = m_maze.worldToGrid(mouseWorldPos);
             sf::Vector2f gridCenter = m_maze.gridToWorld(grid);
-            float checkRadius = m_maze.getTileSize() * 0.7f;
+            float checkRadius = m_maze.getTileSize() * 1.0f;
 
             // 检查玩家
             if (m_player)
@@ -880,7 +880,7 @@ void Game::processEvents()
             bool hasTankAtPos = false;
             GridPos grid = m_maze.worldToGrid(mouseWorldPos);
             sf::Vector2f gridCenter = m_maze.gridToWorld(grid);
-            float checkRadius = m_maze.getTileSize() * 0.7f;
+            float checkRadius = m_maze.getTileSize() * 1.0f;
 
             // 检查本地玩家
             if (m_player)
@@ -1482,7 +1482,7 @@ void Game::renderGame()
 
     // 检查是否有坦克在该位置
     bool hasTankAtPos = false;
-    float checkRadius = m_maze.getTileSize() * 0.7f;
+    float checkRadius = m_maze.getTileSize() * 1.0f;
 
     // 检查玩家
     if (m_player)
