@@ -210,13 +210,13 @@ void Game::resetGame()
   m_mpState.rescueProgress = 0.f;
   m_mpState.fKeyHeld = false;
   m_mpState.canRescue = false;
-  
+
   // 重置终点交互状态（多人模式）
   m_mpState.isAtExitZone = false;
   m_mpState.isHoldingExit = false;
   m_mpState.exitHoldProgress = 0.f;
   m_mpState.eKeyHeld = false;
-  
+
   // 重置终点交互状态（单人模式）
   m_isAtExitZone = false;
   m_isHoldingExit = false;
@@ -445,7 +445,7 @@ void Game::processMainMenuEvents(const sf::Event &event)
         }
         AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       }
-      break; 
+      break;
     }
     case sf::Keyboard::Key::Enter:
     case sf::Keyboard::Key::Space:
@@ -477,7 +477,7 @@ void Game::processMainMenuEvents(const sf::Event &event)
         break;
       default:
         break;
-      }                       
+      }
       break;
     case sf::Keyboard::Key::Left:
     case sf::Keyboard::Key::A:
@@ -1070,11 +1070,11 @@ void Game::update(float dt)
   // 检查是否到达出口（需要按住E键3秒）
   const float EXIT_HOLD_TIME = 3.0f;
   bool atExit = m_maze.isAtExit(m_player->getPosition(), m_player->getCollisionRadius());
-  
+
   if (atExit)
   {
     m_isAtExitZone = true;
-    
+
     if (m_eKeyHeld)
     {
       // 正在按住E键
@@ -1083,9 +1083,9 @@ void Game::update(float dt)
         m_isHoldingExit = true;
         m_exitHoldProgress = 0.f;
       }
-      
+
       m_exitHoldProgress += dt;
-      
+
       // 完成确认
       if (m_exitHoldProgress >= EXIT_HOLD_TIME)
       {
@@ -1673,25 +1673,25 @@ void Game::renderGame()
   if (!m_isMultiplayer && m_isAtExitZone && m_player && !m_gameOver)
   {
     sf::Vector2f exitPos = m_maze.getExitPosition();
-    
+
     if (m_isHoldingExit)
     {
       // 显示确认进度条
       const float EXIT_HOLD_TIME = 3.0f;
       float progress = m_exitHoldProgress / EXIT_HOLD_TIME;
-      
+
       // 进度条背景
       sf::RectangleShape bgBar({80.f, 10.f});
       bgBar.setFillColor(sf::Color(50, 50, 50, 200));
       bgBar.setPosition({exitPos.x - 40.f, exitPos.y - 60.f});
       m_window.draw(bgBar);
-      
+
       // 进度条
       sf::RectangleShape progressBar({80.f * progress, 10.f});
       progressBar.setFillColor(sf::Color(50, 200, 255, 255));
       progressBar.setPosition({exitPos.x - 40.f, exitPos.y - 60.f});
       m_window.draw(progressBar);
-      
+
       // 显示确认中文字
       sf::Text confirmText(m_font);
       confirmText.setString("Exiting...");
@@ -3148,16 +3148,16 @@ void Game::renderMinimap()
 {
   // 保存当前视图
   sf::View currentView = m_window.getView();
-  
+
   // 切换到UI视图绘制小地图
   m_window.setView(m_uiView);
-  
+
   // 小地图参数
   const float minimapSize = 150.f;
   const float minimapMargin = 20.f;
   const float minimapX = minimapMargin;
   const float minimapY = static_cast<float>(LOGICAL_HEIGHT) - minimapSize - minimapMargin - 35.f;
-  
+
   // 绘制小地图背景
   sf::RectangleShape minimapBg({minimapSize, minimapSize});
   minimapBg.setPosition({minimapX, minimapY});
@@ -3165,55 +3165,61 @@ void Game::renderMinimap()
   minimapBg.setOutlineColor(sf::Color(100, 100, 100, 255));
   minimapBg.setOutlineThickness(2.f);
   m_window.draw(minimapBg);
-  
+
   // 计算地图范围（基于迷宫大小）
   sf::Vector2f mazeSize = m_maze.getSize();
   float mapWidth = mazeSize.x;
   float mapHeight = mazeSize.y;
   float scale = std::min(minimapSize / mapWidth, minimapSize / mapHeight) * 0.9f;
-  
+
   // 计算小地图中心偏移（使内容居中）
   float offsetX = minimapX + (minimapSize - mapWidth * scale) / 2.f;
   float offsetY = minimapY + (minimapSize - mapHeight * scale) / 2.f;
-  
+
   // 将世界坐标转换为小地图坐标的lambda
-  auto worldToMinimap = [&](sf::Vector2f worldPos) -> sf::Vector2f {
+  auto worldToMinimap = [&](sf::Vector2f worldPos) -> sf::Vector2f
+  {
     return sf::Vector2f(
-      offsetX + worldPos.x * scale,
-      offsetY + worldPos.y * scale
-    );
+        offsetX + worldPos.x * scale,
+        offsetY + worldPos.y * scale);
   };
-  
+
   // 绘制NPC
-  for (const auto& enemy : m_enemies) {
-    if (enemy->isDead()) continue;
-    
+  for (const auto &enemy : m_enemies)
+  {
+    if (enemy->isDead())
+      continue;
+
     sf::Vector2f npcPos = enemy->getPosition();
     sf::Vector2f npcMiniPos = worldToMinimap(npcPos);
-    
+
     sf::CircleShape npcDot(3.f);
     npcDot.setPosition({npcMiniPos.x - 3.f, npcMiniPos.y - 3.f});
-    
+
     // 根据激活状态显示不同颜色
-    if (enemy->isActivated()) {
-      npcDot.setFillColor(GameColors::MinimapEnemyNpc);  // 已激活：红色
-    } else {
-      npcDot.setFillColor(GameColors::MinimapInactiveNpc);  // 未激活：灰色
+    if (enemy->isActivated())
+    {
+      npcDot.setFillColor(GameColors::MinimapEnemyNpc); // 已激活：红色
+    }
+    else
+    {
+      npcDot.setFillColor(GameColors::MinimapInactiveNpc); // 未激活：灰色
     }
     m_window.draw(npcDot);
   }
-  
+
   // 绘制玩家（黄色，最后绘制以确保在最上层）
-  if (m_player) {
+  if (m_player)
+  {
     sf::Vector2f playerPos = m_player->getPosition();
     sf::Vector2f playerMiniPos = worldToMinimap(playerPos);
-    
+
     sf::CircleShape playerDot(4.f);
     playerDot.setPosition({playerMiniPos.x - 4.f, playerMiniPos.y - 4.f});
     playerDot.setFillColor(GameColors::MinimapPlayer);
     m_window.draw(playerDot);
   }
-  
+
   // 小地图标签
   sf::Text minimapLabel(m_font);
   minimapLabel.setString("Minimap");
@@ -3221,7 +3227,7 @@ void Game::renderMinimap()
   minimapLabel.setFillColor(sf::Color(180, 180, 180));
   minimapLabel.setPosition({minimapX + 5.f, minimapY + 3.f});
   m_window.draw(minimapLabel);
-  
+
   // 恢复之前的视图
   m_window.setView(currentView);
 }

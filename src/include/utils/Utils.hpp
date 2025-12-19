@@ -22,7 +22,7 @@ inline std::string getResourcePath()
     if (resourcesURL)
     {
       char path[PATH_MAX];
-      if (CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8*)path, PATH_MAX))
+      if (CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX))
       {
         CFRelease(resourcesURL);
         return std::string(path) + "/";
@@ -39,19 +39,19 @@ inline std::string getResourcePath()
 namespace GameColors
 {
   // 子弹颜色
-  const sf::Color PlayerBullet = sf::Color::Yellow;           // 己方玩家子弹
-  const sf::Color EnemyPlayerBullet = sf::Color::Magenta;     // 敌方玩家子弹（联机）
-  const sf::Color AllyNpcBullet = sf::Color(100, 180, 255);   // 己方NPC子弹（浅蓝）
-  const sf::Color EnemyNpcBullet = sf::Color::Red;            // 敌方NPC子弹
-  
+  const sf::Color PlayerBullet = sf::Color::Yellow;         // 己方玩家子弹
+  const sf::Color EnemyPlayerBullet = sf::Color::Magenta;   // 敌方玩家子弹（联机）
+  const sf::Color AllyNpcBullet = sf::Color(100, 180, 255); // 己方NPC子弹（浅蓝）
+  const sf::Color EnemyNpcBullet = sf::Color::Red;          // 敌方NPC子弹
+
   // 小地图颜色
-  const sf::Color MinimapPlayer = sf::Color::Yellow;          // 己方玩家
-  const sf::Color MinimapAlly = sf::Color::Cyan;              // 队友（Escape模式）
-  const sf::Color MinimapEnemy = sf::Color::Magenta;          // 敌方玩家（Battle模式）
-  const sf::Color MinimapAllyNpc = sf::Color(100, 180, 255);  // 己方NPC（浅蓝）
-  const sf::Color MinimapEnemyNpc = sf::Color::Red;           // 敌方NPC
+  const sf::Color MinimapPlayer = sf::Color::Yellow;             // 己方玩家
+  const sf::Color MinimapAlly = sf::Color::Cyan;                 // 队友（Escape模式）
+  const sf::Color MinimapEnemy = sf::Color::Magenta;             // 敌方玩家（Battle模式）
+  const sf::Color MinimapAllyNpc = sf::Color(100, 180, 255);     // 己方NPC（浅蓝）
+  const sf::Color MinimapEnemyNpc = sf::Color::Red;              // 敌方NPC
   const sf::Color MinimapInactiveNpc = sf::Color(128, 128, 128); // 未激活NPC
-  const sf::Color MinimapDowned = sf::Color(100, 100, 100);   // 倒地状态
+  const sf::Color MinimapDowned = sf::Color(100, 100, 100);      // 倒地状态
 }
 
 namespace Utils

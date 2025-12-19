@@ -19,7 +19,7 @@ class Bullet
 {
 public:
   Bullet(const sf::Texture &texture, sf::Vector2f position, float angleDegrees, float speed, BulletOwner owner);
-  
+
   // 简易构造函数（不需要纹理）
   Bullet(float x, float y, float angleDegrees, bool isPlayer, sf::Color color = sf::Color::Yellow);
 
@@ -42,14 +42,14 @@ public:
   // 获取伤害值
   float getDamage() const { return m_damage; }
   void setDamage(float damage) { m_damage = damage; }
-  
+
   // 阵营信息（用于多人模式NPC）
   void setTeam(int team) { m_team = team; }
   int getTeam() const { return m_team; }
 
 private:
   std::unique_ptr<sf::Sprite> m_sprite;
-  const sf::Texture* m_texture = nullptr;
+  const sf::Texture *m_texture = nullptr;
   sf::Vector2f m_velocity;
   sf::Vector2f m_position;
   sf::Color m_color = sf::Color::Yellow;
@@ -59,7 +59,7 @@ private:
   float m_damage = 25.f;
   float m_speed = 500.f;
   float m_angle = 0.f;
-  int m_team = 0;  // 0=中立, 1=房主阵营, 2=非房主阵营
+  int m_team = 0; // 0=中立, 1=房主阵营, 2=非房主阵营
 };
 
 // 管理所有子弹

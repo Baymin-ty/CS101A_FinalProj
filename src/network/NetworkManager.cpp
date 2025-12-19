@@ -2,13 +2,13 @@
 #include <iostream>
 #include <cstring>
 
-NetworkManager& NetworkManager::getInstance()
+NetworkManager &NetworkManager::getInstance()
 {
   static NetworkManager instance;
   return instance;
 }
 
-bool NetworkManager::connect(const std::string& host, unsigned short port)
+bool NetworkManager::connect(const std::string &host, unsigned short port)
 {
   m_socket.setBlocking(true);
   auto address = sf::IpAddress::resolve(host);
@@ -20,7 +20,7 @@ bool NetworkManager::connect(const std::string& host, unsigned short port)
     }
     return false;
   }
-  
+
   sf::Socket::Status status = m_socket.connect(address.value(), port, sf::seconds(5));
   m_socket.setBlocking(false);
 
@@ -61,7 +61,7 @@ void NetworkManager::disconnect()
   m_connected = false;
   m_roomCode.clear();
   m_receiveBuffer.clear();
-  
+
   if (m_onDisconnected)
   {
     m_onDisconnected();
@@ -70,26 +70,28 @@ void NetworkManager::disconnect()
 
 void NetworkManager::createRoom(int mazeWidth, int mazeHeight, bool isDarkMode)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::CreateRoom));
-  
+
   // 添加迷宫尺寸
   data.push_back(static_cast<uint8_t>(mazeWidth & 0xFF));
   data.push_back(static_cast<uint8_t>((mazeWidth >> 8) & 0xFF));
   data.push_back(static_cast<uint8_t>(mazeHeight & 0xFF));
   data.push_back(static_cast<uint8_t>((mazeHeight >> 8) & 0xFF));
-  
+
   // 添加暗黑模式标志
   data.push_back(static_cast<uint8_t>(isDarkMode ? 1 : 0));
 
   sendPacket(data);
 }
 
-void NetworkManager::joinRoom(const std::string& roomCode)
+void NetworkManager::joinRoom(const std::string &roomCode)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::JoinRoom));
@@ -102,16 +104,18 @@ void NetworkManager::joinRoom(const std::string& roomCode)
   sendPacket(data);
 }
 
-void NetworkManager::sendPosition(const PlayerState& state)
+void NetworkManager::sendPosition(const PlayerState &state)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::PlayerUpdate));
 
   // 添加位置数据 (float -> bytes)
-  auto addFloat = [&data](float value) {
-    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+  auto addFloat = [&data](float value)
+  {
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&value);
     for (int i = 0; i < 4; i++)
       data.push_back(bytes[i]);
   };
@@ -122,20 +126,22 @@ void NetworkManager::sendPosition(const PlayerState& state)
   addFloat(state.turretAngle);
   addFloat(state.health);
   data.push_back(state.reachedExit ? 1 : 0);
-  data.push_back(state.isDead ? 1 : 0);  // 添加死亡状态
+  data.push_back(state.isDead ? 1 : 0); // 添加死亡状态
 
   sendPacket(data);
 }
 
 void NetworkManager::sendShoot(float x, float y, float angle)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::PlayerShoot));
 
-  auto addFloat = [&data](float value) {
-    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+  auto addFloat = [&data](float value)
+  {
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&value);
     for (int i = 0; i < 4; i++)
       data.push_back(bytes[i]);
   };
@@ -149,7 +155,8 @@ void NetworkManager::sendShoot(float x, float y, float angle)
 
 void NetworkManager::sendReachExit()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::ReachExit));
@@ -158,17 +165,19 @@ void NetworkManager::sendReachExit()
 
 void NetworkManager::sendGameResult(bool localWin)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::GameResult));
-  data.push_back(localWin ? 1 : 0);  // 我赢了
+  data.push_back(localWin ? 1 : 0); // 我赢了
   sendPacket(data);
 }
 
 void NetworkManager::sendRestartRequest()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::RestartRequest));
@@ -177,7 +186,8 @@ void NetworkManager::sendRestartRequest()
 
 void NetworkManager::sendClimaxStart()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::ClimaxStart));
@@ -186,13 +196,15 @@ void NetworkManager::sendClimaxStart()
 
 void NetworkManager::sendWallPlace(float x, float y)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::WallPlace));
 
-  auto addFloat = [&data](float value) {
-    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+  auto addFloat = [&data](float value)
+  {
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&value);
     for (int i = 0; i < 4; i++)
       data.push_back(bytes[i]);
   };
@@ -205,19 +217,22 @@ void NetworkManager::sendWallPlace(float x, float y)
 
 void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::WallDamage));
 
-  auto addInt = [&data](int value) {
-    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+  auto addInt = [&data](int value)
+  {
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&value);
     for (int i = 0; i < 4; i++)
       data.push_back(bytes[i]);
   };
 
-  auto addFloat = [&data](float value) {
-    uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
+  auto addFloat = [&data](float value)
+  {
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&value);
     for (int i = 0; i < 4; i++)
       data.push_back(bytes[i]);
   };
@@ -234,7 +249,8 @@ void NetworkManager::sendWallDamage(int row, int col, float damage, bool destroy
 
 void NetworkManager::sendRescueStart()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::RescueStart));
@@ -243,21 +259,23 @@ void NetworkManager::sendRescueStart()
 
 void NetworkManager::sendRescueProgress(float progress)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::RescueProgress));
-  
-  uint8_t* bytes = reinterpret_cast<uint8_t*>(&progress);
+
+  uint8_t *bytes = reinterpret_cast<uint8_t *>(&progress);
   for (int i = 0; i < 4; i++)
     data.push_back(bytes[i]);
-    
+
   sendPacket(data);
 }
 
 void NetworkManager::sendRescueComplete()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::RescueComplete));
@@ -266,7 +284,8 @@ void NetworkManager::sendRescueComplete()
 
 void NetworkManager::sendRescueCancel()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::RescueCancel));
@@ -275,7 +294,8 @@ void NetworkManager::sendRescueCancel()
 
 void NetworkManager::sendPlayerReady(bool isReady)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::PlayerReady));
@@ -285,7 +305,8 @@ void NetworkManager::sendPlayerReady(bool isReady)
 
 void NetworkManager::sendHostStartGame()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::HostStartGame));
@@ -294,26 +315,29 @@ void NetworkManager::sendHostStartGame()
 
 void NetworkManager::sendNpcActivate(int npcId, int team, int activatorId)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::NpcActivate));
   data.push_back(static_cast<uint8_t>(npcId));
   data.push_back(static_cast<uint8_t>(team));
-  data.push_back(static_cast<uint8_t>(activatorId + 128));  // +128 以支持负数
+  data.push_back(static_cast<uint8_t>(activatorId + 128)); // +128 以支持负数
   sendPacket(data);
 }
 
-void NetworkManager::sendNpcUpdate(const NpcState& state)
+void NetworkManager::sendNpcUpdate(const NpcState &state)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::NpcUpdate));
   data.push_back(static_cast<uint8_t>(state.id));
-  
+
   // 位置
-  auto pushFloat = [&data](float f) {
+  auto pushFloat = [&data](float f)
+  {
     uint32_t bits;
     std::memcpy(&bits, &f, sizeof(float));
     data.push_back(static_cast<uint8_t>(bits & 0xFF));
@@ -321,7 +345,7 @@ void NetworkManager::sendNpcUpdate(const NpcState& state)
     data.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
     data.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
   };
-  
+
   pushFloat(state.x);
   pushFloat(state.y);
   pushFloat(state.rotation);
@@ -334,13 +358,15 @@ void NetworkManager::sendNpcUpdate(const NpcState& state)
 
 void NetworkManager::sendNpcShoot(int npcId, float x, float y, float angle)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::NpcShoot));
   data.push_back(static_cast<uint8_t>(npcId));
-  
-  auto pushFloat = [&data](float f) {
+
+  auto pushFloat = [&data](float f)
+  {
     uint32_t bits;
     std::memcpy(&bits, &f, sizeof(float));
     data.push_back(static_cast<uint8_t>(bits & 0xFF));
@@ -348,7 +374,7 @@ void NetworkManager::sendNpcShoot(int npcId, float x, float y, float angle)
     data.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
     data.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
   };
-  
+
   pushFloat(x);
   pushFloat(y);
   pushFloat(angle);
@@ -357,12 +383,13 @@ void NetworkManager::sendNpcShoot(int npcId, float x, float y, float angle)
 
 void NetworkManager::sendNpcDamage(int npcId, float damage)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::NpcDamage));
   data.push_back(static_cast<uint8_t>(npcId));
-  
+
   uint32_t bits;
   std::memcpy(&bits, &damage, sizeof(float));
   data.push_back(static_cast<uint8_t>(bits & 0xFF));
@@ -372,45 +399,50 @@ void NetworkManager::sendNpcDamage(int npcId, float damage)
   sendPacket(data);
 }
 
-void NetworkManager::sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode, bool isDarkMode)
+void NetworkManager::sendMazeData(const std::vector<std::string> &mazeData, bool isEscapeMode, bool isDarkMode)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   std::vector<uint8_t> data;
   data.push_back(static_cast<uint8_t>(NetMessageType::MazeData));
-  
+
   // 游戏模式标志: bit 0 = isEscapeMode, bit 1 = isDarkMode
   uint8_t modeFlags = (isEscapeMode ? 1 : 0) | (isDarkMode ? 2 : 0);
   data.push_back(modeFlags);
-  
+
   // 迷宫行数
   uint16_t rows = static_cast<uint16_t>(mazeData.size());
   data.push_back(static_cast<uint8_t>(rows & 0xFF));
   data.push_back(static_cast<uint8_t>((rows >> 8) & 0xFF));
-  
+
   // 每行数据
-  for (const auto& row : mazeData) {
+  for (const auto &row : mazeData)
+  {
     uint16_t len = static_cast<uint16_t>(row.length());
     data.push_back(static_cast<uint8_t>(len & 0xFF));
     data.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
-    for (char c : row) {
+    for (char c : row)
+    {
       data.push_back(static_cast<uint8_t>(c));
     }
   }
-  
+
   sendPacket(data);
 }
 
 void NetworkManager::update()
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   receiveData();
 }
 
-void NetworkManager::sendPacket(const std::vector<uint8_t>& data)
+void NetworkManager::sendPacket(const std::vector<uint8_t> &data)
 {
-  if (!m_connected) return;
+  if (!m_connected)
+    return;
 
   // 添加长度前缀 (2 bytes)
   std::vector<uint8_t> packet;
@@ -444,7 +476,7 @@ void NetworkManager::receiveData()
       if (m_receiveBuffer.size() >= 2 + len)
       {
         std::vector<uint8_t> message(m_receiveBuffer.begin() + 2,
-                                      m_receiveBuffer.begin() + 2 + len);
+                                     m_receiveBuffer.begin() + 2 + len);
         m_receiveBuffer.erase(m_receiveBuffer.begin(),
                               m_receiveBuffer.begin() + 2 + len);
         processMessage(message);
@@ -465,14 +497,17 @@ void NetworkManager::receiveData()
   }
 }
 
-void NetworkManager::processMessage(const std::vector<uint8_t>& data)
+void NetworkManager::processMessage(const std::vector<uint8_t> &data)
 {
-  if (data.empty()) return;
+  if (data.empty())
+    return;
 
   NetMessageType type = static_cast<NetMessageType>(data[0]);
 
-  auto readFloat = [&data](size_t offset) -> float {
-    if (offset + 4 > data.size()) return 0.0f;
+  auto readFloat = [&data](size_t offset) -> float
+  {
+    if (offset + 4 > data.size())
+      return 0.0f;
     float value;
     std::memcpy(&value, &data[offset], sizeof(float));
     return value;
@@ -534,16 +569,16 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     if (data.size() >= 4)
     {
       size_t offset = 1;
-      
+
       // 读取游戏模式标志: bit 0 = isEscapeMode, bit 1 = isDarkMode
       uint8_t modeFlags = data[offset];
       bool isEscapeMode = (modeFlags & 1) != 0;
       bool isDarkMode = (modeFlags & 2) != 0;
       offset += 1;
-      
+
       uint16_t rows = data[offset] | (data[offset + 1] << 8);
       offset += 2;
-      
+
       std::vector<std::string> mazeData;
       for (uint16_t i = 0; i < rows && offset + 2 <= data.size(); i++)
       {
@@ -556,13 +591,13 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
           offset += len;
         }
       }
-      
+
       // 先设置游戏模式，再回调 MazeData
       if (m_onGameModeReceived)
       {
         m_onGameModeReceived(isEscapeMode);
       }
-      
+
       if (m_onMazeData)
       {
         m_onMazeData(mazeData, isDarkMode);
@@ -590,7 +625,7 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       state.turretAngle = readFloat(13);
       state.health = readFloat(17);
       state.reachedExit = data[21] != 0;
-      state.isDead = (data.size() >= 23) ? (data[22] != 0) : false;  // 读取死亡状态
+      state.isDead = (data.size() >= 23) ? (data[22] != 0) : false; // 读取死亡状态
       if (m_onPlayerUpdate)
       {
         m_onPlayerUpdate(state);
@@ -650,7 +685,7 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
     {
       int npcId = data[1];
       int team = data[2];
-      int activatorId = static_cast<int>(data[3]) - 128;  // 还原负数
+      int activatorId = static_cast<int>(data[3]) - 128; // 还原负数
       m_onNpcActivate(npcId, team, activatorId);
     }
     break;
@@ -798,14 +833,15 @@ void NetworkManager::processMessage(const std::vector<uint8_t>& data)
       uint8_t hostIPLen = data[offset++];
       std::string hostIP(data.begin() + offset, data.begin() + offset + hostIPLen);
       offset += hostIPLen;
-      
+
       uint8_t guestIPLen = data[offset++];
       std::string guestIP;
-      if (guestIPLen > 0) {
+      if (guestIPLen > 0)
+      {
         guestIP = std::string(data.begin() + offset, data.begin() + offset + guestIPLen);
         offset += guestIPLen;
       }
-      
+
       bool guestReady = (data.size() > offset) ? (data[offset++] != 0) : false;
       bool isDarkMode = (data.size() > offset) ? (data[offset] != 0) : false;
       m_onRoomInfo(hostIP, guestIP, guestReady, isDarkMode);

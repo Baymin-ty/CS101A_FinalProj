@@ -185,8 +185,8 @@ void CollisionSystem::checkMultiplayerCollisions(
         BulletOwner owner = bullet->getOwner();
         // destroyerId: 0=房主（本地玩家），1=非房主（对方玩家）
         // NPC 打掉的墙不给玩家奖励，设为 -1
-        int destroyerId = (owner == BulletOwner::Player) ? 0 : 
-                          (owner == BulletOwner::OtherPlayer) ? 1 : -1;
+        int destroyerId = (owner == BulletOwner::Player) ? 0 : (owner == BulletOwner::OtherPlayer) ? 1
+                                                                                                   : -1;
 
         // 同步墙壁伤害给非房主（包含摧毁者ID）
         NetworkManager::getInstance().sendWallDamage(

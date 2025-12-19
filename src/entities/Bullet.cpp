@@ -34,9 +34,9 @@ void Bullet::update(float dt)
   {
     m_sprite->move(m_velocity * dt);
   }
-  
+
   // 自动失活如果走太远
-  if (m_position.x < -100 || m_position.x > 10000 || 
+  if (m_position.x < -100 || m_position.x > 10000 ||
       m_position.y < -100 || m_position.y > 10000)
   {
     m_active = false;

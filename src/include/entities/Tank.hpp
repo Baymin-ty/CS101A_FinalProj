@@ -25,14 +25,18 @@ public:
 
   // 获取/设置旋转角度
   float getRotation() const { return m_hullAngle; }
-  void setRotation(float angle) { 
-    m_hullAngle = angle; 
-    if (m_hull) m_hull->setRotation(sf::degrees(m_hullAngle));
+  void setRotation(float angle)
+  {
+    m_hullAngle = angle;
+    if (m_hull)
+      m_hull->setRotation(sf::degrees(m_hullAngle));
   }
   float getTurretRotation() const { return m_turretAngle; }
-  void setTurretRotation(float angle) { 
-    m_turretAngle = angle; 
-    if (m_turret) m_turret->setRotation(sf::degrees(m_turretAngle));
+  void setTurretRotation(float angle)
+  {
+    m_turretAngle = angle;
+    if (m_turret)
+      m_turret->setRotation(sf::degrees(m_turretAngle));
   }
 
   // 获取枪口位置
@@ -52,9 +56,10 @@ public:
   // 受到伤害
   void takeDamage(float damage);
   bool isDead() const { return m_healthBar.isDead(); }
-  
+
   // 治疗（恢复百分比血量）
-  void heal(float percent) {
+  void heal(float percent)
+  {
     float maxHp = m_healthBar.getMaxHealth();
     float current = m_healthBar.getHealth();
     float healAmount = maxHp * percent;
@@ -73,8 +78,13 @@ public:
   // 金币系统
   int getCoins() const { return m_coins; }
   void setCoins(int coins) { m_coins = coins; }
-  bool spendCoins(int amount) { 
-    if (m_coins >= amount) { m_coins -= amount; return true; }
+  bool spendCoins(int amount)
+  {
+    if (m_coins >= amount)
+    {
+      m_coins -= amount;
+      return true;
+    }
     return false;
   }
   void addCoins(int amount) { m_coins += amount; }
@@ -83,8 +93,13 @@ public:
   int getWallsInBag() const { return m_wallsInBag; }
   void setWallsInBag(int count) { m_wallsInBag = count; }
   void addWallToBag() { m_wallsInBag++; }
-  bool useWallFromBag() {
-    if (m_wallsInBag > 0) { m_wallsInBag--; return true; }
+  bool useWallFromBag()
+  {
+    if (m_wallsInBag > 0)
+    {
+      m_wallsInBag--;
+      return true;
+    }
     return false;
   }
 
@@ -129,11 +144,11 @@ private:
   sf::Vector2f m_position;
 
   // 金币系统（多人模式）
-  int m_coins = 10;  // 初始10个金币
-  
+  int m_coins = 10; // 初始10个金币
+
   // 背包系统
-  int m_wallsInBag = 0;  // 初始0个棕色格子
-  
+  int m_wallsInBag = 0; // 初始0个棕色格子
+
   // 阵营（多人模式）
-  int m_team = 0;  // 0=未设置，1=玩家1，2=玩家2
+  int m_team = 0; // 0=未设置，1=玩家1，2=玩家2
 };

@@ -35,10 +35,10 @@ private:
   void carvePassage(int x, int y);
   void placeEnemies();
   void placeDestructibleWalls();
-  void placeStartAndEnd();                                    // 随机放置起点和终点
-  void placeMultiplayerSpawns();                              // 放置多人模式两个出生点
+  void placeStartAndEnd();                                     // 随机放置起点和终点
+  void placeMultiplayerSpawns();                               // 放置多人模式两个出生点
   void ensurePath(int startX, int startY, int endX, int endY); // 确保起点到终点有路径
-  std::vector<std::pair<int, int>> getEmptySpaces();          // 获取所有空地
+  std::vector<std::pair<int, int>> getEmptySpaces();           // 获取所有空地
 
   int m_width;
   int m_height;
@@ -49,8 +49,8 @@ private:
 
   int m_enemyCount = 5;
   float m_destructibleRatio = 0.15f;
-  bool m_multiplayerMode = false;  // 是否联机模式
-  bool m_escapeMode = false;        // 是否 Escape 模式（只生成蓝色和棕色墙）
+  bool m_multiplayerMode = false; // 是否联机模式
+  bool m_escapeMode = false;      // 是否 Escape 模式（只生成蓝色和棕色墙）
 
   // 起点和终点坐标
   int m_startX = 1, m_startY = 1;

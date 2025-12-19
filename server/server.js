@@ -402,14 +402,14 @@ function handleMessage(socket, data) {
 
       // 重置房间状态，准备下一轮
       room.started = false;
-      
+
       // 找到发送请求的玩家
       const sender = room.players.find(p => p.socket === socket);
-      
+
       // 重置 reachedExit 状态，并根据发送者身份设置 ready 状态
       for (const player of room.players) {
         player.reachedExit = false;
-        
+
         if (player.socket === socket) {
           // 发送者返回房间：房主自动 ready，非房主保持 not ready
           player.ready = player.isHost;

@@ -33,9 +33,9 @@ endif()
 include(FetchContent)
 FetchContent_Declare(sfml
   GIT_REPOSITORY https://github.com/SFML/SFML.git
-  GIT_TAG        3.0.2
-  GIT_SHALLOW    TRUE
-  GIT_PROGRESS   TRUE
+  GIT_TAG 3.0.2
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(sfml)
 
@@ -132,9 +132,9 @@ if(APPLE)
   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_SOURCE_DIR}/tank_assets" "${RESOURCE_DIR}/tank_assets"
+    "${CMAKE_SOURCE_DIR}/tank_assets" "${RESOURCE_DIR}/tank_assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_SOURCE_DIR}/music_assets" "${RESOURCE_DIR}/music_assets"
+    "${CMAKE_SOURCE_DIR}/music_assets" "${RESOURCE_DIR}/music_assets"
     COMMENT "Copying resources to app bundle..."
   )
 
@@ -142,9 +142,9 @@ elseif(WIN32)
   # Windows: 复制资源文件
   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_SOURCE_DIR}/tank_assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/tank_assets"
+    "${CMAKE_SOURCE_DIR}/tank_assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/tank_assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${CMAKE_SOURCE_DIR}/music_assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/music_assets"
+    "${CMAKE_SOURCE_DIR}/music_assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/music_assets"
     COMMENT "Copying resources to output directory..."
   )
 endif()

@@ -92,7 +92,7 @@ void Tank::update(float dt, sf::Vector2f mousePos)
   // 更新射击计时器
   m_shootTimer += dt;
   m_firedBullet = false;
-  
+
   if (m_mouseHeld && m_shootTimer >= m_shootCooldown)
   {
     m_firedBullet = true;
@@ -146,7 +146,7 @@ void Tank::draw(sf::RenderWindow &window) const
   {
     // 简易图形模式
     float size = 20.f * m_scale / 0.25f;
-    
+
     // 车身
     sf::RectangleShape hull({size * 1.5f, size});
     hull.setOrigin({size * 0.75f, size * 0.5f});
@@ -156,14 +156,14 @@ void Tank::draw(sf::RenderWindow &window) const
     hull.setOutlineColor(sf::Color::Black);
     hull.setOutlineThickness(2.f);
     window.draw(hull);
-    
+
     // 炮塔
     sf::CircleShape turretBase(size * 0.4f);
     turretBase.setOrigin({size * 0.4f, size * 0.4f});
     turretBase.setPosition(m_position);
     turretBase.setFillColor(sf::Color(m_color.r * 0.7f, m_color.g * 0.7f, m_color.b * 0.7f));
     window.draw(turretBase);
-    
+
     // 炮管
     sf::RectangleShape barrel({size * 1.2f, size * 0.2f});
     barrel.setOrigin({0.f, size * 0.1f});

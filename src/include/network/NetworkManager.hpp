@@ -25,43 +25,43 @@ enum class NetMessageType : uint8_t
   GameStart,
 
   // 游戏状态同步
-  PlayerUpdate,  // 玩家位置、角度等
-  PlayerShoot,   // 玩家射击
-  MazeData,      // 迷宫数据
-  RequestMaze,   // 请求迷宫数据
-  ReachExit,     // 到达终点
-  GameWin,       // 游戏胜利（先到终点）
-  GameResult,    // 游戏结果（胜/负）
+  PlayerUpdate,   // 玩家位置、角度等
+  PlayerShoot,    // 玩家射击
+  MazeData,       // 迷宫数据
+  RequestMaze,    // 请求迷宫数据
+  ReachExit,      // 到达终点
+  GameWin,        // 游戏胜利（先到终点）
+  GameResult,     // 游戏结果（胜/负）
   RestartRequest, // 重新开始请求
-  
+
   // NPC同步
-  NpcActivate,   // NPC激活
-  NpcUpdate,     // NPC状态更新（位置、血量等）
-  NpcShoot,      // NPC射击
-  NpcDamage,     // NPC受伤
-  
+  NpcActivate, // NPC激活
+  NpcUpdate,   // NPC状态更新（位置、血量等）
+  NpcShoot,    // NPC射击
+  NpcDamage,   // NPC受伤
+
   // 墙壁放置同步
-  WallPlace,     // 放置墙壁
-  
+  WallPlace, // 放置墙壁
+
   // 音乐同步
-  ClimaxStart,   // 开始播放高潮BGM
-  
+  ClimaxStart, // 开始播放高潮BGM
+
   // 玩家离开
-  PlayerLeft,    // 对方玩家离开房间
-  
+  PlayerLeft, // 对方玩家离开房间
+
   // Escape 模式救援
-  RescueStart,   // 开始救援
-  RescueProgress,// 救援进度
-  RescueComplete,// 救援完成
-  RescueCancel,  // 取消救援
-  
+  RescueStart,    // 开始救援
+  RescueProgress, // 救援进度
+  RescueComplete, // 救援完成
+  RescueCancel,   // 取消救援
+
   // 房间大厅
-  PlayerReady,    // 玩家准备就绪
-  HostStartGame,  // 房主开始游戏
-  RoomInfo,       // 房间信息同步
-  
+  PlayerReady,   // 玩家准备就绪
+  HostStartGame, // 房主开始游戏
+  RoomInfo,      // 房间信息同步
+
   // 墙壁伤害同步
-  WallDamage,     // 墙壁受到伤害
+  WallDamage, // 墙壁受到伤害
 };
 
 // 玩家状态数据
@@ -72,7 +72,7 @@ struct PlayerState
   float turretAngle = 0;
   float health = 100;
   bool reachedExit = false;
-  bool isDead = false;  // 是否已死亡（可被救援）
+  bool isDead = false; // 是否已死亡（可被救援）
 };
 
 // NPC状态数据
@@ -90,18 +90,18 @@ struct NpcState
 // 回调类型
 using OnConnectedCallback = std::function<void()>;
 using OnDisconnectedCallback = std::function<void()>;
-using OnRoomCreatedCallback = std::function<void(const std::string& roomCode)>;
-using OnRoomJoinedCallback = std::function<void(const std::string& roomCode)>;
+using OnRoomCreatedCallback = std::function<void(const std::string &roomCode)>;
+using OnRoomJoinedCallback = std::function<void(const std::string &roomCode)>;
 using OnGameStartCallback = std::function<void()>;
-using OnMazeDataCallback = std::function<void(const std::vector<std::string>& mazeData, bool isDarkMode)>;
+using OnMazeDataCallback = std::function<void(const std::vector<std::string> &mazeData, bool isDarkMode)>;
 using OnRequestMazeCallback = std::function<void()>;
-using OnPlayerUpdateCallback = std::function<void(const PlayerState& state)>;
+using OnPlayerUpdateCallback = std::function<void(const PlayerState &state)>;
 using OnPlayerShootCallback = std::function<void(float x, float y, float angle)>;
 using OnGameResultCallback = std::function<void(bool isWinner)>;
 using OnRestartRequestCallback = std::function<void()>;
-using OnErrorCallback = std::function<void(const std::string& error)>;
+using OnErrorCallback = std::function<void(const std::string &error)>;
 using OnNpcActivateCallback = std::function<void(int npcId, int team, int activatorId)>;
-using OnNpcUpdateCallback = std::function<void(const NpcState& state)>;
+using OnNpcUpdateCallback = std::function<void(const NpcState &state)>;
 using OnNpcShootCallback = std::function<void(int npcId, float x, float y, float angle)>;
 using OnNpcDamageCallback = std::function<void(int npcId, float damage)>;
 using OnPlayerLeftCallback = std::function<void(bool becameHost)>;
@@ -113,57 +113,57 @@ using OnRescueCompleteCallback = std::function<void()>;
 using OnRescueCancelCallback = std::function<void()>;
 using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
 using OnPlayerReadyCallback = std::function<void(bool isReady)>;
-using OnRoomInfoCallback = std::function<void(const std::string& hostIP, const std::string& guestIP, bool guestReady, bool isDarkMode)>;
+using OnRoomInfoCallback = std::function<void(const std::string &hostIP, const std::string &guestIP, bool guestReady, bool isDarkMode)>;
 using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)>;
 
 class NetworkManager
 {
 public:
-  static NetworkManager& getInstance();
+  static NetworkManager &getInstance();
 
   // 禁止拷贝
-  NetworkManager(const NetworkManager&) = delete;
-  NetworkManager& operator=(const NetworkManager&) = delete;
+  NetworkManager(const NetworkManager &) = delete;
+  NetworkManager &operator=(const NetworkManager &) = delete;
 
   // 连接到服务器
-  bool connect(const std::string& host, unsigned short port);
+  bool connect(const std::string &host, unsigned short port);
   void disconnect();
   bool isConnected() const { return m_connected; }
 
   // 房间操作
   void createRoom(int mazeWidth, int mazeHeight, bool isDarkMode = false);
-  void joinRoom(const std::string& roomCode);
+  void joinRoom(const std::string &roomCode);
 
   // 发送迷宫数据（房主调用）
-  void sendMazeData(const std::vector<std::string>& mazeData, bool isEscapeMode = false, bool isDarkMode = false);
+  void sendMazeData(const std::vector<std::string> &mazeData, bool isEscapeMode = false, bool isDarkMode = false);
 
   // 发送游戏数据
-  void sendPosition(const PlayerState& state);
+  void sendPosition(const PlayerState &state);
   void sendShoot(float x, float y, float angle);
   void sendReachExit();
-  void sendGameResult(bool localWin);  // 发送游戏结果
-  void sendRestartRequest();           // 发送重新开始请求
-  
+  void sendGameResult(bool localWin); // 发送游戏结果
+  void sendRestartRequest();          // 发送重新开始请求
+
   // NPC同步
-  void sendNpcActivate(int npcId, int team, int activatorId = -1);  // 发送NPC激活
-  void sendNpcUpdate(const NpcState& state);  // 发送NPC状态更新
-  void sendNpcShoot(int npcId, float x, float y, float angle);  // 发送NPC射击
-  void sendNpcDamage(int npcId, float damage);  // 发送NPC受伤
-  void sendClimaxStart();  // 发送开始播放高潮BGM
-  
+  void sendNpcActivate(int npcId, int team, int activatorId = -1); // 发送NPC激活
+  void sendNpcUpdate(const NpcState &state);                       // 发送NPC状态更新
+  void sendNpcShoot(int npcId, float x, float y, float angle);     // 发送NPC射击
+  void sendNpcDamage(int npcId, float damage);                     // 发送NPC受伤
+  void sendClimaxStart();                                          // 发送开始播放高潮BGM
+
   // 墙壁放置同步
-  void sendWallPlace(float x, float y);  // 发送墙壁放置
-  void sendWallDamage(int row, int col, float damage, bool destroyed, int attribute, int destroyerId);  // 发送墙壁伤害，destroyerId: 0=房主, 1=非房主
-  
+  void sendWallPlace(float x, float y);                                                                // 发送墙壁放置
+  void sendWallDamage(int row, int col, float damage, bool destroyed, int attribute, int destroyerId); // 发送墙壁伤害，destroyerId: 0=房主, 1=非房主
+
   // 救援同步
-  void sendRescueStart();    // 开始救援
-  void sendRescueProgress(float progress);  // 救援进度
-  void sendRescueComplete(); // 救援完成
-  void sendRescueCancel();   // 取消救援
-  
+  void sendRescueStart();                  // 开始救援
+  void sendRescueProgress(float progress); // 救援进度
+  void sendRescueComplete();               // 救援完成
+  void sendRescueCancel();                 // 取消救援
+
   // 房间大厅
-  void sendPlayerReady(bool isReady);  // 发送准备状态
-  void sendHostStartGame();            // 房主发起开始游戏
+  void sendPlayerReady(bool isReady); // 发送准备状态
+  void sendHostStartGame();           // 房主发起开始游戏
 
   // 处理网络消息（在主线程调用）
   void update();
@@ -203,9 +203,9 @@ private:
   NetworkManager() = default;
   ~NetworkManager() { disconnect(); }
 
-  void sendPacket(const std::vector<uint8_t>& data);
+  void sendPacket(const std::vector<uint8_t> &data);
   void receiveData();
-  void processMessage(const std::vector<uint8_t>& data);
+  void processMessage(const std::vector<uint8_t> &data);
 
   sf::TcpSocket m_socket;
   bool m_connected = false;

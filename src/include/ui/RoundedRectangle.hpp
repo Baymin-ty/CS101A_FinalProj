@@ -47,7 +47,7 @@ public:
     update();
   }
 
-  void setRoundedCorners(const std::array<bool, 4>& corners)
+  void setRoundedCorners(const std::array<bool, 4> &corners)
   {
     m_roundedCorners = corners;
     update();
@@ -78,13 +78,13 @@ public:
   sf::Vector2f getPoint(std::size_t index) const override
   {
     float radius = std::min(m_radius, std::min(m_size.x / 2.f, m_size.y / 2.f));
-    
+
     // 计算点属于哪个角，以及在该角中的位置
     std::size_t currentIndex = 0;
     for (int corner = 0; corner < 4; ++corner)
     {
       std::size_t pointsInCorner = m_roundedCorners[corner] ? m_cornerPoints : 1;
-      
+
       if (index < currentIndex + pointsInCorner)
       {
         std::size_t pointInCorner = index - currentIndex;
@@ -92,7 +92,7 @@ public:
       }
       currentIndex += pointsInCorner;
     }
-    
+
     return {0, 0};
   }
 
@@ -101,27 +101,31 @@ private:
   {
     // 四个角的位置
     // 0: 左上, 1: 右上, 2: 右下, 3: 左下
-    
+
     if (!m_roundedCorners[corner])
     {
       // 直角 - 返回角落点
       switch (corner)
       {
-      case 0: return {0, 0};
-      case 1: return {m_size.x, 0};
-      case 2: return {m_size.x, m_size.y};
-      case 3: return {0, m_size.y};
+      case 0:
+        return {0, 0};
+      case 1:
+        return {m_size.x, 0};
+      case 2:
+        return {m_size.x, m_size.y};
+      case 3:
+        return {0, m_size.y};
       }
       return {0, 0};
     }
-    
+
     // 圆角 - 计算圆弧上的点
     float angleStep = (m_cornerPoints > 1) ? (90.f / (m_cornerPoints - 1)) : 0;
     float localAngle = pointInCorner * angleStep;
-    
+
     sf::Vector2f center;
     float startAngle;
-    
+
     switch (corner)
     {
     case 0: // 左上角
@@ -144,7 +148,7 @@ private:
       center = {0, 0};
       startAngle = 0;
     }
-    
+
     float angle = (startAngle + localAngle) * 3.14159265f / 180.f;
     return {center.x + radius * std::cos(angle), center.y + radius * std::sin(angle)};
   }
