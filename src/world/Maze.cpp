@@ -789,7 +789,7 @@ int Maze::checkBulletPath(sf::Vector2f start, sf::Vector2f target) const
   direction /= distance;
 
   // 步进大小（小于格子大小的一半，确保不会跳过墙壁）
-  const float stepSize = m_tileSize * 0.3f;
+  const float stepSize = m_tileSize * 0.05f;
   int steps = static_cast<int>(distance / stepSize) + 1;
 
   int result = 0; // 默认无阻挡
