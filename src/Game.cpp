@@ -91,8 +91,9 @@ bool Game::init()
     return false;
   }
 
-  // 初始化音频系统
-  if (!AudioManager::getInstance().init("music_assets/"))
+  // 初始化音频系统（使用资源路径）
+  std::string resourcePath = getResourcePath();
+  if (!AudioManager::getInstance().init(resourcePath + "music_assets/"))
   {
     std::cerr << "Warning: Failed to initialize audio system" << std::endl;
     // 音频初始化失败不阻止游戏运行
@@ -137,8 +138,9 @@ void Game::startGame()
   m_player = std::make_unique<Tank>();
 
   // 加载玩家坦克纹理
-  m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                         "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+  std::string resPath = getResourcePath();
+  m_player->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                         resPath + "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
 
   // 设置玩家到起点
   m_player->setPosition(m_maze.getStartPosition());
@@ -164,11 +166,12 @@ void Game::spawnEnemies()
   m_enemies.clear();
   const auto &spawnPoints = m_maze.getEnemySpawnPoints();
 
+  std::string resPath = getResourcePath();
   for (const auto &pos : spawnPoints)
   {
     auto enemy = std::make_unique<Enemy>();
-    if (enemy->loadTextures("tank_assets/PNG/Hulls_Color_D/Hull_01.png",
-                            "tank_assets/PNG/Weapon_Color_D/Gun_01.png"))
+    if (enemy->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_D/Hull_01.png",
+                            resPath + "tank_assets/PNG/Weapon_Color_D/Gun_01.png"))
     {
       enemy->setPosition(pos);
       enemy->setBounds(m_maze.getSize());
@@ -224,16 +227,17 @@ void Game::restartMultiplayer()
   sf::Vector2f startPos = m_maze.getPlayerStartPosition();
 
   // 重新创建本地玩家
+  std::string resPath = getResourcePath();
   m_player = std::make_unique<Tank>();
-  m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                         "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+  m_player->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                         resPath + "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
   m_player->setPosition(startPos);
   m_player->setScale(m_tankScale);
 
   // 重新创建其他玩家
   m_otherPlayer = std::make_unique<Tank>();
-  m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
-                              "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+  m_otherPlayer->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_B/Hull_01.png",
+                              resPath + "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
   m_otherPlayer->setPosition(startPos);
   m_otherPlayer->setScale(m_tankScale);
 
@@ -1952,17 +1956,18 @@ void Game::setupNetworkCallbacks()
     m_mpState.rescueProgress = 0.f;
     
     // 创建本地玩家并加载贴图
+    std::string resPath = getResourcePath();
     m_player = std::make_unique<Tank>();
-    m_player->loadTextures("tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                           "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
+    m_player->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_A/Hull_01.png",
+                           resPath + "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
     m_player->setPosition(mySpawn);
     m_player->setScale(m_tankScale);
     m_player->setCoins(10);  // 初始10个金币
     
     // 设置第二个玩家（另一个客户端）- 使用不同颜色贴图
     m_otherPlayer = std::make_unique<Tank>();
-    m_otherPlayer->loadTextures("tank_assets/PNG/Hulls_Color_B/Hull_01.png",
-                                "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
+    m_otherPlayer->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_B/Hull_01.png",
+                                resPath + "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
     m_otherPlayer->setPosition(otherSpawn);
     m_otherPlayer->setScale(m_tankScale);
     

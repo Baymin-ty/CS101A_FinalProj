@@ -1,5 +1,6 @@
 #include "Enemy.hpp"
 #include "Maze.hpp"
+#include "Utils.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
@@ -38,9 +39,10 @@ bool Enemy::loadTextures(const std::string &hullPath, const std::string &turretP
 bool Enemy::loadActivatedTextures()
 {
   // 加载激活状态的贴图（Color_C）
-  if (!m_hullTexture.loadFromFile("tank_assets/PNG/Hulls_Color_C/Hull_01.png"))
+  std::string resPath = getResourcePath();
+  if (!m_hullTexture.loadFromFile(resPath + "tank_assets/PNG/Hulls_Color_C/Hull_01.png"))
     return false;
-  if (!m_turretTexture.loadFromFile("tank_assets/PNG/Weapon_Color_C/Gun_01.png"))
+  if (!m_turretTexture.loadFromFile(resPath + "tank_assets/PNG/Weapon_Color_C/Gun_01.png"))
     return false;
 
   // 保存当前位置和旋转

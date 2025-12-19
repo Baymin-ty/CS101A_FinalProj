@@ -2,9 +2,38 @@
 
 #include <SFML/Graphics.hpp>
 #include <cmath>
+#include <string>
+
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 // 全局常量
 constexpr float TILE_SIZE = 60.f;
+
+// 获取资源路径（macOS app bundle 支持）
+inline std::string getResourcePath()
+{
+#ifdef __APPLE__
+  CFBundleRef mainBundle = CFBundleGetMainBundle();
+  if (mainBundle)
+  {
+    CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(mainBundle);
+    if (resourcesURL)
+    {
+      char path[PATH_MAX];
+      if (CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8*)path, PATH_MAX))
+      {
+        CFRelease(resourcesURL);
+        return std::string(path) + "/";
+      }
+      CFRelease(resourcesURL);
+    }
+  }
+#endif
+  // 非 macOS 或获取失败时使用当前目录
+  return "";
+}
 
 // 游戏颜色常量
 namespace GameColors
