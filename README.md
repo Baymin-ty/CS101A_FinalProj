@@ -315,6 +315,37 @@ AI tanks feature multiple behavior modes:
 - **Spatial Sound Effects**: Combat sounds are positioned in 3D space
 - **Audio Feedback**: Distinct sounds for different wall types, hits, and actions
 
+### 🗺️ Minimap & Dark Mode: Two Ways to Play
+
+The game offers two distinct visual modes that fundamentally change the gameplay experience:
+
+#### **Normal Mode with Minimap**
+In standard mode, players have access to a **real-time minimap** showing the entire maze layout. This transforms the game into a **strategic experience** where you can:
+- Plan optimal routes to the exit
+- Track enemy positions and movements  
+- Coordinate with teammates in multiplayer
+- Make informed decisions about which paths to take
+
+The minimap empowers players to think tactically, weighing risk vs. reward when choosing between shorter dangerous routes or longer safe paths.
+
+#### **Dark Mode: Pure Tension**
+Toggle Dark Mode for an entirely different experience. With **limited visibility** and **no minimap**, every corner becomes a potential ambush. The darkness creates:
+- **Heart-pounding exploration** - You never know what's around the next turn
+- **Heightened audio awareness** - Sound cues become your primary navigation tool
+- **True survival horror atmosphere** - Every enemy encounter is a genuine surprise
+
+#### **🎵 The Climax Mystery**
+Here's where it gets *really* intense: when **any player** approaches the maze exit, the background music dynamically shifts to an **adrenaline-pumping climax track**. 
+
+In normal mode, you can check the minimap to see who's close to winning. But in **Dark Mode Battle**? You hear the music change... but you have **no idea** if it's you or your opponent about to claim victory! 
+
+This creates an incredible psychological tension:
+- *"Is that me triggering the climax music, or are they about to win?"*
+- *"Should I rush to the exit or hunt down my opponent first?"*
+- *"They might be one step away from victory and I can't even see them!"*
+
+The combination of audio-driven suspense and visual uncertainty makes Dark Mode Battle the ultimate test of nerves and skill.
+
 ---
 
 ## 🚀 Running the Multiplayer Server
