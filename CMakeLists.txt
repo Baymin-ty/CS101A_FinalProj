@@ -43,35 +43,47 @@ FetchContent_MakeAvailable(sfml)
 # 源文件和头文件
 # ------------------------------------------------------------------------------
 set(SOURCES
-  src/main.cpp
-  src/Game.cpp
-  src/Tank.cpp
-  src/Bullet.cpp
-  src/HealthBar.cpp
-  src/Enemy.cpp
-  src/Maze.cpp
-  src/MazeGenerator.cpp
-  src/NetworkManager.cpp
-  src/CollisionSystem.cpp
-  src/MultiplayerHandler.cpp
-  src/AudioManager.cpp
+  # Core
+  src/core/main.cpp
+  src/core/Game.cpp
+  # Entities
+  src/entities/Tank.cpp
+  src/entities/Bullet.cpp
+  src/entities/HealthBar.cpp
+  src/entities/Enemy.cpp
+  # World
+  src/world/Maze.cpp
+  src/world/MazeGenerator.cpp
+  # Systems
+  src/systems/CollisionSystem.cpp
+  src/systems/AudioManager.cpp
+  # Network
+  src/network/NetworkManager.cpp
+  src/network/MultiplayerHandler.cpp
 )
 
 set(HEADERS
-  src/include/Utils.hpp
-  src/include/Game.hpp
-  src/include/Tank.hpp
-  src/include/Bullet.hpp
-  src/include/HealthBar.hpp
-  src/include/Enemy.hpp
-  src/include/Maze.hpp
-  src/include/MazeGenerator.hpp
-  src/include/NetworkManager.hpp
-  src/include/CollisionSystem.hpp
-  src/include/UIHelper.hpp
-  src/include/MultiplayerHandler.hpp
-  src/include/AudioManager.hpp
-  src/include/RoundedRectangle.hpp
+  # Core
+  src/include/core/Game.hpp
+  # Entities
+  src/include/entities/Tank.hpp
+  src/include/entities/Bullet.hpp
+  src/include/entities/HealthBar.hpp
+  src/include/entities/Enemy.hpp
+  # World
+  src/include/world/Maze.hpp
+  src/include/world/MazeGenerator.hpp
+  # Systems
+  src/include/systems/CollisionSystem.hpp
+  src/include/systems/AudioManager.hpp
+  # Network
+  src/include/network/NetworkManager.hpp
+  src/include/network/MultiplayerHandler.hpp
+  # UI
+  src/include/ui/UIHelper.hpp
+  src/include/ui/RoundedRectangle.hpp
+  # Utils
+  src/include/utils/Utils.hpp
 )
 
 # ------------------------------------------------------------------------------
@@ -82,6 +94,13 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/include
+  ${CMAKE_SOURCE_DIR}/src/include/core
+  ${CMAKE_SOURCE_DIR}/src/include/entities
+  ${CMAKE_SOURCE_DIR}/src/include/world
+  ${CMAKE_SOURCE_DIR}/src/include/systems
+  ${CMAKE_SOURCE_DIR}/src/include/network
+  ${CMAKE_SOURCE_DIR}/src/include/ui
+  ${CMAKE_SOURCE_DIR}/src/include/utils
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

@@ -1,5 +1,5 @@
-#include "include/CollisionSystem.hpp"
-#include "include/AudioManager.hpp"
+#include "CollisionSystem.hpp"
+#include "AudioManager.hpp"
 #include <cmath>
 #include <algorithm>
 

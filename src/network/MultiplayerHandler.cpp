@@ -1,8 +1,8 @@
-#include "include/MultiplayerHandler.hpp"
-#include "include/UIHelper.hpp"
-#include "include/CollisionSystem.hpp"
-#include "include/Utils.hpp"
-#include "include/AudioManager.hpp"
+#include "MultiplayerHandler.hpp"
+#include "UIHelper.hpp"
+#include "CollisionSystem.hpp"
+#include "Utils.hpp"
+#include "AudioManager.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>

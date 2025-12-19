@@ -1,7 +1,7 @@
 #include "Game.hpp"
-#include "include/CollisionSystem.hpp"
-#include "include/UIHelper.hpp"
-#include "include/MultiplayerHandler.hpp"
+#include "CollisionSystem.hpp"
+#include "UIHelper.hpp"
+#include "MultiplayerHandler.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
