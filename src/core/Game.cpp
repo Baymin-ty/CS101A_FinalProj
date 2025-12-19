@@ -811,7 +811,8 @@ void Game::processEvents()
 
               // 房主默认准备
               m_mpState.localPlayerReady = true;
-              // 对方准备状态由服务器同步
+              // 对方还未返回房间，默认为 NOT READY，等待服务器同步正确状态
+              m_mpState.otherPlayerReady = false;
             }
             else
             {
@@ -819,6 +820,8 @@ void Game::processEvents()
               NetworkManager::getInstance().sendRestartRequest();
               // 非房主返回时默认为 NOT READY
               m_mpState.localPlayerReady = false;
+              // 房主还未返回房间，默认为 NOT READY，等待服务器同步正确状态
+              m_mpState.otherPlayerReady = false;
             }
 
             // 进入房间大厅

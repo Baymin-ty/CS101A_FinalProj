@@ -309,6 +309,12 @@ function handleMessage(socket, data) {
 
       room.started = true;
 
+      // 游戏开始后重置所有玩家的 ready 状态
+      // 这样返回房间时需要重新准备
+      for (const player of room.players) {
+        player.ready = false;
+      }
+
       // 发送游戏开始消息给两个玩家
       const gameStartMsg = Buffer.alloc(1);
       gameStartMsg[0] = MessageType.GameStart;
@@ -397,13 +403,18 @@ function handleMessage(socket, data) {
       // 重置房间状态，准备下一轮
       room.started = false;
       
-      // 重置所有非房主玩家的 ready 状态
-      // 无论是谁返回房间，非房主都需要重新手动 ready
+      // 找到发送请求的玩家
+      const sender = room.players.find(p => p.socket === socket);
+      
+      // 重置 reachedExit 状态，并根据发送者身份设置 ready 状态
       for (const player of room.players) {
         player.reachedExit = false;
-        if (!player.isHost) {
-          player.ready = false;
+        
+        if (player.socket === socket) {
+          // 发送者返回房间：房主自动 ready，非房主保持 not ready
+          player.ready = player.isHost;
         }
+        // 其他玩家的 ready 状态保持不变（可能已经先返回并准备好了）
       }
 
       // 转发重新开始请求给其他玩家
@@ -411,7 +422,7 @@ function handleMessage(socket, data) {
 
       // 发送更新后的房间信息
       sendRoomInfo(room);
-      console.log(`Restart request in room ${roomCode}`);
+      console.log(`Restart request in room ${roomCode} from ${sender?.isHost ? 'host' : 'guest'}`);
       break;
     }
 
