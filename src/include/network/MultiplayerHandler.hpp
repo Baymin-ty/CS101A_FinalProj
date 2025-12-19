@@ -37,6 +37,12 @@ struct MultiplayerState
   bool fKeyHeld = false;          // F键是否按下
   bool canRescue = false;         // 是否在救援范围内
   
+  // 终点交互相关（按住E键3秒才能判定到达）
+  bool isAtExitZone = false;      // 是否在终点区域内
+  bool isHoldingExit = false;     // 是否正在按住E键
+  float exitHoldProgress = 0.f;   // 按住E键的进度 (0-3s)
+  bool eKeyHeld = false;          // E键是否按下
+  
   // 房间大厅相关
   bool localPlayerReady = false;  // 本地玩家是否准备就绪
   bool otherPlayerReady = false;  // 对方玩家是否准备就绪

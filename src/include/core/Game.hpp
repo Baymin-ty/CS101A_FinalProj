@@ -183,6 +183,12 @@ private:
   bool m_gameOver = false;
   bool m_gameWon = false;
   
+  // 单人模式终点交互相关（按住E键3秒才能判定到达）
+  bool m_isAtExitZone = false;      // 是否在终点区域内
+  bool m_isHoldingExit = false;     // 是否正在按住E键
+  float m_exitHoldProgress = 0.f;   // 按住E键的进度 (0-3s)
+  bool m_eKeyHeld = false;          // E键是否按下
+  
   // 音频相关
   bool m_exitVisible = false;  // 终点是否在视野内
 

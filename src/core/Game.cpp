@@ -210,6 +210,18 @@ void Game::resetGame()
   m_mpState.rescueProgress = 0.f;
   m_mpState.fKeyHeld = false;
   m_mpState.canRescue = false;
+  
+  // 重置终点交互状态（多人模式）
+  m_mpState.isAtExitZone = false;
+  m_mpState.isHoldingExit = false;
+  m_mpState.exitHoldProgress = 0.f;
+  m_mpState.eKeyHeld = false;
+  
+  // 重置终点交互状态（单人模式）
+  m_isAtExitZone = false;
+  m_isHoldingExit = false;
+  m_exitHoldProgress = 0.f;
+  m_eKeyHeld = false;
 
   // 断开网络连接
   NetworkManager::getInstance().disconnect();
@@ -252,6 +264,11 @@ void Game::restartMultiplayer()
   m_mpState.rescueProgress = 0.f;
   m_mpState.fKeyHeld = false;
   m_mpState.canRescue = false;
+  // 重置终点交互状态
+  m_mpState.isAtExitZone = false;
+  m_mpState.isHoldingExit = false;
+  m_mpState.exitHoldProgress = 0.f;
+  m_mpState.eKeyHeld = false;
   m_gameOver = false;
   m_gameWon = false;
   m_exitVisible = false; // 重置终点可见状态
@@ -683,6 +700,19 @@ void Game::processEvents()
             m_placementMode = false;
           }
         }
+        else if (keyPressed->code == sf::Keyboard::Key::E)
+        {
+          // E键按下，确认终点
+          m_eKeyHeld = true;
+        }
+      }
+      // E键释放
+      if (const auto *keyReleased = event->getIf<sf::Event::KeyReleased>())
+      {
+        if (keyReleased->code == sf::Keyboard::Key::E)
+        {
+          m_eKeyHeld = false;
+        }
       }
       // 处理鼠标点击放置墙壁
       if (m_placementMode && m_player && m_player->getWallsInBag() > 0)
@@ -875,6 +905,11 @@ void Game::processEvents()
         {
           m_mpState.fKeyHeld = true;
         }
+        // E键确认到达终点
+        if (keyPressed->code == sf::Keyboard::Key::E)
+        {
+          m_mpState.eKeyHeld = true;
+        }
         // 空格键切换放置模式
         if (keyPressed->code == sf::Keyboard::Key::Space)
         {
@@ -889,11 +924,16 @@ void Game::processEvents()
         }
       }
       // F键释放停止救援（Escape 模式）
+      // E键释放停止确认终点
       if (const auto *keyReleased = event->getIf<sf::Event::KeyReleased>())
       {
         if (keyReleased->code == sf::Keyboard::Key::F)
         {
           m_mpState.fKeyHeld = false;
+        }
+        if (keyReleased->code == sf::Keyboard::Key::E)
+        {
+          m_mpState.eKeyHeld = false;
         }
       }
       // 处理鼠标点击放置墙壁
@@ -1022,12 +1062,56 @@ void Game::update(float dt)
     }
   }
 
-  // 检查是否到达出口
-  if (m_maze.isAtExit(m_player->getPosition(), m_player->getCollisionRadius()))
+  // E键状态已通过事件驱动在 processEvents 中设置
+
+  // 检查是否到达出口（需要按住E键3秒）
+  const float EXIT_HOLD_TIME = 3.0f;
+  bool atExit = m_maze.isAtExit(m_player->getPosition(), m_player->getCollisionRadius());
+  
+  if (atExit)
   {
-    m_gameWon = true;
-    m_gameOver = true;
-    m_gameState = GameState::Victory;
+    m_isAtExitZone = true;
+    
+    if (m_eKeyHeld)
+    {
+      // 正在按住E键
+      if (!m_isHoldingExit)
+      {
+        m_isHoldingExit = true;
+        m_exitHoldProgress = 0.f;
+      }
+      
+      m_exitHoldProgress += dt;
+      
+      // 完成确认
+      if (m_exitHoldProgress >= EXIT_HOLD_TIME)
+      {
+        m_gameWon = true;
+        m_gameOver = true;
+        m_gameState = GameState::Victory;
+        m_isHoldingExit = false;
+        m_exitHoldProgress = 0.f;
+      }
+    }
+    else
+    {
+      // 松开E键，取消进度
+      if (m_isHoldingExit)
+      {
+        m_isHoldingExit = false;
+        m_exitHoldProgress = 0.f;
+      }
+    }
+  }
+  else
+  {
+    // 离开终点区域，重置状态
+    if (m_isAtExitZone)
+    {
+      m_isAtExitZone = false;
+      m_isHoldingExit = false;
+      m_exitHoldProgress = 0.f;
+    }
   }
 
   // 更新视角
@@ -1580,6 +1664,51 @@ void Game::renderGame()
       renderDarkModeOverlay();
     else
       renderMinimap();
+  }
+
+  // 渲染终点交互提示和进度（单人模式，在终点区域内时）
+  if (!m_isMultiplayer && m_isAtExitZone && m_player && !m_gameOver)
+  {
+    sf::Vector2f exitPos = m_maze.getExitPosition();
+    
+    if (m_isHoldingExit)
+    {
+      // 显示确认进度条
+      const float EXIT_HOLD_TIME = 3.0f;
+      float progress = m_exitHoldProgress / EXIT_HOLD_TIME;
+      
+      // 进度条背景
+      sf::RectangleShape bgBar({80.f, 10.f});
+      bgBar.setFillColor(sf::Color(50, 50, 50, 200));
+      bgBar.setPosition({exitPos.x - 40.f, exitPos.y - 60.f});
+      m_window.draw(bgBar);
+      
+      // 进度条
+      sf::RectangleShape progressBar({80.f * progress, 10.f});
+      progressBar.setFillColor(sf::Color(50, 200, 255, 255));
+      progressBar.setPosition({exitPos.x - 40.f, exitPos.y - 60.f});
+      m_window.draw(progressBar);
+      
+      // 显示确认中文字
+      sf::Text confirmText(m_font);
+      confirmText.setString("Exiting...");
+      confirmText.setCharacterSize(16);
+      confirmText.setFillColor(sf::Color::Cyan);
+      sf::FloatRect bounds = confirmText.getLocalBounds();
+      confirmText.setPosition({exitPos.x - bounds.size.x / 2.f, exitPos.y - 85.f});
+      m_window.draw(confirmText);
+    }
+    else
+    {
+      // 显示按 E 确认提示
+      sf::Text exitHint(m_font);
+      exitHint.setString("Hold E to exit");
+      exitHint.setCharacterSize(16);
+      exitHint.setFillColor(sf::Color::Cyan);
+      sf::FloatRect bounds = exitHint.getLocalBounds();
+      exitHint.setPosition({exitPos.x - bounds.size.x / 2.f, exitPos.y - 60.f});
+      m_window.draw(exitHint);
+    }
   }
 
   // 切换到 UI 视图绘制 UI
