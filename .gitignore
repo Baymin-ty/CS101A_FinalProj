@@ -3,7 +3,6 @@
 
 # Build
 Build/
-Build_Release/
 
 # macOS system files
 .DS_Store
