@@ -2086,6 +2086,14 @@ void Game::setupNetworkCallbacks()
     m_mpState.isRescuing = false;
     m_mpState.beingRescued = false;
     m_mpState.rescueProgress = 0.f;
+    m_mpState.fKeyHeld = false;
+    m_mpState.canRescue = false;
+    
+    // 重置终点交互状态
+    m_mpState.isAtExitZone = false;
+    m_mpState.isHoldingExit = false;
+    m_mpState.exitHoldProgress = 0.f;
+    m_mpState.eKeyHeld = false;
     
     // 创建本地玩家并加载贴图
     std::string resPath = getResourcePath();
