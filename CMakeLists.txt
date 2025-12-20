@@ -91,6 +91,7 @@ set(HEADERS
 # ------------------------------------------------------------------------------
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/include
@@ -109,9 +110,22 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   SFML::Audio
 )
 
+
 # macOS: 链接 CoreFoundation 框架（用于获取 bundle 路径）
 if(APPLE)
   target_link_libraries(${PROJECT_NAME} PRIVATE "-framework CoreFoundation")
+endif()
+
+# ------------------------------------------------------------------------------
+# Windows: 在 Release 配置下隐藏控制台窗口（MSVC -> /SUBSYSTEM:WINDOWS, MinGW/GCC -> -mwindows）
+# 这不会修改源代码，只改变链接子系统（Debug 保持有控制台便于调试）
+# ------------------------------------------------------------------------------
+if(MSVC)
+  target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>)
+  # 保持使用标准 main() 作为入口点，避免需要 WinMain
+  target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/ENTRY:mainCRTStartup>)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-mwindows>)
 endif()
 
 # ------------------------------------------------------------------------------
@@ -154,13 +168,21 @@ if(APPLE)
 elseif(WIN32)
   # Windows: 需要 .ico 文件和资源文件
   set(APP_ICON_ICO "${CMAKE_SOURCE_DIR}/resources/windows/icon.ico")
-  set(APP_RC_FILE "${CMAKE_SOURCE_DIR}/resources/windows/app.rc")
-  
-  # 检查是否存在 ico 文件，如果不存在则提示用户转换
-  if(NOT EXISTS ${APP_ICON_ICO})
-    message(WARNING "Windows icon file not found: ${APP_ICON_ICO}")
-    message(WARNING "Please convert tank_assets/icon.png to resources/windows/icon.ico")
-    message(WARNING "You can use online tools or ImageMagick: convert icon.png icon.ico")
+
+  # 生成一个包含绝对路径的 RC 文件到构建目录，以确保资源编译器能找到 ico
+  set(APP_RC_IN "${CMAKE_SOURCE_DIR}/resources/windows/app.rc.in")
+  set(APP_RC_FILE "${CMAKE_BINARY_DIR}/app_generated.rc")
+
+  if(EXISTS ${APP_ICON_ICO} AND EXISTS ${APP_RC_IN})
+    configure_file(${APP_RC_IN} ${APP_RC_FILE} @ONLY)
+  else()
+    if(NOT EXISTS ${APP_ICON_ICO})
+      message(WARNING "Windows icon file not found: ${APP_ICON_ICO}")
+      message(WARNING "Please convert tank_assets/icon.png to resources/windows/icon.ico")
+    endif()
+    if(NOT EXISTS ${APP_RC_IN})
+      message(WARNING "app.rc.in template not found: ${APP_RC_IN}")
+    endif()
   endif()
 endif()
 
@@ -196,8 +218,8 @@ if(APPLE)
   )
 
 elseif(WIN32)
-  # Windows: 添加资源文件以设置图标
-  if(EXISTS ${APP_ICON_ICO})
+  # Windows: 添加生成的 RC 文件以设置图标（如果存在）
+  if(EXISTS ${APP_RC_FILE})
     target_sources(${PROJECT_NAME} PRIVATE ${APP_RC_FILE})
   endif()
   
