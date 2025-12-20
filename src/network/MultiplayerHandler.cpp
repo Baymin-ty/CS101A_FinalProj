@@ -378,79 +378,136 @@ void MultiplayerHandler::update(
 
   // 检查玩家是否到达终点（只有活着的玩家才能到达终点，需要按住E键3秒）
   const float EXIT_HOLD_TIME = 3.0f;
-  sf::Vector2f exitPos = ctx.maze.getExitPosition();
+  
   if (!state.localPlayerDead)
   {
-    float distToExit = std::hypot(ctx.player->getPosition().x - exitPos.x,
-                                  ctx.player->getPosition().y - exitPos.y);
-
-    if (distToExit < TILE_SIZE)
+    if (state.isEscapeMode)
     {
-      state.isAtExitZone = true;
+      // Escape 模式：单个终点
+      sf::Vector2f exitPos = ctx.maze.getExitPosition();
+      float distToExit = std::hypot(ctx.player->getPosition().x - exitPos.x,
+                                    ctx.player->getPosition().y - exitPos.y);
 
-      if (state.eKeyHeld)
+      if (distToExit < TILE_SIZE)
       {
-        // 正在按住E键
-        if (!state.isHoldingExit)
+        state.isAtExitZone = true;
+
+        if (state.eKeyHeld)
         {
-          state.isHoldingExit = true;
-          state.exitHoldProgress = 0.f;
-          std::cout << "[DEBUG] Started holding E at exit" << std::endl;
-        }
-
-        state.exitHoldProgress += dt;
-
-        // 完成确认
-        if (state.exitHoldProgress >= EXIT_HOLD_TIME && !state.localPlayerReachedExit)
-        {
-          state.localPlayerReachedExit = true;
-          state.isHoldingExit = false;
-          state.exitHoldProgress = 0.f;
-          std::cout << "[DEBUG] Exit confirmed! localPlayerReachedExit = true" << std::endl;
-
-          if (state.isEscapeMode)
+          if (!state.isHoldingExit)
           {
-            // Escape 模式：两个人都到达才算胜利（只由房主判定）
+            state.isHoldingExit = true;
+            state.exitHoldProgress = 0.f;
+          }
+
+          state.exitHoldProgress += dt;
+
+          if (state.exitHoldProgress >= EXIT_HOLD_TIME && !state.localPlayerReachedExit)
+          {
+            state.localPlayerReachedExit = true;
+            state.isHoldingExit = false;
+            state.exitHoldProgress = 0.f;
+            std::cout << "[DEBUG] Escape mode: Exit confirmed!" << std::endl;
+
+            // 检查是否双方都到达（只由房主判定）
             if (state.isHost && state.otherPlayerReachedExit && !state.otherPlayerDead)
             {
               state.multiplayerWin = true;
-              std::cout << "[DEBUG] Escape mode: Both reached exit, sending win" << std::endl;
               net.sendGameResult(true);
               onVictory();
               return;
             }
-            // 非房主或对方还没到达：只标记自己到达了，等待
           }
-          else
+        }
+        else
+        {
+          if (state.isHoldingExit)
           {
-            // Battle 模式：先到达者胜利
-            state.multiplayerWin = true;
-            std::cout << "[DEBUG] Battle mode: Reached exit first, sending win" << std::endl;
-            net.sendGameResult(true);
-            onVictory();
-            return;
+            state.isHoldingExit = false;
+            state.exitHoldProgress = 0.f;
           }
         }
       }
       else
       {
-        // 松开E键，取消进度
-        if (state.isHoldingExit)
+        if (state.isAtExitZone)
         {
+          state.isAtExitZone = false;
           state.isHoldingExit = false;
           state.exitHoldProgress = 0.f;
-          std::cout << "[DEBUG] Exit hold cancelled (E key released)" << std::endl;
         }
       }
     }
     else
     {
-      // 离开终点区域，重置状态
-      if (state.isAtExitZone)
+      // Battle 模式：多个终点
+      const auto& battleExits = ctx.maze.getBattleExitPositions();
+      int exitIndex = ctx.maze.isAtBattleExit(ctx.player->getPosition(), ctx.player->getCollisionRadius());
+      
+      if (exitIndex >= 0 && exitIndex < MultiplayerState::BATTLE_EXIT_COUNT && !state.localExitsActivated[exitIndex])
       {
-        state.isAtExitZone = false;
-        state.isHoldingExit = false;
-        state.exitHoldProgress = 0.f;
+        state.isAtExitZone = true;
+        state.currentExitIndex = exitIndex;
+
+        if (state.eKeyHeld)
+        {
+          if (!state.isHoldingExit)
+          {
+            state.isHoldingExit = true;
+            state.exitHoldProgress = 0.f;
+          }
+
+          state.exitHoldProgress += dt;
+
+          if (state.exitHoldProgress >= EXIT_HOLD_TIME)
+          {
+            state.localExitsActivated[exitIndex] = true;
+            state.isHoldingExit = false;
+            state.exitHoldProgress = 0.f;
+            std::cout << "[DEBUG] Battle mode: Exit " << (exitIndex + 1) << " activated!" << std::endl;
+            
+            // 同步终点激活状态给对方
+            net.sendExitActivated(exitIndex);
+
+            // 检查是否所有终点都已激活
+            bool allActivated = true;
+            for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i)
+            {
+              if (!state.localExitsActivated[i])
+              {
+                allActivated = false;
+                break;
+              }
+            }
+
+            if (allActivated)
+            {
+              state.multiplayerWin = true;
+              std::cout << "[DEBUG] Battle mode: All exits activated, you win!" << std::endl;
+              net.sendGameResult(true);
+              onVictory();
+              return;
+            }
+          }
+        }
+        else
+        {
+          if (state.isHoldingExit)
+          {
+            state.isHoldingExit = false;
+            state.exitHoldProgress = 0.f;
+          }
+        }
+      }
+      else
+      {
+        if (state.isAtExitZone)
+        {
+          state.isAtExitZone = false;
+          state.isHoldingExit = false;
+          state.exitHoldProgress = 0.f;
+          state.currentExitIndex = -1;
+        }
       }
     }
   }
@@ -467,12 +524,12 @@ void MultiplayerHandler::update(
     return;
   }
 
-  // Battle 模式：检查本地玩家是否死亡（这个检查可能是重复的，但为了安全保留）
+  // Battle 模式：检查本地玩家是否死亡
   if (!state.isEscapeMode && ctx.player->isDead() && !state.localPlayerDead)
   {
     state.localPlayerDead = true;
     state.multiplayerWin = false;
-    std::cout << "[DEBUG] Battle mode (second check): Local player died, sending lose" << std::endl;
+    std::cout << "[DEBUG] Battle mode: Local player died, sending lose" << std::endl;
     net.sendGameResult(false);
     onDefeat();
     return;
@@ -804,13 +861,57 @@ void MultiplayerHandler::renderMultiplayer(
   }
 
   // 渲染终点
-  sf::Vector2f exitPos = ctx.maze.getExitPosition();
-  sf::RectangleShape exitMarker({TILE_SIZE * 0.8f, TILE_SIZE * 0.8f});
-  exitMarker.setFillColor(sf::Color(0, 255, 0, 100));
-  exitMarker.setOutlineColor(sf::Color::Green);
-  exitMarker.setOutlineThickness(3.f);
-  exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
-  ctx.window.draw(exitMarker);
+  if (ctx.maze.isBattleMode())
+  {
+    // Battle模式：渲染3个带编号的出口
+    const auto &battleExits = ctx.maze.getBattleExitPositions();
+    for (size_t i = 0; i < battleExits.size(); ++i)
+    {
+      sf::Vector2f exitPos = battleExits[i];
+      sf::RectangleShape exitMarker({TILE_SIZE * 0.8f, TILE_SIZE * 0.8f});
+      
+      // 如果该出口已被本地玩家激活，显示为较亮的绿色
+      bool isActivated = state.localExitsActivated[i];
+      if (isActivated)
+      {
+        exitMarker.setFillColor(sf::Color(0, 255, 0, 200));
+        exitMarker.setOutlineColor(sf::Color(100, 255, 100));
+      }
+      else
+      {
+        exitMarker.setFillColor(sf::Color(0, 255, 0, 100));
+        exitMarker.setOutlineColor(sf::Color::Green);
+      }
+      exitMarker.setOutlineThickness(3.f);
+      exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
+      ctx.window.draw(exitMarker);
+      
+      // 绘制出口编号 (1, 2, 3)
+      sf::Text exitNumber(ctx.font);
+      exitNumber.setString(std::to_string(i + 1));
+      exitNumber.setCharacterSize(static_cast<unsigned int>(TILE_SIZE * 0.5f));
+      exitNumber.setFillColor(sf::Color::White);
+      exitNumber.setOutlineColor(sf::Color::Black);
+      exitNumber.setOutlineThickness(2.f);
+      sf::FloatRect textBounds = exitNumber.getLocalBounds();
+      exitNumber.setPosition({
+        exitPos.x - textBounds.size.x / 2.f - textBounds.position.x,
+        exitPos.y - textBounds.size.y / 2.f - textBounds.position.y
+      });
+      ctx.window.draw(exitNumber);
+    }
+  }
+  else
+  {
+    // Escape模式：渲染单个出口
+    sf::Vector2f exitPos = ctx.maze.getExitPosition();
+    sf::RectangleShape exitMarker({TILE_SIZE * 0.8f, TILE_SIZE * 0.8f});
+    exitMarker.setFillColor(sf::Color(0, 255, 0, 100));
+    exitMarker.setOutlineColor(sf::Color::Green);
+    exitMarker.setOutlineThickness(3.f);
+    exitMarker.setPosition({exitPos.x - TILE_SIZE * 0.4f, exitPos.y - TILE_SIZE * 0.4f});
+    ctx.window.draw(exitMarker);
+  }
 
   // 渲染NPC
   renderNpcs(ctx, state);
@@ -945,11 +1046,37 @@ void MultiplayerHandler::renderMultiplayer(
   }
 
   // 渲染终点交互提示和进度（在终点区域内时，且游戏未结束）
-  // Battle模式下对方先到达终点时游戏已结束，不再显示提示
-  bool gameEnded = (!state.isEscapeMode && state.otherPlayerReachedExit);
-  if (state.isAtExitZone && !state.localPlayerDead && !state.localPlayerReachedExit && !gameEnded)
+  // Battle模式下对方先激活全部出口时游戏已结束，不再显示提示
+  bool allOtherExitsActivated = true;
+  for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i) {
+    if (!state.otherExitsActivated[i]) {
+      allOtherExitsActivated = false;
+      break;
+    }
+  }
+  bool gameEnded = (!state.isEscapeMode && allOtherExitsActivated);
+  
+  // Battle模式下检查当前出口是否已激活
+  bool currentExitActivated = (!state.isEscapeMode && state.currentExitIndex >= 0 && 
+                               state.currentExitIndex < MultiplayerState::BATTLE_EXIT_COUNT &&
+                               state.localExitsActivated[state.currentExitIndex]);
+  
+  if (state.isAtExitZone && !state.localPlayerDead && !state.localPlayerReachedExit && !gameEnded && !currentExitActivated)
   {
-    sf::Vector2f exitPos = ctx.maze.getExitPosition();
+    // 获取当前出口位置
+    sf::Vector2f exitPos;
+    if (ctx.maze.isBattleMode() && state.currentExitIndex >= 0)
+    {
+      const auto &battleExits = ctx.maze.getBattleExitPositions();
+      if (state.currentExitIndex < static_cast<int>(battleExits.size()))
+      {
+        exitPos = battleExits[state.currentExitIndex];
+      }
+    }
+    else
+    {
+      exitPos = ctx.maze.getExitPosition();
+    }
 
     if (state.isHoldingExit)
     {
@@ -971,7 +1098,14 @@ void MultiplayerHandler::renderMultiplayer(
 
       // 显示确认中文字
       sf::Text confirmText(ctx.font);
-      confirmText.setString("Exiting...");
+      if (ctx.maze.isBattleMode())
+      {
+        confirmText.setString("Activating Exit " + std::to_string(state.currentExitIndex + 1) + "...");
+      }
+      else
+      {
+        confirmText.setString("Exiting...");
+      }
       confirmText.setCharacterSize(16);
       confirmText.setFillColor(sf::Color::Cyan);
       sf::FloatRect bounds = confirmText.getLocalBounds();
@@ -982,7 +1116,14 @@ void MultiplayerHandler::renderMultiplayer(
     {
       // 显示按 E 确认提示
       sf::Text exitHint(ctx.font);
-      exitHint.setString("Hold E to exit");
+      if (ctx.maze.isBattleMode())
+      {
+        exitHint.setString("Hold E (Exit " + std::to_string(state.currentExitIndex + 1) + ")");
+      }
+      else
+      {
+        exitHint.setString("Hold E to exit");
+      }
       exitHint.setCharacterSize(16);
       exitHint.setFillColor(sf::Color::Cyan);
       sf::FloatRect bounds = exitHint.getLocalBounds();
@@ -1178,10 +1319,68 @@ void MultiplayerHandler::renderUI(
     coinsText.setFillColor(sf::Color::Yellow);
     coinsText.setPosition({barX, barY + 60.f});
     ctx.window.draw(coinsText);
+    
+    // Battle 模式：出口激活状态显示
+    float exitStatusY = barY + 90.f;
+    
+    // 本地玩家出口状态
+    sf::Text youExitLabel(ctx.font);
+    youExitLabel.setString("You Exits: ");
+    youExitLabel.setCharacterSize(16);
+    youExitLabel.setFillColor(sf::Color::White);
+    youExitLabel.setPosition({barX, exitStatusY});
+    ctx.window.draw(youExitLabel);
+    
+    float exitIndicatorX = barX + 85.f;
+    for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i)
+    {
+      // 绘制出口编号
+      sf::Text exitNum(ctx.font);
+      exitNum.setString(std::to_string(i + 1));
+      exitNum.setCharacterSize(16);
+      
+      if (state.localExitsActivated[i])
+      {
+        exitNum.setFillColor(sf::Color::Green);
+      }
+      else
+      {
+        exitNum.setFillColor(sf::Color(100, 100, 100));
+      }
+      exitNum.setPosition({exitIndicatorX + i * 25.f, exitStatusY});
+      ctx.window.draw(exitNum);
+    }
+    
+    // 对手玩家出口状态
+    float opponentExitY = exitStatusY + 22.f;
+    sf::Text opponentExitLabel(ctx.font);
+    opponentExitLabel.setString("Enemy Exits: ");
+    opponentExitLabel.setCharacterSize(16);
+    opponentExitLabel.setFillColor(sf::Color::White);
+    opponentExitLabel.setPosition({barX, opponentExitY});
+    ctx.window.draw(opponentExitLabel);
+    
+    for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i)
+    {
+      sf::Text exitNum(ctx.font);
+      exitNum.setString(std::to_string(i + 1));
+      exitNum.setCharacterSize(16);
+      
+      if (state.otherExitsActivated[i])
+      {
+        exitNum.setFillColor(sf::Color::Red);  // 敌人激活用红色
+      }
+      else
+      {
+        exitNum.setFillColor(sf::Color(100, 100, 100));
+      }
+      exitNum.setPosition({exitIndicatorX + i * 25.f, opponentExitY});
+      ctx.window.draw(exitNum);
+    }
   }
 
   // 墙壁背包显示
-  float wallsY = state.isEscapeMode ? barY + 110.f : barY + 85.f;
+  float wallsY = state.isEscapeMode ? barY + 110.f : barY + 145.f;  // Battle模式需要更多空间显示出口状态
   sf::Text wallsText(ctx.font);
   wallsText.setString("Walls: " + std::to_string(ctx.player ? ctx.player->getWallsInBag() : 0));
   wallsText.setCharacterSize(20);

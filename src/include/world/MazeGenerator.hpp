@@ -27,15 +27,22 @@ public:
   // 设置 Escape 模式（只生成蓝色和棕色墙）
   void setEscapeMode(bool escape) { m_escapeMode = escape; }
 
+  // 设置 Battle 模式（生成3个标号终点）
+  void setBattleMode(bool battle) { m_battleMode = battle; }
+
   // 获取两个出生点（用于多人模式）
   std::pair<int, int> getSpawn1() const { return {m_spawn1X, m_spawn1Y}; }
   std::pair<int, int> getSpawn2() const { return {m_spawn2X, m_spawn2Y}; }
+
+  // 获取 Battle 模式的3个终点位置
+  std::vector<std::pair<int, int>> getBattleExits() const { return m_battleExits; }
 
 private:
   void carvePassage(int x, int y);
   void placeEnemies();
   void placeDestructibleWalls();
   void placeStartAndEnd();                                     // 随机放置起点和终点
+  void placeBattleExits();                                     // Battle 模式：放置3个终点
   void placeMultiplayerSpawns();                               // 放置多人模式两个出生点
   void ensurePath(int startX, int startY, int endX, int endY); // 确保起点到终点有路径
   std::vector<std::pair<int, int>> getEmptySpaces();           // 获取所有空地
@@ -51,6 +58,7 @@ private:
   float m_destructibleRatio = 0.15f;
   bool m_multiplayerMode = false; // 是否联机模式
   bool m_escapeMode = false;      // 是否 Escape 模式（只生成蓝色和棕色墙）
+  bool m_battleMode = false;      // 是否 Battle 模式（生成3个终点）
 
   // 起点和终点坐标
   int m_startX = 1, m_startY = 1;
@@ -59,4 +67,7 @@ private:
   // 多人模式两个出生点
   int m_spawn1X = 1, m_spawn1Y = 1;
   int m_spawn2X = 1, m_spawn2Y = 1;
+
+  // Battle 模式的3个终点
+  std::vector<std::pair<int, int>> m_battleExits;
 };

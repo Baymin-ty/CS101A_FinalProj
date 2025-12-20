@@ -25,6 +25,7 @@ void Maze::loadFromString(const std::vector<std::string> &map)
   m_walls.clear();
   m_walls.resize(m_rows, std::vector<Wall>(m_cols));
   m_enemySpawnPoints.clear();
+  m_battleExitPositions.clear();
   m_spawn1Position = {0.f, 0.f};
   m_spawn2Position = {0.f, 0.f};
 
@@ -107,6 +108,23 @@ void Maze::loadFromString(const std::vector<std::string> &map)
         m_spawn2Position = {x + m_tileSize / 2.f, y + m_tileSize / 2.f};
         break;
 
+      case 'A': // Battle 模式终点1
+      case 'B': // Battle 模式终点2
+      case 'C': // Battle 模式终点3
+        wall.type = WallType::Exit;
+        wall.shape.setFillColor(m_exitColor);
+        {
+          sf::Vector2f exitPos = {x + m_tileSize / 2.f, y + m_tileSize / 2.f};
+          // 确保按 A, B, C 顺序存储
+          int exitIndex = ch - 'A';
+          while (static_cast<int>(m_battleExitPositions.size()) <= exitIndex)
+          {
+            m_battleExitPositions.push_back({0.f, 0.f});
+          }
+          m_battleExitPositions[exitIndex] = exitPos;
+        }
+        break;
+
       default: // 空地
         wall.type = WallType::None;
         break;
@@ -131,6 +149,8 @@ void Maze::generateRandomMaze(int width, int height, unsigned int seed, int enem
   generator.setMultiplayerMode(multiplayerMode);
   // 设置 Escape 模式（只生成蓝色和棕色墙）
   generator.setEscapeMode(escapeMode);
+  // 设置 Battle 模式（多人模式且非 Escape 模式时，生成3个终点）
+  generator.setBattleMode(multiplayerMode && !escapeMode);
   std::vector<std::string> mazeData = generator.generate();
   loadFromString(mazeData);
 }
@@ -419,6 +439,22 @@ bool Maze::isAtExit(sf::Vector2f position, float radius) const
   float dy = position.y - m_exitPosition.y;
   float dist = std::sqrt(dx * dx + dy * dy);
   return dist < radius + m_tileSize / 2.f;
+}
+
+int Maze::isAtBattleExit(sf::Vector2f position, float radius) const
+{
+  for (size_t i = 0; i < m_battleExitPositions.size(); ++i)
+  {
+    const auto& exitPos = m_battleExitPositions[i];
+    float dx = position.x - exitPos.x;
+    float dy = position.y - exitPos.y;
+    float dist = std::sqrt(dx * dx + dy * dy);
+    if (dist < radius + m_tileSize / 2.f)
+    {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;  // 不在任何终点
 }
 
 bool Maze::isWalkable(int row, int col) const

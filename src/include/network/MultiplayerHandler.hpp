@@ -42,6 +42,12 @@ struct MultiplayerState
   bool isHoldingExit = false;   // 是否正在按住E键
   float exitHoldProgress = 0.f; // 按住E键的进度 (0-3s)
   bool eKeyHeld = false;        // E键是否按下
+  int currentExitIndex = -1;    // 当前正在激活的终点索引（Battle模式）
+
+  // Battle 模式多终点相关（3个终点）
+  static constexpr int BATTLE_EXIT_COUNT = 3;
+  bool localExitsActivated[BATTLE_EXIT_COUNT] = {false, false, false};   // 本地玩家激活的终点
+  bool otherExitsActivated[BATTLE_EXIT_COUNT] = {false, false, false};   // 对方玩家激活的终点
 
   // 房间大厅相关
   bool localPlayerReady = false;  // 本地玩家是否准备就绪

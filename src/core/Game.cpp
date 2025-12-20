@@ -216,6 +216,13 @@ void Game::resetGame()
   m_mpState.isHoldingExit = false;
   m_mpState.exitHoldProgress = 0.f;
   m_mpState.eKeyHeld = false;
+  
+  // 重置 Battle 模式出口激活状态
+  m_mpState.currentExitIndex = -1;
+  for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i) {
+    m_mpState.localExitsActivated[i] = false;
+    m_mpState.otherExitsActivated[i] = false;
+  }
 
   // 重置终点交互状态（单人模式）
   m_isAtExitZone = false;
@@ -269,6 +276,12 @@ void Game::restartMultiplayer()
   m_mpState.isHoldingExit = false;
   m_mpState.exitHoldProgress = 0.f;
   m_mpState.eKeyHeld = false;
+  // 重置 Battle 模式出口激活状态
+  m_mpState.currentExitIndex = -1;
+  for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i) {
+    m_mpState.localExitsActivated[i] = false;
+    m_mpState.otherExitsActivated[i] = false;
+  }
   m_gameOver = false;
   m_gameWon = false;
   m_exitVisible = false; // 重置终点可见状态
@@ -2439,6 +2452,30 @@ void Game::setupNetworkCallbacks()
     }
     m_mpState.isDarkMode = isDarkMode;
     std::cout << "[DEBUG] Room info: host=" << hostIP << ", guest=" << guestIP << ", guestReady=" << guestReady << ", darkMode=" << isDarkMode << std::endl; });
+
+  net.setOnExitActivated([this](int exitIndex)
+                         {
+    // 收到对方激活终点的消息
+    if (exitIndex >= 0 && exitIndex < MultiplayerState::BATTLE_EXIT_COUNT) {
+      m_mpState.otherExitsActivated[exitIndex] = true;
+      std::cout << "[DEBUG] Other player activated exit " << (exitIndex + 1) << std::endl;
+      
+      // 检查对方是否激活了所有终点（对方获胜）
+      bool allActivated = true;
+      for (int i = 0; i < MultiplayerState::BATTLE_EXIT_COUNT; ++i) {
+        if (!m_mpState.otherExitsActivated[i]) {
+          allActivated = false;
+          break;
+        }
+      }
+      
+      if (allActivated) {
+        // 对方先激活了所有终点，我们输了
+        m_mpState.multiplayerWin = false;
+        std::cout << "[DEBUG] Other player activated all exits, we lose!" << std::endl;
+        // 等待 GameResult 消息来触发 onDefeat
+      }
+    } });
 
   net.setOnError([this](const std::string &error)
                  { m_mpState.connectionStatus = "Error: " + error; });

@@ -62,6 +62,9 @@ enum class NetMessageType : uint8_t
 
   // 墙壁伤害同步
   WallDamage, // 墙壁受到伤害
+
+  // Battle 模式终点激活
+  ExitActivated, // 玩家激活了一个终点
 };
 
 // 玩家状态数据
@@ -115,6 +118,7 @@ using OnGameModeReceivedCallback = std::function<void(bool isEscapeMode)>;
 using OnPlayerReadyCallback = std::function<void(bool isReady)>;
 using OnRoomInfoCallback = std::function<void(const std::string &hostIP, const std::string &guestIP, bool guestReady, bool isDarkMode)>;
 using OnWallDamageCallback = std::function<void(int row, int col, float damage, bool destroyed, int attribute, int destroyerId)>;
+using OnExitActivatedCallback = std::function<void(int exitIndex)>;
 
 class NetworkManager
 {
@@ -165,6 +169,9 @@ public:
   void sendPlayerReady(bool isReady); // 发送准备状态
   void sendHostStartGame();           // 房主发起开始游戏
 
+  // Battle 模式终点激活
+  void sendExitActivated(int exitIndex); // 发送终点激活消息
+
   // 处理网络消息（在主线程调用）
   void update();
 
@@ -196,6 +203,7 @@ public:
   void setOnGameModeReceived(OnGameModeReceivedCallback cb) { m_onGameModeReceived = cb; }
   void setOnPlayerReady(OnPlayerReadyCallback cb) { m_onPlayerReady = cb; }
   void setOnRoomInfo(OnRoomInfoCallback cb) { m_onRoomInfo = cb; }
+  void setOnExitActivated(OnExitActivatedCallback cb) { m_onExitActivated = cb; }
 
   std::string getRoomCode() const { return m_roomCode; }
 
@@ -242,4 +250,5 @@ private:
   OnGameModeReceivedCallback m_onGameModeReceived;
   OnPlayerReadyCallback m_onPlayerReady;
   OnRoomInfoCallback m_onRoomInfo;
+  OnExitActivatedCallback m_onExitActivated;
 };

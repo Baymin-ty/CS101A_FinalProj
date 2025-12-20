@@ -313,6 +313,17 @@ void NetworkManager::sendHostStartGame()
   sendPacket(data);
 }
 
+void NetworkManager::sendExitActivated(int exitIndex)
+{
+  if (!m_connected)
+    return;
+
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(NetMessageType::ExitActivated));
+  data.push_back(static_cast<uint8_t>(exitIndex));
+  sendPacket(data);
+}
+
 void NetworkManager::sendNpcActivate(int npcId, int team, int activatorId)
 {
   if (!m_connected)
@@ -845,6 +856,15 @@ void NetworkManager::processMessage(const std::vector<uint8_t> &data)
       bool guestReady = (data.size() > offset) ? (data[offset++] != 0) : false;
       bool isDarkMode = (data.size() > offset) ? (data[offset] != 0) : false;
       m_onRoomInfo(hostIP, guestIP, guestReady, isDarkMode);
+    }
+    break;
+  }
+  case NetMessageType::ExitActivated:
+  {
+    if (data.size() >= 2 && m_onExitActivated)
+    {
+      int exitIndex = static_cast<int>(data[1]);
+      m_onExitActivated(exitIndex);
     }
     break;
   }

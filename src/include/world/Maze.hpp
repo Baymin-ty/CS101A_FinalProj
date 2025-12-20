@@ -109,8 +109,17 @@ public:
   // 获取出口位置
   sf::Vector2f getExitPosition() const { return m_exitPosition; }
 
+  // 获取 Battle 模式的多个终点位置
+  const std::vector<sf::Vector2f>& getBattleExitPositions() const { return m_battleExitPositions; }
+  
+  // 检查是否是 Battle 模式（有多个终点）
+  bool isBattleMode() const { return !m_battleExitPositions.empty(); }
+
   // 检查是否到达出口
   bool isAtExit(sf::Vector2f position, float radius) const;
+  
+  // 检查是否到达指定的 Battle 终点（返回终点索引，-1表示不在任何终点）
+  int isAtBattleExit(sf::Vector2f position, float radius) const;
 
   // 获取敌人生成点
   const std::vector<sf::Vector2f> &getEnemySpawnPoints() const { return m_enemySpawnPoints; }
@@ -183,6 +192,7 @@ private:
   std::vector<std::string> m_mazeData; // 保存原始迷宫数据用于网络传输
   sf::Vector2f m_startPosition;
   sf::Vector2f m_exitPosition;
+  std::vector<sf::Vector2f> m_battleExitPositions;  // Battle 模式的3个终点位置
   std::vector<sf::Vector2f> m_enemySpawnPoints;
   sf::Vector2f m_spawn1Position; // 多人模式出生点1
   sf::Vector2f m_spawn2Position; // 多人模式出生点2

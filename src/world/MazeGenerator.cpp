@@ -34,16 +34,36 @@ std::vector<std::string> MazeGenerator::generate()
   // 初始化网格，全部填充墙
   m_grid.clear();
   m_grid.resize(m_height, std::vector<char>(m_width, '#'));
+  m_battleExits.clear();
 
   // 使用递归回溯法生成迷宫
   // 从 (1,1) 开始挖通道
   carvePassage(1, 1);
 
   // 随机放置起点和终点
-  placeStartAndEnd();
+  if (m_battleMode)
+  {
+    // Battle 模式：放置3个标号终点
+    placeBattleExits();
+  }
+  else
+  {
+    placeStartAndEnd();
+  }
 
   // 确保有路径
-  ensurePath(m_startX, m_startY, m_endX, m_endY);
+  if (m_battleMode)
+  {
+    // Battle 模式：确保起点到所有3个终点都有路径
+    for (const auto &exit : m_battleExits)
+    {
+      ensurePath(m_startX, m_startY, exit.first, exit.second);
+    }
+  }
+  else
+  {
+    ensurePath(m_startX, m_startY, m_endX, m_endY);
+  }
 
   // 放置敌人
   placeEnemies();
@@ -157,6 +177,132 @@ void MazeGenerator::placeStartAndEnd()
 
   m_grid[m_startY][m_startX] = 'S';
   m_grid[m_endY][m_endX] = 'E';
+}
+
+void MazeGenerator::placeBattleExits()
+{
+  // Battle 模式：放置起点和3个标号终点
+  auto emptySpaces = getEmptySpaces();
+  if (emptySpaces.size() < 4)
+  {
+    // 回退到默认位置
+    m_startX = 1;
+    m_startY = 1;
+    m_grid[m_startY][m_startX] = 'S';
+    
+    // 默认3个终点位置
+    m_battleExits.clear();
+    m_battleExits.push_back({m_width - 2, 1});
+    m_battleExits.push_back({1, m_height - 2});
+    m_battleExits.push_back({m_width - 2, m_height - 2});
+    
+    m_grid[1][m_width - 2] = 'A';
+    m_grid[m_height - 2][1] = 'B';
+    m_grid[m_height - 2][m_width - 2] = 'C';
+    return;
+  }
+
+  std::shuffle(emptySpaces.begin(), emptySpaces.end(), m_rng);
+
+  // 随机选一个起点（靠近中心）
+  int centerX = m_width / 2;
+  int centerY = m_height / 2;
+  
+  // 从空地中找一个靠近中心的位置作为起点区域的参考
+  std::vector<std::pair<int, std::pair<int, int>>> centerDistPoints;
+  for (const auto& [x, y] : emptySpaces)
+  {
+    int dist = std::abs(x - centerX) + std::abs(y - centerY);
+    centerDistPoints.push_back({dist, {x, y}});
+  }
+  std::sort(centerDistPoints.begin(), centerDistPoints.end());
+  
+  // 从距离中心最近的前30%中随机选一个作为起点
+  int centerCount = std::max(1, static_cast<int>(centerDistPoints.size() * 0.3));
+  int startIdx = m_rng() % centerCount;
+  m_startX = centerDistPoints[startIdx].second.first;
+  m_startY = centerDistPoints[startIdx].second.second;
+
+  // 计算所有点与起点的距离
+  std::vector<std::pair<int, std::pair<int, int>>> distancePoints;
+  for (const auto& [x, y] : emptySpaces)
+  {
+    if (x == m_startX && y == m_startY) continue;
+    int dist = std::abs(x - m_startX) + std::abs(y - m_startY);
+    distancePoints.push_back({dist, {x, y}});
+  }
+
+  // 按距离排序（从远到近）
+  std::sort(distancePoints.begin(), distancePoints.end(),
+            [](const auto &a, const auto &b)
+            { return a.first > b.first; });
+
+  // 从距离最远的前50%中选择3个终点，确保它们之间有一定距离
+  m_battleExits.clear();
+  std::set<std::pair<int, int>> usedPositions;
+  usedPositions.insert({m_startX, m_startY});
+  
+  int topCount = std::max(3, static_cast<int>(distancePoints.size() * 0.5));
+  const int MIN_EXIT_DISTANCE = std::max(5, (m_width + m_height) / 8);  // 终点之间的最小距离
+  
+  for (int i = 0; i < topCount && m_battleExits.size() < 3; ++i)
+  {
+    auto [dist, pos] = distancePoints[i];
+    auto [ex, ey] = pos;
+    
+    // 检查是否与已选终点距离足够远
+    bool tooClose = false;
+    for (const auto& [usedX, usedY] : m_battleExits)
+    {
+      int d = std::abs(ex - usedX) + std::abs(ey - usedY);
+      if (d < MIN_EXIT_DISTANCE)
+      {
+        tooClose = true;
+        break;
+      }
+    }
+    
+    if (!tooClose)
+    {
+      m_battleExits.push_back({ex, ey});
+    }
+  }
+  
+  // 如果没有找到足够的终点，降低距离要求重新选
+  if (m_battleExits.size() < 3)
+  {
+    for (int i = 0; i < topCount && m_battleExits.size() < 3; ++i)
+    {
+      auto [dist, pos] = distancePoints[i];
+      auto [ex, ey] = pos;
+      
+      // 检查是否已经被使用
+      bool alreadyUsed = false;
+      for (const auto& [usedX, usedY] : m_battleExits)
+      {
+        if (ex == usedX && ey == usedY)
+        {
+          alreadyUsed = true;
+          break;
+        }
+      }
+      
+      if (!alreadyUsed)
+      {
+        m_battleExits.push_back({ex, ey});
+      }
+    }
+  }
+
+  // 设置网格
+  m_grid[m_startY][m_startX] = 'S';
+  
+  // 用 'A', 'B', 'C' 标记3个终点（区别于出生点的 '1', '2'）
+  for (size_t i = 0; i < m_battleExits.size() && i < 3; ++i)
+  {
+    auto [ex, ey] = m_battleExits[i];
+    m_grid[ey][ex] = static_cast<char>('A' + i);
+  }
 }
 
 void MazeGenerator::ensurePath(int startX, int startY, int endX, int endY)
