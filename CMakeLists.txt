@@ -109,7 +109,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   SFML::Network
   SFML::Audio
 )
- 
+
 
 
 # macOS: 链接 CoreFoundation 框架（用于获取 bundle 路径）
@@ -138,7 +138,7 @@ if(APPLE)
   # macOS: 将 PNG 转换为 ICNS 格式
   set(APP_ICON_ICNS "${CMAKE_BINARY_DIR}/icon.icns")
   set(ICONSET_DIR "${CMAKE_BINARY_DIR}/icon.iconset")
-  
+
   # 创建 iconset 并生成 icns 文件
   add_custom_command(
     OUTPUT ${APP_ICON_ICNS}
@@ -157,15 +157,15 @@ if(APPLE)
     DEPENDS ${APP_ICON_PNG}
     COMMENT "Generating macOS icon from PNG..."
   )
-  
+
   # 添加图标为自定义 target
   add_custom_target(GenerateAppIcon DEPENDS ${APP_ICON_ICNS})
-  
+
   # 设置图标文件属性
   set_source_files_properties(${APP_ICON_ICNS} PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources"
   )
-  
+
 elseif(WIN32)
   # Windows: 需要 .ico 文件和资源文件
   set(APP_ICON_ICO "${CMAKE_SOURCE_DIR}/resources/windows/icon.ico")
@@ -201,7 +201,7 @@ if(APPLE)
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
     MACOSX_BUNDLE_ICON_FILE "icon.icns"
   )
-  
+
   # 添加图标依赖
   add_dependencies(${PROJECT_NAME} GenerateAppIcon)
 
@@ -223,7 +223,7 @@ elseif(WIN32)
   if(EXISTS ${APP_RC_FILE})
     target_sources(${PROJECT_NAME} PRIVATE ${APP_RC_FILE})
   endif()
-  
+
   # Windows: 复制资源文件
   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -251,19 +251,19 @@ if(APPLE)
   # macOS: 生成 DMG 安装包
   set(CPACK_GENERATOR "DragNDrop")
   set(CPACK_DMG_VOLUME_NAME "Tank Maze Game")
-  set(CPACK_DMG_FORMAT "UDBZ")  # 压缩格式
+  set(CPACK_DMG_FORMAT "UDBZ") # 压缩格式
   set(CPACK_PACKAGE_ICON "${CMAKE_BINARY_DIR}/icon.icns")
-  
+
   # 安装 .app bundle
   install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     COMPONENT Runtime
   )
-  
+
 elseif(WIN32)
   # Windows: 生成 ZIP 或 NSIS 安装包
   set(CPACK_GENERATOR "ZIP")
-  
+
   install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION .
     COMPONENT Runtime
