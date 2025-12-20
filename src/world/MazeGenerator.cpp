@@ -353,15 +353,15 @@ void MazeGenerator::placeDestructibleWalls()
   }
   else
   {
-    // Battle 模式：40%金色，20%治疗，40%普通
+    // Battle 模式：15%金色，10%治疗，75%普通
     for (const auto &[x, y] : destructibleCandidates)
     {
       float roll = static_cast<float>(m_rng() % 1000) / 1000.f;
-      if (roll < 0.40f)
+      if (roll < 0.15f)
       {
         m_grid[y][x] = 'G'; // Gold
       }
-      else if (roll < 0.60f)
+      else if (roll < 0.25f)
       {
         m_grid[y][x] = 'H'; // Heal
       }
