@@ -133,6 +133,4 @@ private:
   const float m_shootCooldown = 1.0f;
   const float m_directionChangeInterval = 2.0f;
   const float m_activationRange = 60.f; // 激活距离（需要接近才能激活）
-
-  // （已移除）网络插值相关字段 - 未在工程中使用
 };
