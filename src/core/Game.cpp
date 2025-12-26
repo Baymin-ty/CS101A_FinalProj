@@ -227,64 +227,6 @@ void Game::resetGame()
   NetworkManager::getInstance().disconnect();
 }
 
-void Game::restartMultiplayer()
-{
-  // 重新开始多人游戏，使用已有的迷宫数据
-  if (!m_mpState.generatedMazeData.empty())
-  {
-    m_maze.loadFromString(m_mpState.generatedMazeData);
-  }
-
-  // 设置玩家位置
-  sf::Vector2f startPos = m_maze.getPlayerStartPosition();
-
-  // 重新创建本地玩家
-  std::string resPath = getResourcePath();
-  m_player = std::make_unique<Tank>();
-  m_player->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_A/Hull_01.png",
-                         resPath + "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
-  m_player->setPosition(startPos);
-  m_player->setScale(m_tankScale);
-
-  // 重新创建其他玩家
-  m_otherPlayer = std::make_unique<Tank>();
-  m_otherPlayer->loadTextures(resPath + "tank_assets/PNG/Hulls_Color_B/Hull_01.png",
-                              resPath + "tank_assets/PNG/Weapon_Color_B/Gun_01.png");
-  m_otherPlayer->setPosition(startPos);
-  m_otherPlayer->setScale(m_tankScale);
-
-  // 重置状态
-  m_mpState.localPlayerReachedExit = false;
-  m_mpState.otherPlayerReachedExit = false;
-  m_mpState.multiplayerWin = false;
-  m_mpState.localPlayerDead = false;
-  m_mpState.otherPlayerDead = false;
-  m_mpState.isRescuing = false;
-  m_mpState.beingRescued = false;
-  m_mpState.rescueProgress = 0.f;
-  m_mpState.fKeyHeld = false;
-  m_mpState.canRescue = false;
-  // 重置终点交互状态
-  m_mpState.isAtExitZone = false;
-  m_mpState.isHoldingExit = false;
-  m_mpState.exitHoldProgress = 0.f;
-  m_mpState.eKeyHeld = false;
-  m_gameOver = false;
-  m_gameWon = false;
-  m_exitVisible = false; // 重置终点可见状态
-  m_bullets.clear();
-
-  // 初始化相机位置和缩放
-  m_gameView.setCenter(startPos);
-  m_gameView.setSize({LOGICAL_WIDTH * VIEW_ZOOM, LOGICAL_HEIGHT * VIEW_ZOOM});
-  m_currentCameraPos = startPos;
-
-  m_gameState = GameState::Multiplayer;
-
-  // 播放游戏开始BGM
-  AudioManager::getInstance().playBGM(BGMType::Start);
-}
-
 void Game::run()
 {
   // 开始播放菜单BGM
@@ -432,19 +374,16 @@ void Game::processMainMenuEvents(const sf::Event &event)
     case sf::Keyboard::Key::Down:
     case sf::Keyboard::Key::S:
     {
-      // 向下移动，跳过无意义的子选项（MapWidth, MapHeight, EnemyCount）
+      int current = static_cast<int>(m_mainMenuOption);
+      for (int i = 0; i < optionCount; ++i)
       {
-        int current = static_cast<int>(m_mainMenuOption);
-        for (int i = 0; i < optionCount; ++i)
-        {
-          current = (current + 1) % optionCount;
-          MainMenuOption cand = static_cast<MainMenuOption>(current);
-          // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
-          m_mainMenuOption = cand;
-          break;
-        }
-        AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
+        current = (current + 1) % optionCount;
+        MainMenuOption cand = static_cast<MainMenuOption>(current);
+        // 允许在任何情况下将光标移到 MapWidth/MapHeight/EnemyCount
+        m_mainMenuOption = cand;
+        break;
       }
+      AudioManager::getInstance().playSFXGlobal(SFXType::MenuSelect);
       break;
     }
     case sf::Keyboard::Key::Enter:
@@ -1776,7 +1715,7 @@ void Game::renderGame()
     }
     else if (m_player->getWallsInBag() > 0)
     {
-      // 提示可以按B进入放置模式
+      // 提示可以按 SPACE 进入放置模式
       sf::Text bagHint(m_font);
       bagHint.setString("Press SPACE to place walls");
       bagHint.setCharacterSize(18);

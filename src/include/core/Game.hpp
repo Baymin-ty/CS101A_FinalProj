@@ -102,7 +102,6 @@ private:
   void spawnEnemies();
   void resetGame();
   void startGame();
-  void restartMultiplayer(); // 重新开始多人游戏
   void updateCamera();
   void generateRandomMaze();
   void handleWindowResize(); // 处理窗口大小变化，保持宽高比
