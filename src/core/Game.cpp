@@ -143,7 +143,13 @@ void Game::startGame()
                          resPath + "tank_assets/PNG/Weapon_Color_A/Gun_01.png");
 
   // 设置玩家到起点
-  m_player->setPosition(m_maze.getStartPosition());
+  sf::Vector2f startPos = m_maze.getStartPosition();
+  m_player->setPosition(startPos);
+
+  // 初始化相机位置和缩放，直接居中到玩家位置（无移动效果）
+  m_currentCameraPos = startPos;
+  m_gameView.setCenter(startPos);
+  m_gameView.setSize({LOGICAL_WIDTH * VIEW_ZOOM, LOGICAL_HEIGHT * VIEW_ZOOM});
 
   // 清空子弹
   m_bullets.clear();
