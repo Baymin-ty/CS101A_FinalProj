@@ -39,20 +39,28 @@ std::vector<std::string> MazeGenerator::generate()
   // 从 (1,1) 开始挖通道
   carvePassage(1, 1);
 
-  // 随机放置起点和终点
-  placeStartAndEnd();
-
-  // 确保有路径
-  ensurePath(m_startX, m_startY, m_endX, m_endY);
+  // 根据模式放置起点/出生点和终点
+  if (m_multiplayerMode)
+  {
+    // 多人模式：放置两个出生点和终点
+    placeMultiplayerSpawns();
+    // 确保两个出生点到终点都有路径
+    ensurePath(m_spawn1X, m_spawn1Y, m_endX, m_endY);
+    ensurePath(m_spawn2X, m_spawn2Y, m_endX, m_endY);
+  }
+  else
+  {
+    // 单人模式：放置起点和终点
+    placeStartAndEnd();
+    // 确保起点到终点有路径
+    ensurePath(m_startX, m_startY, m_endX, m_endY);
+  }
 
   // 放置敌人
   placeEnemies();
 
   // 放置可破坏墙
   placeDestructibleWalls();
-
-  // 放置多人模式出生点（在终点附近对称的两个位置）
-  placeMultiplayerSpawns();
 
   // 转换为字符串向量
   std::vector<std::string> result;
@@ -383,11 +391,16 @@ void MazeGenerator::placeMultiplayerSpawns()
   auto emptySpaces = getEmptySpaces();
   if (emptySpaces.size() < 3)
   {
-    // 回退到起点附近
-    m_spawn1X = m_startX;
-    m_spawn1Y = m_startY;
-    m_spawn2X = m_startX;
-    m_spawn2Y = m_startY + 2;
+    // 回退到默认位置
+    m_spawn1X = m_width / 2 - 2;
+    m_spawn1Y = m_height / 2;
+    m_spawn2X = m_width / 2 + 2;
+    m_spawn2Y = m_height / 2;
+    m_endX = m_width - 2;
+    m_endY = m_height - 2;
+    m_grid[m_spawn1Y][m_spawn1X] = '1';
+    m_grid[m_spawn2Y][m_spawn2X] = '2';
+    m_grid[m_endY][m_endX] = 'E';
     return;
   }
 
@@ -548,27 +561,20 @@ void MazeGenerator::placeMultiplayerSpawns()
             { return std::get<2>(a) > std::get<2>(b); });
 
   // 从距离最远的前 30% 中随机选一个作为终点
-  int bestEndX = m_endX, bestEndY = m_endY;
   if (!endCandidates.empty())
   {
     int topCount = std::max(1, static_cast<int>(endCandidates.size() * 0.3));
     int selectedIdx = m_rng() % topCount;
-    bestEndX = std::get<0>(endCandidates[selectedIdx]);
-    bestEndY = std::get<1>(endCandidates[selectedIdx]);
+    m_endX = std::get<0>(endCandidates[selectedIdx]);
+    m_endY = std::get<1>(endCandidates[selectedIdx]);
   }
-
-  // 更新终点位置
-  if (bestEndX != m_endX || bestEndY != m_endY)
+  else
   {
-    // 清除旧终点
-    if (m_grid[m_endY][m_endX] == 'E')
-    {
-      m_grid[m_endY][m_endX] = '.';
-    }
-    m_endX = bestEndX;
-    m_endY = bestEndY;
-    m_grid[m_endY][m_endX] = 'E';
+    // 回退：使用默认终点位置
+    m_endX = m_width - 2;
+    m_endY = m_height - 2;
   }
+  m_grid[m_endY][m_endX] = 'E';
 
   // 在地图上标记出生点，用 '1' 和 '2' 表示
   // 确保位置是空地才标记
