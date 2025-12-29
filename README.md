@@ -312,6 +312,26 @@ The game supports **seamless online multiplayer** between macOS and Windows play
 - Click on any empty tile to place a wall from your inventory
 - Use walls strategically to block enemies or create defensive positions
 
+
+### 🤖 Intelligent NPC System
+AI tanks feature multiple behavior modes:
+- **Chase** - Pursue detected players using pathfinding
+- **Attack** - Engage targets when in line of sight
+- **Destroy Walls** - Break through destructible obstacles blocking their path
+
+**Recruit Ally NPCs**: Collect **3 gold coins** (from destroying gold walls) to recruit an NPC to fight alongside you! Allies change their appearance and will attack enemies instead of you.
+
+### ⚖️ Fairness Mechanisms
+- **Logical Resolution**: All players see the same game area regardless of screen size
+- **Synchronized Random Mazes**: Multiplayer mazes are identical for all participants
+- **Balanced Spawn Points**: Players and enemies spawn at predetermined fair locations
+
+### 🎵 Dynamic Audio Experience
+- **Adaptive Music**: Background tracks change based on game progress (start → middle → climax when approaching exit)
+- **Spatial Sound Effects**: Combat sounds are positioned in 3D space
+- **Audio Feedback**: Distinct sounds for different wall types, hits, and actions
+
+
 ### 🗺️ Minimap & Dark Mode: Two Ways to Play
 
 The game offers two distinct visual modes that fundamentally change the gameplay experience:
