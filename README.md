@@ -119,7 +119,7 @@ mkdir -p Build && cd Build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release -j
 
-open CS101AFinalProj.app
+open Tank\ Maze\ Game.app
 ```
 
 **Debug build**
